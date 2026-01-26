@@ -1,0 +1,10 @@
+
+# Copilot: Backend-only Python dependencies for the local Flask API.
+#
+# Requirements:
+# - Flask for API server
+# - Werkzeug (comes with Flask) for secure filename handling (if used)
+# - pandas + pyarrow for parquet reading
+#
+# Constraints:
+# - Keep minimal. Do not add processor/watchdog dependencies here.

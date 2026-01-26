@@ -5,7 +5,7 @@ This document describes the design of the Bookshelf Demo ETL pipeline, the role 
 
 ## System Overview
 
-The Bookshelf Demo is a fully local, event-driven ETL pipeline that processes book cover images and extracts metadata into structured Parquet files. The system is designed for simplicity and local execution with no external cloud dependencies.
+The Bookshelf Demo is a fully local, event-driven ETL pipeline that processes book cover images and extracts metadata into structured Parquet files. The system includes both a backend processor and an optional REST API for file upload and data retrieval.
 
 ### High-Level Data Flow
 
@@ -15,9 +15,19 @@ graph LR
     B -->|New Image Files| C["Extractor"]
     C -->|Metadata| D["Parquet Writer"]
     D -->|Timestamped Parquet Files| E["📁 data/processed/"]
+    
+    F["REST API"] -->|Upload Images| A
+    E -->|Read Latest Data| F
+    G["Client App"] -->|HTTP| F
 ```
 
-## Architecture Components
+### Architecture Components
+
+The system consists of two main components: the **Processor** (local ETL pipeline) and the **Backend** (optional REST API interface).
+
+## Processor Components
+
+The processor folder contains the core ETL pipeline modules:
 
 ### 1. Watcher (`processor/watcher.py`)
 
@@ -127,6 +137,98 @@ sequenceDiagram
     PW->>DB: Write timestamped Parquet file
 ```
 
+## Backend Components (Optional REST API)
+
+The backend folder provides a Flask-based REST API for uploading images and retrieving processed data:
+
+### 1. Flask Application (`backend/app.py`)
+
+**Purpose:** Initialize and configure the Flask web server.
+
+**Responsibilities:**
+- Create Flask app instance
+- Load configuration from `settings.py`
+- Register routes and blueprints
+- Provide runnable entrypoint
+
+**Technology:** Flask micro-framework for lightweight HTTP server
+
+**Key Concepts:**
+- Minimal setup focused on app configuration
+- Local-only demo (no authentication, no database, no cloud)
+- Routes delegated to `routes.py`
+
+### 2. REST Routes (`backend/routes.py`)
+
+**Purpose:** Implement HTTP endpoints for file upload and data retrieval.
+
+**Endpoints:**
+
+- **POST /upload**
+  - Accept multipart/form-data with a single file field named "file"
+  - Save the file to `data/raw/` with a safe filename
+  - Validate allowed extensions (jpg, jpeg, png, webp)
+  - Return JSON response with status and saved file path
+  - The processor watcher automatically detects and processes the uploaded image
+
+- **GET /books**
+  - Read the newest Parquet file from `data/processed/` via `parquet_reader.py`
+  - Return JSON array of book records
+  - Return empty array with helpful message if no data yet processed
+
+**Key Concepts:**
+- Thin endpoints focused on I/O only
+- No direct extraction triggering (processor handles it asynchronously)
+- Clear HTTP status codes and JSON error messages
+- Demo-friendly and readable design
+
+### 3. Parquet Reader (`backend/parquet_reader.py`)
+
+**Purpose:** Read and parse Parquet files into JSON-serializable format.
+
+**Responsibilities:**
+- Locate the newest Parquet file in `data/processed/`
+- Read Parquet file using PyArrow/pandas
+- Convert records to JSON-serializable dictionaries
+- Handle missing or corrupted files gracefully
+
+**Technology:** PyArrow and pandas for Parquet file handling
+
+### 4. Settings (`backend/settings.py`)
+
+**Purpose:** Centralized configuration management.
+
+**Responsibilities:**
+- Define paths to data directories
+- Set allowed file extensions
+- Configure Flask server parameters
+- Environment-specific settings
+
+**Key Concepts:**
+- All paths are derived from project structure
+- Settings are imported and used by app.py and routes.py
+
+### 5. Utilities (`backend/utils.py`)
+
+**Purpose:** Helper functions for file operations and validation.
+
+**Responsibilities:**
+- Safe filename generation and validation
+- File extension validation
+- Directory and file existence checks
+- Common utilities used by routes and readers
+
+## Integration Between Processor and Backend
+
+When using the REST API with the processor:
+
+1. **Client** calls `POST /upload` with an image file
+2. **Backend** saves the image to `data/raw/`
+3. **Processor** detects the new file via watcher
+4. **Processor** extracts metadata and writes Parquet output
+5. **Client** calls `GET /books` to retrieve the processed metadata
+6. **Backend** reads the latest Parquet file and returns JSON response
+
 ## Module Dependencies
 
 ```mermaid
@@ -135,34 +237,52 @@ graph TB
     watcher["watcher.py"]
     extractor["extractor.py"]
     parquet["parquet_writer.py"]
-    utils["utils.py"]
+    
+    app["app.py"]
+    routes["routes.py"]
+    reader["parquet_reader.py"]
+    settings["settings.py"]
     
     main --> watcher
     main --> extractor
     main --> parquet
     
-    watcher --> utils
-    extractor --> utils
-    parquet --> utils
+    app --> routes
+    app --> settings
+    routes --> reader
+    routes --> settings
+    reader -.->|read from| parquet
     
     watcher -.->|watchdog| WD["watchdog library"]
     parquet -.->|pandas/pyarrow| PA["pandas + pyarrow"]
+    app -.->|Flask| FK["Flask"]
 ```
 
 ## Directory Structure
 
 ```
-processor/
-├── main.py              # Entry point & orchestration
-├── watcher.py           # Filesystem monitoring
-├── extractor.py         # Metadata extraction
-├── parquet_writer.py    # Parquet output generation
-├── utils.py             # Shared utilities
-└── requirements.txt     # Python dependencies
-
-data/
-├── raw/                 # Input images (monitored)
-└── processed/           # Output Parquet files (generated)
+sudoblark.ai.bookshelf-demo/
+├── processor/              # Core ETL pipeline
+│   ├── main.py            # Entry point & orchestration
+│   ├── watcher.py         # Filesystem monitoring
+│   ├── extractor.py       # Metadata extraction
+│   ├── parquet_writer.py  # Parquet output generation
+│   ├── logger.py          # Centralized logging
+│   ├── utils.py           # Shared utilities (future)
+│   └── requirements.txt    # Python dependencies
+├── backend/               # Optional REST API
+│   ├── app.py            # Flask app initialization
+│   ├── routes.py         # HTTP endpoints
+│   ├── parquet_reader.py # Parquet file reading
+│   ├── settings.py       # Configuration
+│   ├── utils.py          # Helper functions
+│   └── requirements.txt   # Flask dependencies
+├── data/
+│   ├── raw/              # Input directory for book cover images
+│   └── processed/        # Output directory for Parquet files
+├── docs/                 # Documentation
+│   └── architecture.md   # This file
+└── README.md             # Project overview
 ```
 
 ## Design Principles
@@ -212,14 +332,50 @@ Each module has a clear, focused purpose:
 
 ## Running the System
 
+### Processor Only
+
 ```bash
 cd processor
+python3 -m venv venv
+source venv/bin/activate
 pip install -r requirements.txt
 python main.py
 ```
 
+The processor will monitor `data/raw/` and generate Parquet files in `data/processed/`.
+
+### With REST API
+
+In one terminal, start the processor:
+
+```bash
+cd processor
+source venv/bin/activate
+python main.py
+```
+
+In another terminal, start the backend:
+
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+python app.py
+```
+
+Then use the API:
+
+```bash
+# Upload an image
+curl -X POST -F "file=@/path/to/cover.jpg" http://localhost:5000/upload
+
+# Get processed books
+curl http://localhost:5000/books
+```
+
 The system will:
-1. Start monitoring `data/raw/` for new image files
-2. Automatically process files as they arrive
-3. Generate Parquet files in `data/processed/`
+1. Accept image uploads via REST API
+2. Automatically process files via the processor
+3. Return processed metadata via REST API
 4. Continue running until manually stopped (Ctrl+C)
