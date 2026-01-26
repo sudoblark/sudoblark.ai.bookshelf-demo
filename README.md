@@ -68,16 +68,12 @@ This project is built with simplicity and local execution in mind—no cloud dep
 
 ## Getting Started
 
-### Option 1: Processor Only
-
-Follow these steps to set up and run the image processor locally.
-
-#### Prerequisites
+### Prerequisites
 
 - Python 3.8 or higher
-- pip (Python package manager)
+- git
 
-#### Installation
+### Quick Start
 
 1. Clone the repository:
    ```bash
@@ -85,164 +81,69 @@ Follow these steps to set up and run the image processor locally.
    cd sudoblark.ai.bookshelf-demo
    ```
 
-2. Navigate to the processor directory:
+2. Install dependencies with Make:
    ```bash
-   cd processor
+   make install-all
    ```
 
-3. Create a Python virtual environment:
+3. Run everything:
    ```bash
-   python3 -m venv venv
+   make run-all
    ```
 
-4. Activate the virtual environment:
-   ```bash
-   # On macOS and Linux:
-   source venv/bin/activate
-   
-   # On Windows:
-   venv\Scripts\activate
-   ```
+That's it! The processor will monitor `data/raw/` and the backend API will be available at `http://localhost:5000`.
 
-5. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Alternative: Processor Only
 
-### Option 2: Processor + REST API Backend
+```bash
+make install-processor
+make run-processor
+```
 
-To set up both the processor and the optional REST API backend with separate virtual environments:
+### See All Options
 
-1. Clone the repository and set up the processor (steps 1-5 above)
-
-2. In a separate terminal, set up the backend. From the project root:
-   ```bash
-   cd backend
-   ```
-
-3. Create a Python virtual environment for the backend:
-   ```bash
-   python3 -m venv venv
-   ```
-
-4. Activate the backend virtual environment:
-   ```bash
-   # On macOS and Linux:
-   source venv/bin/activate
-   
-   # On Windows:
-   venv\Scripts\activate
-   ```
-
-5. Install backend dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+```bash
+make help
+```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Usage
 
-### Running the Processor Only
+The processor automatically monitors `data/raw/` for new images, extracts metadata, and writes results to `data/processed/` as Parquet files.
 
-From the processor directory with the virtual environment activated:
+**Processor:** `make run-processor`
 
-```bash
-python main.py
-```
+**Backend API:** `make run-backend` (starts Flask on `http://localhost:5000`)
 
-The processor will:
-1. Watch the `data/raw/` directory for new image files
-2. Extract metadata from each image as it arrives
-3. Write the structured metadata to Parquet files in `data/processed/`
+**Both together:** `make run-all`
 
-### Running the REST API Backend
+### REST API Endpoints (Backend)
 
-From the backend directory with the virtual environment activated:
+For detailed endpoint documentation and architecture overview, see [docs/architecture.md](docs/architecture.md).
 
-```bash
-python app.py
-```
-
-The backend will start a local Flask server on `http://localhost:5000` with the following endpoints:
-
-**POST /upload**
-- Upload a book cover image
-- Request: multipart/form-data with file field
-- Response: JSON with status, filename, and path
-- Example:
-  ```bash
-  curl -X POST -F "file=@cover.jpg" http://localhost:5000/upload
-  ```
-
-**GET /books**
-- Retrieve processed book metadata
-- Response: JSON array of book records
-- Example:
-  ```bash
-  curl http://localhost:5000/books
-  ```
-
-### Running Both Processor and Backend Together
-
-For the complete workflow with image upload and data retrieval:
-
-**Terminal 1 - Processor:**
-```bash
-cd processor
-source venv/bin/activate
-python main.py
-```
-
-**Terminal 2 - Backend:**
-```bash
-cd backend
-source venv/bin/activate
-python app.py
-```
-
-Then use the REST API to upload images and retrieve results:
-```bash
-# Upload an image
-curl -X POST -F "file=@/path/to/cover.jpg" http://localhost:5000/upload
-
-# Retrieve processed books
-curl http://localhost:5000/books
-```
+Quick reference:
+- `POST /upload` - Upload image files
+- `GET /books` - Retrieve processed metadata
+- `GET /status` - System status
+- `GET /health` - Health check
 
 ### Adding Images
 
-**Via Processor (Direct):**
-Simply place book cover images into the `data/raw/` directory:
+**Direct:** Drop images into `data/raw/`
 
+**Via API:**
 ```bash
-cp /path/to/book-cover.jpg data/raw/
+curl -X POST -F "file=@cover.jpg" http://localhost:5000/upload
 ```
 
-**Via REST API:**
-Use the `/upload` endpoint (see Running the REST API Backend section above)
-
 Supported formats: PNG, JPG, JPEG, WEBP
-
-### Output
-
-Processed data is written to `data/processed/` as timestamped Parquet files containing:
-- Book metadata extracted from cover images
-- Structured fields optimized for querying and analysis
-- Processing timestamps for tracking and auditing
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Documentation
 
-For a detailed understanding of how the system is designed and how each component works, see the [Architecture Guide](docs/architecture.md).
-
-The architecture document includes:
-- System overview and data flow diagrams
-- Component responsibilities and design patterns
-- Module dependencies and interactions
-- Future enhancement roadmap
-- Error handling strategies
+For system architecture, design principles, and detailed data flow, see the [Architecture Guide](docs/architecture.md).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -252,27 +153,27 @@ The architecture document includes:
 ```
 sudoblark.ai.bookshelf-demo/
 ├── processor/              # Core ETL pipeline
-│   ├── main.py            # Entry point and orchestration
-│   ├── watcher.py         # Filesystem event monitoring
-│   ├── extractor.py       # Metadata extraction logic
-│   ├── parquet_writer.py  # Parquet file generation
-│   ├── logger.py          # Centralized logging
-│   ├── utils.py           # Utility functions (future)
-│   ├── requirements.txt    # Python dependencies
-│   └── venv/              # Virtual environment (local, not versioned)
+│   ├── main.py            # Entry point
+│   ├── watcher.py         # Filesystem monitoring
+│   ├── extractor.py       # Metadata extraction
+│   ├── parquet_writer.py  # Parquet generation
+│   ├── logger.py          # Logging
+│   ├── requirements.txt    # Dependencies
+│   └── venv/              # Virtual environment (local)
 ├── backend/               # Optional REST API
-│   ├── app.py            # Flask app initialization
-│   ├── routes.py         # HTTP endpoints
-│   ├── parquet_reader.py # Parquet file reading
+│   ├── app.py            # Flask server
+│   ├── routes.py         # API endpoints
+│   ├── parquet_reader.py # Parquet reading
 │   ├── settings.py       # Configuration
-│   ├── utils.py          # Helper functions
-│   ├── requirements.txt   # Flask dependencies
-│   └── venv/             # Virtual environment (local, not versioned)
+│   ├── utils.py          # Utilities
+│   ├── requirements.txt   # Dependencies
+│   └── venv/             # Virtual environment (local)
 ├── data/
-│   ├── raw/              # Input directory for book cover images
-│   └── processed/        # Output directory for Parquet files
-├── docs/                 # Documentation
-│   └── architecture.md   # System architecture guide
+│   ├── raw/              # Input images
+│   └── processed/        # Output Parquet files
+├── docs/
+│   └── architecture.md   # Architecture guide
+├── Makefile              # Build automation
 └── README.md             # This file
 ```
 
