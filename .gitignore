@@ -244,3 +244,36 @@ processor/*.log
 
 # Virtual environment for processor
 processor/venv/
+
+# Backend virtual environment
+backend/venv/
+
+# Backend log files
+backend/backend.log
+backend/*.log
+
+# Flutter / Dart
+# Flutter
+user_interface/build/
+user_interface/.dart_tool/
+user_interface/.flutter-plugins
+user_interface/.flutter-plugins-dependencies
+user_interface/.packages
+user_interface/pubspec.lock
+user_interface/coverage/
+user_interface/.fvm/
+
+# Android
+user_interface/android/.gradle/
+user_interface/android/key.properties
+user_interface/android/local.properties
+
+# iOS
+user_interface/ios/Pods/
+user_interface/ios/Podfile.lock
+user_interface/ios/.symlinks/
+user_interface/ios/Flutter/Flutter.framework
+user_interface/ios/Flutter/Flutter.podspec
+
+# Web
+user_interface/web/
