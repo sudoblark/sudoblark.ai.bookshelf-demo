@@ -1,10 +1,13 @@
 
-# Copilot: Backend-only Python dependencies for the local Flask API.
+# Python dependencies for the Bookshelf Demo backend API.
 #
-# Requirements:
-# - Flask for API server
-# - Werkzeug (comes with Flask) for secure filename handling (if used)
-# - pandas + pyarrow for parquet reading
-#
-# Constraints:
-# - Keep minimal. Do not add processor/watchdog dependencies here.
+# This backend is independent from the processor and requires only
+# Flask for the REST API and pandas/pyarrow for reading Parquet files.
+# All other imports (logging, pathlib, etc.) are from Python stdlib.
+
+# Web framework for REST API
+Flask>=2.0.0
+
+# Data manipulation and Parquet file reading
+pandas>=1.3.0
+pyarrow>=10.0.0
