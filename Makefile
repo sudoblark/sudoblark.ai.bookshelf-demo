@@ -1,4 +1,4 @@
-.PHONY: help install-processor install-backend install-all run-processor run-backend run-all clean
+.PHONY: help install-processor install-backend install-all run-processor run-backend clean
 
 help:
 	@echo "Sudoblark AI Bookshelf Demo - Make Targets"
@@ -12,15 +12,15 @@ help:
 	@echo "Run Targets:"
 	@echo "  make run-processor        Run processor (filesystem monitoring)"
 	@echo "  make run-backend          Run backend REST API on http://localhost:5000"
-	@echo "  make run-all              Run processor and backend in parallel"
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make clean                Remove venvs and logs"
 	@echo "  make help                 Show this help message"
 	@echo ""
 	@echo "Examples:"
-	@echo "  make install-all && make run-all"
-	@echo "  make install-processor && make run-processor"
+	@echo "  make install-all"
+	@echo "  make run-processor        # in terminal 1"
+	@echo "  make run-backend          # in terminal 2"
 
 # Install processor in isolated virtual environment
 install-processor:
@@ -67,19 +67,6 @@ run-backend:
 	@cd backend && \
 	  . venv/bin/activate && \
 	  python app.py
-
-# Run processor and backend in parallel (requires tmux or similar)
-run-all:
-	@echo "Starting processor and backend..."
-	@echo ""
-	@echo "Processor: Monitoring data/raw/ for new images"
-	@echo "Backend:   REST API on http://localhost:5000"
-	@echo ""
-	@echo "To stop, press Ctrl+C in this terminal"
-	@echo ""
-	@(cd processor && . venv/bin/activate && python main.py) & \
-	(cd backend && . venv/bin/activate && python app.py) & \
-	wait
 
 # Clean up virtual environments and logs
 clean:

@@ -86,12 +86,19 @@ This project is built with simplicity and local execution in mind—no cloud dep
    make install-all
    ```
 
-3. Run everything:
+3. Run processor and backend in separate terminals:
+   
+   **Terminal 1 (Processor):**
    ```bash
-   make run-all
+   make run-processor
+   ```
+   
+   **Terminal 2 (Backend):**
+   ```bash
+   make run-backend
    ```
 
-That's it! The processor will monitor `data/raw/` and the backend API will be available at `http://localhost:5000`.
+Both processes will log output to their respective terminals so you can monitor them side-by-side.
 
 ### Alternative: Processor Only
 

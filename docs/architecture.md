@@ -166,27 +166,21 @@ Each module has a clear, focused purpose:
 
 ### Using the Makefile (Recommended)
 
-The Makefile automates setup and running:
+The Makefile automates setup and running. Open two terminal windows:
 
+**Terminal 1 - Processor:**
 ```bash
-# Install processor dependencies
 make install-processor
-
-# Install backend dependencies  
-make install-backend
-
-# Run processor only
 make run-processor
-
-# Run backend only
-make run-backend
-
-# Run both processor and backend simultaneously
-make run-all
-
-# View all available targets
-make help
 ```
+
+**Terminal 2 - Backend:**
+```bash
+make install-backend
+make run-backend
+```
+
+Arrange terminals side-by-side to monitor both processes simultaneously.
 
 ### Manual Setup
 
