@@ -232,3 +232,15 @@ terraform.rc
 
 # Temp dev files
 dev_scratchpad/*
+
+# Bookshelf Demo specific
+# Data directories - never commit raw images or processed parquet files
+data/raw/*
+data/processed/*
+
+# Processor log files
+processor/processor.log
+processor/*.log
+
+# Virtual environment for processor
+processor/venv/

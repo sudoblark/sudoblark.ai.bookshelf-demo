@@ -1,3 +1,12 @@
 
-# Copilot: List Python dependencies required by the processor service.
-# Keep this file minimal and lightweight; this project is intended to run locally.
+# Python dependencies for the Bookshelf Demo processor.
+#
+# This project is designed to run locally with minimal external dependencies.
+# All packages listed below are open-source and can be installed via pip.
+
+# Filesystem monitoring for event-driven image processing
+watchdog>=3.0.0
+
+# Data manipulation and Parquet file generation
+pandas>=1.3.0
+pyarrow>=10.0.0
