@@ -1,22 +1,69 @@
-/*
-Copilot: This file implements the state provider for managing the books list.
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../models/book.dart';
+import '../services/api_service.dart';
 
-Goals:
-1. Use the Provider package to manage async state.
-2. Fetch books from api_service.getBooks() and cache the result.
-3. Provide a refresh method to re-fetch data.
-4. Handle loading, success, and error states.
-5. Expose the list of books to consuming widgets.
+/// Manages the state of the books list fetched from the backend.
+///
+/// Handles loading, caching, and refreshing of book data. Extends ChangeNotifier
+/// to notify listeners when data changes.
+class BooksProvider extends ChangeNotifier {
+  /// The current list of books
+  List<Book> _books = [];
 
-Expectations:
-- Use StateNotifierProvider or FutureProvider from Riverpod/Provider.
-- Cache results to avoid excessive API calls.
-- Include error handling and meaningful error messages.
-- Support refresh/reload functionality.
-- Expose state as a stream or future for UI widgets.
+  /// Whether books are currently being fetched
+  bool _isLoading = false;
 
-Do not include:
-- UI code (this is pure state management).
-- API calls directly (delegate to api_service).
-- Complex business logic.
-*/
+  /// Error message if fetch fails
+  String? _error;
+
+  /// Getter for the books list
+  List<Book> get books => _books;
+
+  /// Getter for loading state
+  bool get isLoading => _isLoading;
+
+  /// Getter for error message
+  String? get error => _error;
+
+  /// Whether the list is empty
+  bool get isEmpty => _books.isEmpty && !_isLoading;
+
+  /// Fetch books from the backend API.
+  ///
+  /// Updates [_books], [_isLoading], and [_error] states.
+  /// Notifies listeners when state changes.
+  Future<void> fetchBooks() async {
+    _isLoading = true;
+    _error = null;
+    notifyListeners();
+
+    try {
+      _books = await ApiService.getBooks();
+      _error = null;
+    } catch (e) {
+      _error = 'Failed to fetch books: $e';
+      _books = [];
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
+  /// Refresh the books list by fetching from the backend again.
+  ///
+  /// This can be called by UI widgets (e.g., pull-to-refresh).
+  Future<void> refresh() async {
+    await fetchBooks();
+  }
+
+  /// Clear the current books list and reset state.
+  ///
+  /// Useful for cleanup or logout scenarios.
+  void clear() {
+    _books = [];
+    _error = null;
+    _isLoading = false;
+    notifyListeners();
+  }
+}
