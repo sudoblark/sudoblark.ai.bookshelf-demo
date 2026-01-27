@@ -1,24 +1,46 @@
-/*
-Copilot: This file implements the image upload screen.
+import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/upload_provider.dart';
+import '../widgets/upload_form.dart';
 
-Goals:
-1. Provide a file picker to select image files (JPG, PNG, WEBP).
-2. Display a preview of the selected image.
-3. Implement an upload button that calls api_service.uploadImage().
-4. Show upload progress and success/error feedback to the user.
-5. Use upload_provider for state management.
+/// UploadScreen composes the UploadForm and connects it to UploadProvider.
+class UploadScreen extends StatelessWidget {
+	const UploadScreen({Key? key}) : super(key: key);
 
-Expectations:
-- Use image_picker package for file selection.
-- Display the selected image with Image.file().
-- Show loading indicator during upload.
-- Display success/error messages with SnackBar or AlertDialog.
-- Disable the upload button while uploading.
-- Support multiple sequential uploads in a session.
+	@override
+	Widget build(BuildContext context) {
+		final uploadProvider = Provider.of<UploadProvider>(context);
 
-Do not include:
-- Direct API calls (use upload_provider instead).
-- Data persistence beyond current session.
-- Complex image processing.
-- Hardcoded file paths.
-*/
+		return Padding(
+			padding: const EdgeInsets.all(16.0),
+			child: Column(
+				crossAxisAlignment: CrossAxisAlignment.stretch,
+				children: [
+					Text(
+						'Upload Book Cover',
+						style: Theme.of(context).textTheme.headlineSmall,
+					),
+					const SizedBox(height: 12),
+					UploadForm(
+						isUploading: uploadProvider.isLoading,
+						errorMessage: uploadProvider.error,
+						successMessage: uploadProvider.isSuccess ? 'Upload successful' : null,
+						onUpload: (File file) async {
+							await uploadProvider.uploadImage(file);
+							if (uploadProvider.isSuccess) {
+								ScaffoldMessenger.of(context).showSnackBar(
+									const SnackBar(content: Text('Upload completed')),
+								);
+							} else if (uploadProvider.isError) {
+								ScaffoldMessenger.of(context).showSnackBar(
+									SnackBar(content: Text(uploadProvider.error ?? 'Upload failed')),
+								);
+							}
+						},
+					),
+				],
+			),
+		);
+	}
+}

@@ -1,24 +1,51 @@
-/*
-Copilot: This file implements the main home screen with navigation between two tabs/sections.
+import 'package:flutter/material.dart';
+import '../utils/app_theme.dart';
+import 'upload_screen.dart';
+import 'books_list_screen.dart';
 
-Goals:
-1. Create a TabBar or bottom navigation to switch between:
-   - Upload screen (POST images)
-   - Books list screen (VIEW processed data)
-2. Provide a clean, centered layout with app branding.
-3. Include app title and simple navigation UI.
-4. Keep navigation logic minimal and declarative.
+/// Home screen with bottom navigation to switch between Upload and Books tabs.
+class HomeScreen extends StatefulWidget {
+   const HomeScreen({Key? key}) : super(key: key);
 
-Expectations:
-- Use StatefulWidget if using TabBar, StatelessWidget if using bottom nav.
-- Include a Scaffold with AppBar.
-- Use the app_theme.dart for colors and typography.
-- Keep the screen simple—let child screens handle complexity.
-- Avoid API calls directly; delegate to child screens.
+   @override
+   State<HomeScreen> createState() => _HomeScreenState();
+}
 
-Do not include:
-- Complex state management at this level.
-- API calls.
-- File picker or upload logic (belongs in upload_screen).
-- Data fetching logic (belongs in books_list_screen).
-*/
+class _HomeScreenState extends State<HomeScreen> {
+   int _currentIndex = 0;
+
+   static const List<Widget> _pages = <Widget>[
+      UploadScreen(),
+      BooksListScreen(),
+   ];
+
+   void _onNavTapped(int index) {
+      setState(() {
+         _currentIndex = index;
+      });
+   }
+
+   @override
+   Widget build(BuildContext context) {
+      return Scaffold(
+         appBar: AppBar(
+            title: const Text('Bookshelf Demo'),
+         ),
+         body: _pages[_currentIndex],
+         bottomNavigationBar: BottomNavigationBar(
+            currentIndex: _currentIndex,
+            onTap: _onNavTapped,
+            items: const [
+               BottomNavigationBarItem(
+                  icon: Icon(Icons.upload_file),
+                  label: 'Upload',
+               ),
+               BottomNavigationBarItem(
+                  icon: Icon(Icons.list_alt),
+                  label: 'Books',
+               ),
+            ],
+         ),
+      );
+   }
+}
