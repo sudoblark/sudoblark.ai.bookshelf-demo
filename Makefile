@@ -1,4 +1,4 @@
-.PHONY: help install-processor install-backend install-all run-processor run-backend clean
+.PHONY: help install-processor install-backend install-all install-ui run-processor run-backend run-ui clean
 
 help:
 	@echo "Sudoblark AI Bookshelf Demo - Make Targets"
@@ -12,6 +12,7 @@ help:
 	@echo "Run Targets:"
 	@echo "  make run-processor        Run processor (filesystem monitoring)"
 	@echo "  make run-backend          Run backend REST API on http://localhost:5000"
+	@echo "  make run-ui               Run Flutter UI (user_interface)"
 	@echo ""
 	@echo "Maintenance:"
 	@echo "  make clean                Remove venvs and logs"
@@ -43,8 +44,13 @@ install-backend:
 	  echo "✓ Backend installed to backend/venv"
 
 # Install both processor and backend
-install-all: install-processor install-backend
+install-all: install-processor install-backend install-ui
 	@echo "✓ All dependencies installed"
+
+# Install Flutter UI dependencies
+install-ui:
+	@echo "Installing Flutter UI dependencies (user_interface)..."
+	@cd user_interface && flutter pub get && echo "✓ Flutter dependencies installed"
 
 # Run processor only
 run-processor:
@@ -67,6 +73,12 @@ run-backend:
 	@cd backend && \
 	  . venv/bin/activate && \
 	  python app.py
+
+# Run Flutter UI
+run-ui:
+	@echo "Starting Flutter UI (user_interface)"
+	@echo "Tip: Override API host with --dart-define=API_HOST=http://<host>:5000"
+	@cd user_interface && flutter run
 
 # Clean up virtual environments and logs
 clean:

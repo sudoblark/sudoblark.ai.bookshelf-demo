@@ -72,40 +72,26 @@ This project is built with simplicity and local execution in mind—no cloud dep
 
 - Python 3.8 or higher
 - git
+- Flutter (optional — required to run the demo UI)
 
 ### Quick Start
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/sudoblark/sudoblark.ai.bookshelf-demo.git
-   cd sudoblark.ai.bookshelf-demo
-   ```
-
-2. Install dependencies with Make:
-   ```bash
-   make install-all
-   ```
-
-3. Run processor and backend in separate terminals:
-   
-   **Terminal 1 (Processor):**
-   ```bash
-   make run-processor
-   ```
-   
-   **Terminal 2 (Backend):**
-   ```bash
-   make run-backend
-   ```
-
-Both processes will log output to their respective terminals so you can monitor them side-by-side.
-
-### Alternative: Processor Only
+1. Clone the repository and install everything:
 
 ```bash
-make install-processor
-make run-processor
+git clone https://github.com/sudoblark/sudoblark.ai.bookshelf-demo.git
+cd sudoblark.ai.bookshelf-demo
+make install-all
 ```
+
+2. Start components in separate terminals:
+
+- Processor: `make run-processor`
+- Backend: `make run-backend`
+- UI (optional): `make run-ui`
+
+For a step-by-step facilitator runbook and troubleshooting, see [docs/demo-setup.md](docs/demo-setup.md).
+For architecture and data flow diagrams, see [docs/architecture.md](docs/architecture.md).
 
 ### See All Options
 
@@ -113,21 +99,20 @@ make run-processor
 make help
 ```
 
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+This repository contains three runnable components:
 
-## Usage
+- `processor/` — Core ETL pipeline that watches `data/raw/`, extracts metadata, and writes Parquet to `data/processed/`.
+- `backend/` — Flask REST API for uploads and data retrieval.
+- `user_interface/` — Flutter client used during demos to upload images and view processed results.
 
-The processor automatically monitors `data/raw/` for new images, extracts metadata, and writes results to `data/processed/` as Parquet files.
+To run the Flutter UI manually (override backend host):
 
-**Processor:** `make run-processor`
-
-**Backend API:** `make run-backend` (starts Flask on `http://localhost:5000`)
-
-**Both together:** `make run-all`
+```bash
+cd user_interface
+flutter run --dart-define=API_HOST=http://<backend-host>:5000
+```
 
 ### REST API Endpoints (Backend)
-
-For detailed endpoint documentation and architecture overview, see [docs/architecture.md](docs/architecture.md).
 
 Quick reference:
 - `POST /upload` - Upload image files
@@ -154,32 +139,18 @@ For system architecture, design principles, and detailed data flow, see the [Arc
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-## 
+
 ## Project Structure
 
 ```
 sudoblark.ai.bookshelf-demo/
 ├── processor/              # Core ETL pipeline
-│   ├── main.py            # Entry point
-│   ├── watcher.py         # Filesystem monitoring
-│   ├── extractor.py       # Metadata extraction
-│   ├── parquet_writer.py  # Parquet generation
-│   ├── logger.py          # Logging
-│   ├── requirements.txt    # Dependencies
-│   └── venv/              # Virtual environment (local)
-├── backend/               # Optional REST API
-│   ├── app.py            # Flask server
-│   ├── routes.py         # API endpoints
-│   ├── parquet_reader.py # Parquet reading
-│   ├── settings.py       # Configuration
-│   ├── utils.py          # Utilities
-│   ├── requirements.txt   # Dependencies
-│   └── venv/             # Virtual environment (local)
+├── backend/               # REST API
+├── user_interface/        # Flutter client (UI)
 ├── data/
 │   ├── raw/              # Input images
 │   └── processed/        # Output Parquet files
-├── docs/
-│   └── architecture.md   # Architecture guide
+├── docs/                  # Documentation and runbooks
 ├── Makefile              # Build automation
 └── README.md             # This file
 ```
