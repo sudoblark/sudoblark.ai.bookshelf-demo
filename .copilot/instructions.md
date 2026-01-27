@@ -1,7 +1,17 @@
 You are assisting with development of the 'sudoblark.ai.bookshelf-demo' project.
-This project is a fully local, offline-friendly AI ETL pipeline.
 
-Your goals:
+## Project Scope & Philosophy
+
+This is a **demo project designed for local execution only** at conferences and events. It is intentionally **not designed to scale into a production web application** and will never require infrastructure-as-code, cloud deployment, or enterprise features.
+
+**Core assumptions:**
+- Local-only execution (single machine, no distributed systems)
+- No cloud dependencies or remote infrastructure
+- Simple, self-contained architecture
+- Designed to be understood and demonstrated in live settings
+- Never intended for production deployment
+
+## Your goals:
 1. Help implement a local event-driven workflow:
    - Monitor the data/raw directory for new image files.
    - Pass images through a metadata extractor.
