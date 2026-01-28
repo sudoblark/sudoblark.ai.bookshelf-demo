@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/widgets.dart';
+import 'dart:async';
 import '../models/book.dart';
 import '../services/api_service.dart';
 
@@ -35,7 +37,10 @@ class BooksProvider extends ChangeNotifier {
   Future<void> fetchBooks() async {
     _isLoading = true;
     _error = null;
-    notifyListeners();
+    // Defer the initial notification to avoid calling notifyListeners
+    // synchronously during the widget build phase which causes
+    // "setState() or markNeedsBuild() called during build" errors.
+    WidgetsBinding.instance.addPostFrameCallback((_) => notifyListeners());
 
     try {
       _books = await ApiService.getBooks();
