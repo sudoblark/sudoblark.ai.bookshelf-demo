@@ -46,7 +46,7 @@ def upload_file():
         HTTP 500 if save fails.
     
     Example Request:
-        curl -X POST -F "file=@cover.jpg" http://localhost:5000/upload
+        curl -X POST -F "file=@cover.jpg" http://localhost:5001/upload
     
     Example Response (success):
         {
@@ -137,7 +137,7 @@ def get_books():
         HTTP 500 if Parquet file exists but cannot be read.
     
     Example Request:
-        curl http://localhost:5000/books
+        curl http://localhost:5001/books
     
     Example Response (with data):
         {
@@ -214,7 +214,7 @@ def get_status():
         JSON response with system status information.
     
     Example Request:
-        curl http://localhost:5000/status
+        curl http://localhost:5001/status
     
     Example Response:
         {

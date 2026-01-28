@@ -2,14 +2,14 @@
 ///
 /// Configuration is read from environment variables where applicable, with
 /// sensible defaults for local development. Build with --dart-define to override.
-/// Example: flutter run --dart-define=API_HOST=http://192.168.1.100:5000
+/// Example: flutter run --dart-define=API_HOST=http://192.168.1.100:5001
 
 /// API configuration and endpoints
 class ApiConstants {
   /// Base URL for backend API
-  /// Override at build time: flutter run --dart-define=API_HOST=http://your.ip:5000
-  static const String baseUrl =
-      String.fromEnvironment('API_HOST', defaultValue: 'http://localhost:5000');
+    /// Override at build time: flutter run --dart-define=API_HOST=http://your.ip:5001
+    static const String baseUrl =
+      String.fromEnvironment('API_HOST', defaultValue: 'http://localhost:5001');
 
   /// API endpoint paths
   static const String uploadImageEndpoint = '/api/upload';

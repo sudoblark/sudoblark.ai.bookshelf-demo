@@ -11,7 +11,7 @@ help:
 	@echo ""
 	@echo "Run Targets:"
 	@echo "  make run-processor        Run processor (filesystem monitoring)"
-	@echo "  make run-backend          Run backend REST API on http://localhost:5000"
+	@echo "  make run-backend          Run backend REST API on http://localhost:5001"
 	@echo "  make run-ui               Run Flutter UI (user_interface)"
 	@echo ""
 	@echo "Maintenance:"
@@ -62,7 +62,7 @@ run-processor:
 
 # Run backend only
 run-backend:
-	@echo "Starting REST API backend on http://localhost:5000"
+	@echo "Starting REST API backend on http://localhost:5001"
 	@echo "Available endpoints:"
 	@echo "  POST /upload              - Upload image files"
 	@echo "  GET  /books               - Get processed books"
@@ -77,7 +77,7 @@ run-backend:
 # Run Flutter UI
 run-ui:
 	@echo "Starting Flutter UI (user_interface)"
-	@echo "Tip: Override API host with --dart-define=API_HOST=http://<host>:5000"
+	@echo "Tip: Override API host with --dart-define=API_HOST=http://<host>:5001"
 	@cd user_interface && flutter run
 
 # Clean up virtual environments and logs

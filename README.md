@@ -109,7 +109,7 @@ To run the Flutter UI manually (override backend host):
 
 ```bash
 cd user_interface
-flutter run --dart-define=API_HOST=http://<backend-host>:5000
+flutter run --dart-define=API_HOST=http://<backend-host>:5001
 ```
 
 ### REST API Endpoints (Backend)
@@ -126,7 +126,7 @@ Quick reference:
 
 **Via API:**
 ```bash
-curl -X POST -F "file=@cover.jpg" http://localhost:5000/upload
+curl -X POST -F "file=@cover.jpg" http://localhost:5001/upload
 ```
 
 Supported formats: PNG, JPG, JPEG, WEBP

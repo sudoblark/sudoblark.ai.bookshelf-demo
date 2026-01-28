@@ -40,7 +40,7 @@ make run-ui
 3. Upload a test image (or use the UI Upload tab):
 
 ```bash
-curl -X POST -F "file=@/path/to/book-cover.jpg" http://localhost:5000/upload
+curl -X POST -F "file=@/path/to/book-cover.jpg" http://localhost:5001/upload
 ```
 
 4. Verify processing:
@@ -51,8 +51,8 @@ curl -X POST -F "file=@/path/to/book-cover.jpg" http://localhost:5000/upload
 5. Optional: Check backend endpoints:
 
 ```bash
-curl http://localhost:5000/books
-curl http://localhost:5000/status
+curl http://localhost:5001/books
+curl http://localhost:5001/status
 ```
 
 6. Stop the demo: Ctrl+C in each terminal.
@@ -64,7 +64,7 @@ Notes and troubleshooting
 
 ```bash
 cd user_interface
-flutter run --dart-define=API_HOST=http://<backend-host>:5000
+flutter run --dart-define=API_HOST=http://<backend-host>:5001
 ```
 
 - If port 5000 is occupied, set the backend to another port and point the UI to it via `API_HOST`.

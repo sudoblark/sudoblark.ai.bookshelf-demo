@@ -23,7 +23,7 @@ Behavioral expectations:
   in README rather than embedding permission logic here.
 
 Developer notes / run commands:
-  flutter run --dart-define=API_HOST=http://192.168.1.100:5000
+  flutter run --dart-define=API_HOST=http://192.168.1.100:5001
 
 Files referenced:
 
