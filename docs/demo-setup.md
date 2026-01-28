@@ -33,9 +33,10 @@ make run-backend
 ```
 
 Terminal C — UI (Flutter client):
-```bash
-make run-ui
-```
+
+Open the `user_interface/` folder in VS Code, choose an emulator or physical device from the device selector, then press Run/Debug to start the app. Add `--dart-define=API_HOST=http://<backend-host>:5001` to your launch configuration if you need to point the UI at a non-local backend.
+
+Note: Use `flutter emulators` to view a list of available emulators, and run a new emulator as required. i.e. `flutter emulators --launch Medium_Phone_API_36.1`
 
 3. Upload a test image (or use the UI Upload tab):
 
@@ -67,7 +68,7 @@ cd user_interface
 flutter run --dart-define=API_HOST=http://<backend-host>:5001
 ```
 
-- If port 5000 is occupied, set the backend to another port and point the UI to it via `API_HOST`.
+- If the default backend port is occupied, run the backend on another port and point the UI to it via `API_HOST`.
 
 Advanced checks
 
@@ -80,5 +81,4 @@ ls -lh data/processed/
 - Upload via curl and verify processor logs for extraction events.
 
 This document is the single source of truth for demo execution.
-make run-ui
 

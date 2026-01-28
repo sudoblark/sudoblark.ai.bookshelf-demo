@@ -105,12 +105,7 @@ This repository contains three runnable components:
 - `backend/` — Flask REST API for uploads and data retrieval.
 - `user_interface/` — Flutter client used during demos to upload images and view processed results.
 
-To run the Flutter UI manually (override backend host):
-
-```bash
-cd user_interface
-flutter run --dart-define=API_HOST=http://<backend-host>:5001
-```
+The Flutter UI is intended to be run via VS Code, utilising the appropriate plugins to allow for selection of an emulated device to run the mobile app on.
 
 ### REST API Endpoints (Backend)
 
