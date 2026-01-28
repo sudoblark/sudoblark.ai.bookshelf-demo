@@ -14,12 +14,12 @@ class UploadForm extends StatefulWidget {
    final String? successMessage;
 
    const UploadForm({
-      Key? key,
+      super.key,
       required this.onUpload,
       this.isUploading = false,
       this.errorMessage,
       this.successMessage,
-   }) : super(key: key);
+   });
 
    @override
    State<UploadForm> createState() => _UploadFormState();

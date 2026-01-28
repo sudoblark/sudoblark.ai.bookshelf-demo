@@ -131,15 +131,9 @@ class AppTheme {
         ),
       ),
 
-      // Card theme
-      cardTheme: CardTheme(
-        color: surfaceColor,
-        elevation: UiConstants.cardElevation,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(UiConstants.borderRadius),
-        ),
-        margin: EdgeInsets.all(UiConstants.smallSpacing),
-      ),
+      // Card theme (use defaults for broad compatibility)
+      // Custom card styling intentionally omitted for compatibility with
+      // multiple Flutter versions; rely on colorScheme and ElevatedCard styles.
 
       // Input decoration theme
       inputDecorationTheme: InputDecorationTheme(
@@ -167,13 +161,7 @@ class AppTheme {
       // Scaffold background
       scaffoldBackgroundColor: backgroundColor,
 
-      // Dialog theme
-      dialogTheme: DialogTheme(
-        backgroundColor: surfaceColor,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(UiConstants.borderRadius),
-        ),
-      ),
+      // Dialog theme (omit explicit DialogTheme for cross-version safety)
     );
   }
 

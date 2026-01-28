@@ -12,11 +12,11 @@ class BookList extends StatelessWidget {
 	final List<Book>? books;
 	final void Function(Book)? onBookTap;
 
-	const BookList({
-		Key? key,
-		required this.books,
-		this.onBookTap,
-	}) : super(key: key);
+		const BookList({
+			super.key,
+			required this.books,
+			this.onBookTap,
+		});
 
 	@override
 	Widget build(BuildContext context) {

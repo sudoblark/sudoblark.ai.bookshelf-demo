@@ -51,7 +51,7 @@ void main() {
 }
 
 class AppRoot extends StatelessWidget {
-  const AppRoot({Key? key}) : super(key: key);
+  const AppRoot({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import '../utils/app_theme.dart';
 import 'upload_screen.dart';
 import 'books_list_screen.dart';
 
 /// Home screen with bottom navigation to switch between Upload and Books tabs.
 class HomeScreen extends StatefulWidget {
-   const HomeScreen({Key? key}) : super(key: key);
+   const HomeScreen({super.key});
 
    @override
    State<HomeScreen> createState() => _HomeScreenState();

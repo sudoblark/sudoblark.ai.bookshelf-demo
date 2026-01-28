@@ -5,10 +5,10 @@ import '../widgets/book_list.dart';
 
 /// BooksListScreen fetches and displays books using BooksProvider.
 class BooksListScreen extends StatefulWidget {
-	const BooksListScreen({Key? key}) : super(key: key);
+  const BooksListScreen({super.key});
 
-	@override
-	State<BooksListScreen> createState() => _BooksListScreenState();
+  @override
+  State<BooksListScreen> createState() => _BooksListScreenState();
 }
 
 class _BooksListScreenState extends State<BooksListScreen> {

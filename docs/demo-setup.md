@@ -36,7 +36,8 @@ Terminal C — UI (Flutter client):
 
 Open the `user_interface/` folder in VS Code, choose an emulator or physical device from the device selector, then press Run/Debug to start the app. Add `--dart-define=API_HOST=http://<backend-host>:5001` to your launch configuration if you need to point the UI at a non-local backend.
 
-Note: Use `flutter emulators` to view a list of available emulators, and run a new emulator as required. i.e. `flutter emulators --launch Medium_Phone_API_36.1`
+Note: Use `flutter emulators` to view a list of available emulators, and run a new emulator as required. i.e. `flutter emulators --launch Medium_Phone_API_36.1`. You can also just run `flutter run`
+in the `user_interface` folder to load the app onto the emulated device.
 
 3. Upload a test image (or use the UI Upload tab):
 
