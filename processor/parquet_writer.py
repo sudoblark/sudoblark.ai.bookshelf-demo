@@ -17,6 +17,7 @@ Design:
 
 from pathlib import Path
 from datetime import datetime
+import uuid
 from typing import Dict, List, Optional
 import pandas as pd
 
@@ -84,6 +85,15 @@ class ParquetWriter:
             raise ParquetWriteError(error_msg)
         
         logger.debug(f"Writing {len(metadata_records)} metadata records to Parquet")
+
+        # Ensure each record has an `id` and `processed_at` for downstream consumers
+        for rec in metadata_records:
+            if not isinstance(rec, dict):
+                continue
+            if 'id' not in rec or not rec.get('id'):
+                rec['id'] = str(uuid.uuid4())
+            if 'processed_at' not in rec or not rec.get('processed_at'):
+                rec['processed_at'] = datetime.utcnow().isoformat() + 'Z'
         
         try:
             # Convert list of dicts to pandas DataFrame
@@ -125,6 +135,12 @@ class ParquetWriter:
             metadata = {"title": "Book 1", ...}
             path = writer.write_single(metadata)
         """
+        # Ensure single metadata record contains required fields
+        if 'id' not in metadata or not metadata.get('id'):
+            metadata['id'] = str(uuid.uuid4())
+        if 'processed_at' not in metadata or not metadata.get('processed_at'):
+            metadata['processed_at'] = datetime.utcnow().isoformat() + 'Z'
+
         return self.write([metadata])
 
     def _generate_timestamped_filename(self) -> str:

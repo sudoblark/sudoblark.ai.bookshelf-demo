@@ -19,7 +19,7 @@ from pathlib import Path
 from logger import get_logger
 from settings import RAW_DIR, PROCESSED_DIR, ALLOWED_EXTENSIONS
 from utils import validate_filename_input, safe_filename
-from parquet_reader import read_latest_parquet, ParquetReadError, get_parquet_info
+from parquet_reader import read_all_parquet, ParquetReadError, get_parquet_info
 
 logger = get_logger(__name__)
 
@@ -166,8 +166,8 @@ def get_books():
     logger.debug("GET /books request received")
     
     try:
-        # Read latest Parquet file
-        records = read_latest_parquet()
+        # Read all Parquet files and aggregate records
+        records = read_all_parquet()
         
         # Prepare response with metadata and books list (demo-friendly)
         response = {

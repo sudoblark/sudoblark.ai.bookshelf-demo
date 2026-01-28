@@ -83,6 +83,37 @@ def read_latest_parquet() -> List[Dict[str, any]]:
         raise ParquetReadError(error_msg) from e
 
 
+def read_all_parquet() -> List[Dict[str, any]]:
+    """
+    Read all Parquet files in the processed directory and return a combined list of records.
+
+    Files that fail to read are skipped with a warning so the API can still return
+    any successfully-read records.
+    """
+    logger.debug(f"Attempting to read all Parquet files from: {PROCESSED_DIR}")
+
+    parquet_files = list_parquet_files(str(PROCESSED_DIR))
+
+    if not parquet_files:
+        logger.info("No Parquet files found in processed directory")
+        return []
+
+    all_records: List[Dict[str, any]] = []
+
+    for pf in parquet_files:
+        try:
+            df = pd.read_parquet(pf, engine='pyarrow')
+            records = df.to_dict(orient='records')
+            all_records.extend(records)
+            logger.debug(f"Read {len(records)} records from {pf}")
+        except Exception as e:
+            logger.warning(f"Failed to read Parquet file {pf}, skipping: {e}")
+            continue
+
+    logger.info(f"Successfully aggregated {len(all_records)} records from {len(parquet_files)} Parquet files")
+    return all_records
+
+
 def read_parquet_file(filepath: str) -> List[Dict[str, any]]:
     """
     Read a specific Parquet file and return records as dictionaries.
