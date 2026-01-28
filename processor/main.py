@@ -19,6 +19,9 @@ import signal
 from pathlib import Path
 from typing import List, Dict, Optional
 
+from importlib import import_module
+import os
+import settings as proc_settings
 from logger import get_logger
 from watcher import create_watcher
 from extractor import extract_metadata, MetadataExtractionError
@@ -169,22 +172,22 @@ def main() -> int:
         Exit code (0 for success, 1 for error).
     """
     try:
-        # Define data directories
-        # Paths are relative to the processor directory
-        processor_dir = Path(__file__).parent.resolve()
-        project_dir = processor_dir.parent
-        data_raw_dir = project_dir / "data" / "raw"
-        data_processed_dir = project_dir / "data" / "processed"
+        # Use configured data directories from processor settings
+        data_raw_dir = Path(proc_settings.DATA_RAW_DIR)
+        data_processed_dir = Path(proc_settings.DATA_PROCESSED_DIR)
         
         logger.info("=" * 60)
         logger.info("Bookshelf Demo ETL Pipeline")
         logger.info("=" * 60)
         
         # Create and run the pipeline
+        # Read batch size from processor settings (can still be overridden by env var)
+        batch_size = getattr(proc_settings, 'PROCESSOR_BATCH_SIZE', 1)
+
         pipeline = ETLPipeline(
             data_raw_dir=str(data_raw_dir),
             data_processed_dir=str(data_processed_dir),
-            batch_size=10
+            batch_size=batch_size,
         )
         
         pipeline.start()

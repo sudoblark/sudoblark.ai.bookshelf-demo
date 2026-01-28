@@ -19,6 +19,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler, FileCreatedEvent
 
 from logger import get_logger
+import settings as proc_settings
 
 logger = get_logger(__name__)
 
@@ -92,6 +93,31 @@ class ImageFileHandler(FileSystemEventHandler):
             self._processed_files.discard(file_key)
             return
 
+        # Wait until the file write appears to be finished (size stabilizes).
+        # This avoids race conditions where the file is created but still being written.
+        stable = False
+        last_size = -1
+        attempts = 0
+        max_attempts = 20  # ~10 seconds with 0.5s sleep
+
+        while not stable and attempts < max_attempts:
+            try:
+                current_size = file_path.stat().st_size
+            except (OSError, IOError):
+                current_size = -1
+
+            if current_size == last_size and current_size > 0:
+                stable = True
+                break
+
+            last_size = current_size
+            attempts += 1
+            import time
+            time.sleep(0.5)
+
+        if not stable:
+            logger.debug(f"File size did not stabilize for: {file_path} (attempts={attempts})")
+
         # Log the detected file
         logger.info(f"New image detected: {file_path}")
 
@@ -164,15 +190,18 @@ class FileWatcher:
         logger.info("File watcher stopped.")
 
 
-def create_watcher(data_raw_path, on_image_created):
+def create_watcher(data_raw_path=None, on_image_created=None):
     """
     Factory function to create and configure a FileWatcher.
     
     Args:
-        data_raw_path: Path to the data/raw directory.
+        data_raw_path: Path to the data/raw directory. If `None`, the
+                       processor settings default is used.
         on_image_created: Callback function for new images.
     
     Returns:
         FileWatcher instance.
     """
+    if data_raw_path is None:
+        data_raw_path = proc_settings.DATA_RAW_DIR
     return FileWatcher(data_raw_path, on_image_created)

@@ -21,6 +21,7 @@ import json
 from typing import Dict, List, Optional
 
 from logger import get_logger
+from copilot_client import extract_book_metadata
 
 logger = get_logger(__name__)
 
@@ -95,12 +96,23 @@ def extract_metadata(image_path: str) -> Dict[str, any]:
     # Get current timestamp in ISO 8601 format
     processed_at = datetime.utcnow().isoformat() + "Z"
     
-    # Placeholder metadata extraction
-    # TODO: Integrate with Copilot Studio agent for intelligent extraction
-    # Example integration point:
-    # metadata = copilot_client.extract_book_metadata(str(image_path))
-    
-    metadata = _extract_placeholder_metadata(filename, processed_at)
+    # Attempt to use Copilot Studio agent first (if configured).
+    try:
+        copilot_result = extract_book_metadata(str(image_path))
+    except Exception as e:
+        logger.warning(f"Copilot extraction failed: {e}")
+        copilot_result = None
+
+    if copilot_result and isinstance(copilot_result, dict):
+        # Ensure essential fields exist; fallback to placeholders where missing.
+        if 'filename' not in copilot_result:
+            copilot_result['filename'] = filename
+        if 'processed_at' not in copilot_result:
+            copilot_result['processed_at'] = processed_at
+        metadata = copilot_result
+    else:
+        # Fallback to local placeholder extractor
+        metadata = _extract_placeholder_metadata(filename, processed_at)
     
     logger.info(f"Metadata extracted for: {filename}")
     logger.debug(f"Extracted metadata: {json.dumps(metadata, indent=2)}")

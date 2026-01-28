@@ -21,6 +21,7 @@ from typing import Dict, List, Optional
 import pandas as pd
 
 from logger import get_logger
+import settings as proc_settings
 
 logger = get_logger(__name__)
 
@@ -38,7 +39,7 @@ class ParquetWriter:
     data/processed directory as Parquet files with timestamped names.
     """
 
-    def __init__(self, output_dir: str):
+    def __init__(self, output_dir: str | None = None):
         """
         Initialize the Parquet writer.
         
@@ -46,6 +47,8 @@ class ParquetWriter:
             output_dir: Path to the output directory for Parquet files.
                        Can be relative or absolute. Will be created if missing.
         """
+        if output_dir is None:
+            output_dir = proc_settings.DATA_PROCESSED_DIR
         self.output_dir = Path(output_dir).resolve()
         
         # Ensure the output directory exists
