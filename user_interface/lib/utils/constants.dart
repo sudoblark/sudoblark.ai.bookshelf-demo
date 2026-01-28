@@ -13,9 +13,9 @@ class ApiConstants {
       String.fromEnvironment('API_HOST', defaultValue: 'http://localhost:5001');
 
   /// API endpoint paths
-  static const String uploadImageEndpoint = '/api/upload';
-  static const String getBooksEndpoint = '/api/books';
-  static const String getStatusEndpoint = '/api/status';
+  static const String uploadImageEndpoint = '/upload';
+  static const String getBooksEndpoint = '/books';
+  static const String getStatusEndpoint = '/status';
 }
 
 /// File upload constraints

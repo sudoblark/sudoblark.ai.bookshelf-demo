@@ -25,9 +25,10 @@ class ApiService {
         '${ApiConstants.baseUrl}${ApiConstants.uploadImageEndpoint}',
       );
 
+      // The backend expects the multipart field to be named 'file'.
       final request = http.MultipartRequest('POST', uri)
         ..files.add(
-          await http.MultipartFile.fromPath('image', imageFile.path),
+          await http.MultipartFile.fromPath('file', imageFile.path),
         );
 
       final response = await request.send().timeout(

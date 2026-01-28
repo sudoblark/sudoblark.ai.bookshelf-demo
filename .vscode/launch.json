@@ -1,0 +1,12 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Flutter (Debug, Android AVD)",
+      "type": "dart",
+      "request": "launch",
+      "program": "user_interface/lib/main.dart",
+      "args": ["--dart-define=API_HOST=http://10.0.2.2:5001"]
+    }
+  ]
+}
