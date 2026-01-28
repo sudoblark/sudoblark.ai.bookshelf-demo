@@ -77,7 +77,20 @@ class ApiService {
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonData = _parseJsonResponse(response.body);
+        final parsed = _parseJsonResponse(response.body);
+
+        // Backend returns an object with metadata and a `books` list:
+        // { "status": "ok", "count": N, "books": [ ... ] }
+        // Fall back to raw list if needed.
+        List<dynamic> jsonData;
+        if (parsed is List) {
+          jsonData = parsed;
+        } else if (parsed is Map<String, dynamic> && parsed['books'] is List) {
+          jsonData = parsed['books'] as List<dynamic>;
+        } else {
+          throw FormatException('Unexpected JSON format for books endpoint');
+        }
+
         return jsonData.map((item) => Book.fromJson(item as Map<String, dynamic>)).toList();
       } else if (response.statusCode == 404) {
         return [];

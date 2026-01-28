@@ -16,6 +16,7 @@ Design:
 
 from pathlib import Path
 from datetime import datetime
+import uuid
 import json
 from typing import Dict, List, Optional
 
@@ -123,6 +124,8 @@ def _extract_placeholder_metadata(filename: str, processed_at: str) -> Dict[str,
         Dictionary with placeholder metadata.
     """
     metadata = {
+        # Unique identifier for this record
+        "id": str(uuid.uuid4()),
         "filename": filename,
         "title": "Extracted Title",
         "author": "Extracted Author",

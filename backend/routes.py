@@ -169,19 +169,19 @@ def get_books():
         # Read latest Parquet file
         records = read_latest_parquet()
         
-        # Prepare response
+        # Prepare response with metadata and books list (demo-friendly)
         response = {
             "status": "ok",
             "count": len(records),
             "books": records
         }
-        
+
         # Add helpful message if no data yet
         if not records:
             response["message"] = "No processed books yet. Upload images and wait for processing."
-        
+
         logger.info(f"Books endpoint returning {len(records)} records")
-        
+
         return jsonify(response), 200
     
     except ParquetReadError as e:
