@@ -46,13 +46,13 @@
 
 ## About The Project
 
-The Bookshelf Demo is a fully local, offline-friendly ETL pipeline designed to:
+The Bookshelf Demo is a fully local, event-driven ETL pipeline designed to:
 
 - Monitor the `data/raw/` directory for new book cover images in real-time
-- Extract book metadata using a local metadata extractor
+- Extract book metadata using AWS Bedrock with Claude 3 Haiku
 - Generate structured Parquet files in `data/processed/` for analysis and machine learning workflows
 
-This project is built with simplicity and local execution in mind—no cloud dependencies, no external APIs required by default.
+This project integrates with AWS Bedrock for intelligent, cost-effective metadata extraction.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -73,6 +73,7 @@ This project is built with simplicity and local execution in mind—no cloud dep
 - Python 3.8 or higher
 - git
 - Flutter (optional — required to run the demo UI)
+- AWS account with Bedrock access (for Claude 3 Haiku model)
 
 ### Quick Start
 
@@ -131,6 +132,14 @@ Supported formats: PNG, JPG, JPEG, WEBP
 ## Documentation
 
 For system architecture, design principles, and detailed data flow, see the [Architecture Guide](docs/architecture.md).
+
+To configure AWS Bedrock metadata extraction, set the following environment variables before running the processor:
+
+- `AWS_ACCESS_KEY_ID` - Your AWS access key ID
+- `AWS_SECRET_ACCESS_KEY` - Your AWS secret access key
+- `AWS_REGION` - AWS region (default: us-east-1)
+
+For setup instructions and configuration, see `docs/demo-setup.md`.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

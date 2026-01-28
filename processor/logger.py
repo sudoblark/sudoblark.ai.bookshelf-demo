@@ -40,6 +40,11 @@ def _setup_root_logger():
     # Set root logger level to DEBUG (handlers will filter)
     root_logger.setLevel(logging.DEBUG)
     
+    # Suppress verbose logging from Azure SDK libraries
+    logging.getLogger('azure').setLevel(logging.WARNING)
+    logging.getLogger('azure.core.pipeline.policies').setLevel(logging.WARNING)
+    logging.getLogger('msal').setLevel(logging.WARNING)
+    
     # Console handler (INFO level)
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(LOG_LEVEL_CONSOLE)

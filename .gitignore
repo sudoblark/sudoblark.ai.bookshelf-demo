@@ -186,6 +186,7 @@ fabric.properties
 # Data directories - never commit raw images or processed parquet files
 data/raw/*
 data/processed/*
+data/demo-images/*
 
 # Processor ETL pipeline
 processor/processor.log

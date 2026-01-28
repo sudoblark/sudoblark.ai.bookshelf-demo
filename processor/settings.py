@@ -24,9 +24,25 @@ DATA_PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
 # the PROCESSOR_BATCH_SIZE environment variable.
 PROCESSOR_BATCH_SIZE = int(os.getenv('PROCESSOR_BATCH_SIZE', '1'))
 
+# Backend URL used when the processor prefers to upload images to the
+# local backend so the LM server can fetch them. Defaults to the backend
+# used by the Flutter UI and demo scripts.
+BACKEND_URL = os.getenv('BACKEND_URL', os.getenv('API_HOST', 'http://localhost:5001'))
+
+# AWS Bedrock configuration for metadata extraction
+# These should be set via environment variables before running the processor
+AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', '')
+AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', '')
+AWS_REGION = os.getenv('AWS_REGION', 'eu-west-2')
+
+# Bedrock model configuration
+BEDROCK_MODEL_ID = 'anthropic.claude-3-haiku-20240307-v1:0'
+
 def get_config() -> dict:
     return {
         'DATA_RAW_DIR': str(DATA_RAW_DIR),
         'DATA_PROCESSED_DIR': str(DATA_PROCESSED_DIR),
         'PROCESSOR_BATCH_SIZE': PROCESSOR_BATCH_SIZE,
+        'BACKEND_URL': BACKEND_URL,
+        # AWS configuration is not emitted here to avoid leaking credentials.
     }

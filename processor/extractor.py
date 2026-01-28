@@ -21,7 +21,7 @@ import json
 from typing import Dict, List, Optional
 
 from logger import get_logger
-from copilot_client import extract_book_metadata
+from llm_client import extract_book_metadata
 
 logger = get_logger(__name__)
 

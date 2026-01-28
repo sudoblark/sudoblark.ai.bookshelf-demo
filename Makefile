@@ -52,6 +52,7 @@ run-processor:
 	@echo "Press Ctrl+C to stop"
 	@cd processor && \
 	  . venv/bin/activate && \
+	  [ -f ../.env ] && set -a && . ../.env && set +a; \
 	  python main.py
 
 # Run backend only
@@ -66,6 +67,7 @@ run-backend:
 	@echo "Press Ctrl+C to stop"
 	@cd backend && \
 	  . venv/bin/activate && \
+	  [ -f ../.env ] && set -a && . ../.env && set +a; \
 	  python app.py
 
 

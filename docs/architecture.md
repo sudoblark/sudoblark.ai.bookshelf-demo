@@ -13,7 +13,7 @@ The Bookshelf Demo is a fully local, event-driven ETL pipeline that processes bo
 graph LR
     A["📁 data/raw/"] -->|File System Events| B["Watcher"]
     B -->|New Image Files| C["Extractor"]
-    C -->|Metadata| D["Parquet Writer"]
+    C -->|Metadata (from Bedrock)| D["Parquet Writer"]
     D -->|Timestamped Parquet Files| E["📁 data/processed/"]
 
     F["REST API"] -->|Upload Images| A
@@ -53,7 +53,7 @@ Typical flow when using the REST API:
 1. Client calls `POST /upload` with an image file.
 2. Backend saves the image to `data/raw/`.
 3. Processor detects the new file via the watcher.
-4. Processor extracts metadata and writes Parquet output to `data/processed/`.
+4. Processor sends the image to AWS Bedrock (Claude 3 Haiku) for metadata extraction and writes Parquet output to `data/processed/`.
 5. Client calls `GET /books` to retrieve the processed metadata; backend reads Parquet and returns JSON.
 
 ## Component Interactions
@@ -74,6 +74,8 @@ graph TB
     end
     
     main -->|monitors & processes| raw
+    main -->|queries Bedrock API for extraction| processor_llm["AWS Bedrock (Claude 3 Haiku)"]
+    processor_llm -->|returns metadata| main
     main -->|writes| processed
     app -->|accepts uploads| raw
     app -->|reads| processed
