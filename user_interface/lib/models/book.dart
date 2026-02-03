@@ -18,6 +18,9 @@ class Book {
   /// Extracted ISBN (International Standard Book Number)
   final String? isbn;
 
+  /// Extracted book description
+  final String description;
+
   /// Timestamp when the book record was processed
   final DateTime processedAt;
 
@@ -28,6 +31,7 @@ class Book {
     required this.title,
     required this.author,
     this.isbn,
+    this.description = '',
     required this.processedAt,
   });
 
@@ -41,6 +45,7 @@ class Book {
   ///   "title": "Book Title",
   ///   "author": "Author Name",
   ///   "isbn": "978-0-123456-78-9" (optional),
+  ///   "description": "Book description" (optional),
   ///   "processed_at": "2026-01-27T10:30:00Z"
   /// }
   /// ```
@@ -51,6 +56,7 @@ class Book {
       title: json['title'] as String,
       author: json['author'] as String,
       isbn: json['isbn'] as String?,
+      description: json['description'] as String? ?? '',
       processedAt: DateTime.parse(json['processed_at'] as String),
     );
   }
@@ -65,6 +71,7 @@ class Book {
       'title': title,
       'author': author,
       'isbn': isbn,
+      'description': description,
       'processed_at': processedAt.toIso8601String(),
     };
   }

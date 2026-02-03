@@ -54,12 +54,28 @@ class _BooksListScreenState extends State<BooksListScreen> {
 					child: BookList(
 						books: provider.books,
 						onBookTap: (book) {
-							// Placeholder: show details in a dialog
+							// Show book details in a dialog
 							showDialog(
 								context: context,
 								builder: (context) => AlertDialog(
 									title: Text(book.title),
-									content: Text('Author: ${book.author}\nFilename: ${book.filename}'),
+									content: SingleChildScrollView(
+										child: Column(
+											mainAxisSize: MainAxisSize.min,
+											crossAxisAlignment: CrossAxisAlignment.start,
+											children: [
+												Text('Author: ${book.author}', style: const TextStyle(fontWeight: FontWeight.bold)),
+												const SizedBox(height: 8),
+												if (book.description.isNotEmpty) ...[
+													const Text('Description:', style: TextStyle(fontWeight: FontWeight.bold)),
+													const SizedBox(height: 4),
+													Text(book.description),
+													const SizedBox(height: 8),
+												],
+												Text('Filename: ${book.filename}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+											],
+										),
+									),
 									actions: [
 										TextButton(
 											onPressed: () => Navigator.of(context).pop(),
