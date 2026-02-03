@@ -1,7 +1,9 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
 import '../utils/constants.dart';
 
 /// A form widget for picking an image file and triggering upload.
@@ -33,10 +35,35 @@ class _UploadFormState extends State<UploadForm> {
       setState(() {
          _fileError = null;
       });
-      final picker = ImagePicker();
-      final picked = await picker.pickImage(source: ImageSource.gallery);
-      if (picked == null) return;
-      final file = File(picked.path);
+      print('Attempting to pick image from gallery...');
+      
+      // Use file_picker for desktop platforms (macOS, Windows, Linux)
+      // Use image_picker for mobile (Android, iOS)
+      if (Platform.isMacOS || Platform.isWindows || Platform.isLinux) {
+         print('Using file_picker for desktop platform');
+         final result = await FilePicker.platform.pickFiles(
+            type: FileType.custom,
+            allowedExtensions: ['jpg', 'jpeg', 'png'],
+         );
+         print('File picker result: ${result?.files.firstOrNull?.path ?? "null (user cancelled)"}');
+         
+         if (result == null || result.files.isEmpty) return;
+         
+         final file = File(result.files.first.path!);
+         _validateAndSetFile(file);
+      } else {
+         print('Using image_picker for mobile platform');
+         final picker = ImagePicker();
+         final picked = await picker.pickImage(source: ImageSource.gallery);
+         print('Image picker result: ${picked?.path ?? "null (user cancelled)"}');
+         
+         if (picked == null) return;
+         final file = File(picked.path);
+         _validateAndSetFile(file);
+      }
+   }
+
+   void _validateAndSetFile(File file) {
       // Validate extension
       final ext = file.path.split('.').last.toLowerCase();
       if (!FileConstants.acceptedExtensions.any((e) => e.replaceAll('.', '') == ext)) {
@@ -46,17 +73,19 @@ class _UploadFormState extends State<UploadForm> {
          });
          return;
       }
-      // Validate size
-      if (await file.length() > FileConstants.maxFileSizeBytes) {
-         setState(() {
-            _fileError = 'File too large (max 10MB).';
-            _selectedFile = null;
-         });
-         return;
-      }
-      setState(() {
-         _selectedFile = file;
-         _fileError = null;
+      // Validate size (async check)
+      file.length().then((size) {
+         if (size > FileConstants.maxFileSizeBytes) {
+            setState(() {
+               _fileError = 'File too large (max 10MB).';
+               _selectedFile = null;
+            });
+         } else {
+            setState(() {
+               _selectedFile = file;
+               _fileError = null;
+            });
+         }
       });
    }
 
