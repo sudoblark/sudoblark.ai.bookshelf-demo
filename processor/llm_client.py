@@ -46,9 +46,9 @@ def _get_bedrock_client():
 		raise
 
 def extract_book_metadata(image_path: str) -> Optional[Dict[str, Any]]:
-	"""Extract metadata from `image_path` using AWS Bedrock Claude 3 Haiku.
+	"""Extract metadata from `image_path` using AWS Bedrock Claude Haiku 4.5.
 	
-	Uses Claude 3 Haiku vision model to analyze book cover images and extract
+	Uses Claude Haiku 4.5 vision model to analyze book cover images and extract
 	metadata such as title, author, ISBN, publisher, and description.
 	
 	Args:
@@ -78,7 +78,7 @@ def extract_book_metadata(image_path: str) -> Optional[Dict[str, Any]]:
 		# Get Bedrock client
 		bedrock = _get_bedrock_client()
 		
-		# Construct the request body for Claude 3
+		# Construct the request body for Claude Haiku 4.5
 		request_body = {
 			"anthropic_version": "bedrock-2023-05-31",
 			"max_tokens": 1024,
@@ -125,9 +125,8 @@ def extract_book_metadata(image_path: str) -> Optional[Dict[str, Any]]:
 			
 			logger.info(f"Successfully extracted metadata for: {full_file_path.name}")
 			return metadata
-		else:
-			logger.warning("Unexpected Bedrock response structure")
-			return None
+		logger.warning("Unexpected Bedrock response structure")
+		return None
 			
 	except ClientError as e:
 		logger.error(f"Bedrock ClientError: {e}")
@@ -141,7 +140,7 @@ def extract_book_metadata(image_path: str) -> Optional[Dict[str, Any]]:
 		return None
 
 def _parse_bedrock_response(response_text: str) -> Dict[str, Any]:
-	"""Parse Bedrock Claude response into metadata dictionary."""
+	"""Parse Bedrock model response into metadata dictionary."""
 	metadata = {
 		'title': '',
 		'author': '',
@@ -151,7 +150,7 @@ def _parse_bedrock_response(response_text: str) -> Dict[str, Any]:
 		'published_year': None,
 	}
 	
-	# Claude should return JSON directly based on our instruction
+	# Model should return JSON directly based on our instruction
 	try:
 		# Try to parse as JSON first
 		parsed = json.loads(response_text.strip())
