@@ -202,6 +202,48 @@ backend/venv/
 dev_scratchpad/*
 
 # ============================================================================
+# AWS LAMBDA FUNCTIONS
+# ============================================================================
+
+# Lambda deployment packages (ZIP files)
+lambda-packages/*.zip
+lambda-packages/**/*.zip
+
+# Lambda dependencies installed for packaging
+lambda-packages/**/package/
+lambda-packages/**/.aws-sam/
+
+# ============================================================================
+# TERRAFORM
+# ============================================================================
+
+# Terraform state files
+**/.terraform/
+**/.terraform.lock.hcl
+**/terraform.tfstate
+**/terraform.tfstate.backup
+**/terraform.tfstate.*.backup
+**/.terraform.tfstate.lock.info
+
+# Terraform variable files with sensitive data
+**/*.tfvars
+!**/*example.tfvars
+
+# Crash log files
+**/crash.log
+**/crash.*.log
+
+# Terraform plan output files
+**/*.tfplan
+**/plan.out
+
+# Terraform override files
+**/override.tf
+**/override.tf.json
+**/*_override.tf
+**/*_override.tf.json
+
+# ============================================================================
 # SYSTEM
 # ============================================================================
 

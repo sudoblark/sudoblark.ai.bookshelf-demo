@@ -1,1 +1,30 @@
+repos:
+  # Terraform formatting
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.88.1
+    hooks:
+      - id: terraform_fmt
+        args:
+          - --args=-recursive
 
+  # General file fixes
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        types: [text]
+      - id: end-of-file-fixer
+        types: [text]
+      - id: check-yaml
+        args: ['--unsafe']
+      - id: check-json
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: ['--fix=lf']
+
+  # YAML formatting for workflows
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        files: ^\.github/workflows/.*\.ya?ml$

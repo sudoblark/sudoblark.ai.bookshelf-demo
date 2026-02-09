@@ -1,0 +1,45 @@
+name: Terraform Apply
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Create Lambda deployment packages
+        run: |
+          # Unzip processor
+          cd lambda-packages/unzip-processor
+          pip install -r requirements.txt -t .
+          zip -r ../unzip-processor.zip .
+          cd ../..
+
+          # Metadata extractor
+          cd lambda-packages/metadata-extractor
+          pip install -r requirements.txt -t .
+          zip -r ../metadata-extractor.zip .
+          cd ../..
+
+      - name: terraform apply
+        uses: dflook/terraform-apply@v1
+        with:
+          auto_approve: true
+          path: ./infrastructure/aws-sudoblark-development
