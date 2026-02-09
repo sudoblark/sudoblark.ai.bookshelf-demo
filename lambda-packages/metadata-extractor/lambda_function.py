@@ -179,15 +179,19 @@ def process_image_to_parquet(
     if not source_bucket or not image_key:
         raise ValueError("source_bucket and image_key must not be empty")
 
-    # Resolve full bucket name
+    # Resolve full bucket name from source bucket naming pattern
+    # Expected format: account-project-application-bucket_type
+    # Application name may contain hyphens (e.g., bookshelf-demo)
+    # Strategy: Remove the last segment (bucket type), what remains is the prefix
     bucket_parts: List[str] = source_bucket.split("-")
     if len(bucket_parts) < 4:
         raise ValueError(f"Invalid source bucket name format: {source_bucket}")
 
-    account: str = bucket_parts[0]
-    project: str = bucket_parts[1]
-    application: str = bucket_parts[2]
-    processed_bucket: str = f"{account}-{project}-{application}-{config['processed_bucket']}"
+    # Remove last segment (bucket type like "landing", "raw", "processed")
+    # The remaining segments form the prefix: account-project-application
+    prefix_parts: List[str] = bucket_parts[:-1]
+    prefix: str = "-".join(prefix_parts)
+    processed_bucket: str = f"{prefix}-{config['processed_bucket']}"
 
     logger.info(f"Extracting metadata from s3://{source_bucket}/{image_key}")
 
