@@ -68,10 +68,8 @@ locals {
         # AWS SDK for pandas (includes pandas, pyarrow, numpy, etc.)
         # Version 11 for Python 3.11 in eu-west-2
         # See: https://aws-sdk-pandas.readthedocs.io/en/stable/layers.html
-        "arn:aws:lambda:eu-west-2:336392948345:layer:AWSSDKPandas-Python311:11",
-        # Pillow layer for image processing
-        # ARN for eu-west-2 Python 3.11
-        "arn:aws:lambda:eu-west-2:770693421928:layer:Klayers-p311-pillow:10"
+        "arn:aws:lambda:eu-west-2:336392948345:layer:AWSSDKPandas-Python311:11"
+        # Pillow bundled directly in deployment ZIP due to layer permission restrictions
       ]
       environment_variables = {
         PROCESSED_BUCKET = "processed"
