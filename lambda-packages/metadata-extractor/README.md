@@ -16,7 +16,6 @@ Extracts book metadata from images using AWS Bedrock (Claude 3 Haiku) and writes
 - `PROCESSED_BUCKET`: Short name of the processed bucket (e.g., "processed")
 - `LOG_LEVEL`: Logging level (default: "INFO")
 - `BEDROCK_MODEL_ID`: Bedrock model ID (default: "anthropic.claude-3-haiku-20240307-v1:0")
-- `AWS_REGION`: AWS region for Bedrock (default: "eu-west-2")
 
 ## Metadata Fields
 
