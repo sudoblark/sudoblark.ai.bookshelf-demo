@@ -133,4 +133,83 @@ locals {
   iam_roles_map = {
     for role in local.iam_roles_enriched : role.name => role
   }
+
+  # Enrich Glue databases with computed full names
+  glue_databases_enriched = [
+    for db in local.glue_databases : merge(
+      {
+        account     = local.account
+        project     = local.project
+        application = local.application
+        description = ""
+      },
+      db,
+      {
+        # Computed full database name
+        full_name = lower("${local.account}-${local.project}-${local.application}-${db.name}")
+      }
+    )
+  ]
+
+  # Create a map of Glue databases keyed by name
+  glue_databases_map = {
+    for db in local.glue_databases_enriched : db.name => db
+  }
+
+  # Enrich Glue crawlers with resolved references
+  glue_crawlers_enriched = [
+    for crawler in local.glue_crawlers : merge(
+      {
+        account        = local.account
+        project        = local.project
+        application    = local.application
+        description    = ""
+        s3_target_path = ""
+        schedule       = ""
+        table_prefix   = ""
+      },
+      crawler,
+      {
+        # Computed full crawler name
+        full_name = lower("${local.account}-${local.project}-${local.application}-${crawler.name}")
+        # Resolved database name from reference
+        database_full_name = local.glue_databases_map[crawler.database_name].full_name
+        # Resolved S3 target path
+        s3_target_full_path = "s3://${local.buckets_map[crawler.s3_target_bucket].full_name}${crawler.s3_target_path != "" ? "/${crawler.s3_target_path}" : ""}"
+        # Resolved IAM role ARN
+        role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.iam_roles_map[crawler.iam_role_name].full_name}"
+      }
+    )
+  ]
+
+  # Create a map of Glue crawlers keyed by name
+  glue_crawlers_map = {
+    for crawler in local.glue_crawlers_enriched : crawler.name => crawler
+  }
+
+  # Enrich Athena workgroups with resolved references
+  athena_workgroups_enriched = [
+    for wg in local.athena_workgroups : merge(
+      {
+        account                            = local.account
+        project                            = local.project
+        application                        = local.application
+        description                        = ""
+        publish_cloudwatch_metrics_enabled = true
+        bytes_scanned_cutoff_per_query     = 0
+      },
+      wg,
+      {
+        # Computed full workgroup name
+        full_name = lower("${local.account}-${local.project}-${local.application}-${wg.name}")
+        # Resolved results bucket S3 path
+        results_s3_path = "s3://${local.buckets_map[wg.results_bucket].full_name}/"
+      }
+    )
+  ]
+
+  # Create a map of Athena workgroups keyed by name
+  athena_workgroups_map = {
+    for wg in local.athena_workgroups_enriched : wg.name => wg
+  }
 }
