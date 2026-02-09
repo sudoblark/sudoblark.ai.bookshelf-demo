@@ -16,7 +16,6 @@ Extracts book metadata from images using AWS Bedrock (Claude 3 Haiku) and writes
 - `PROCESSED_BUCKET`: Short name of the processed bucket (e.g., "processed")
 - `LOG_LEVEL`: Logging level (default: "INFO")
 - `BEDROCK_MODEL_ID`: Bedrock model ID (default: "anthropic.claude-3-haiku-20240307-v1:0")
-- `AWS_REGION`: AWS region for Bedrock (default: "eu-west-2")
 
 ## Metadata Fields
 
@@ -33,11 +32,11 @@ Extracted metadata includes:
 
 ## Lambda Layers
 
-This function requires two Lambda layers:
-1. **AWS SDK for pandas** (Python 3.11): Provides pandas and pyarrow
-   - ARN: `arn:aws:lambda:eu-west-2:336392948345:layer:AWSSDKPandas-Python311:11`
-2. **Pillow** (Python 3.11): Provides image processing
-   - ARN: `arn:aws:lambda:eu-west-2:770693421928:layer:Klayers-p311-pillow:10`
+This function requires the AWS SDK for pandas Lambda layer:
+- **AWS SDK for pandas** (Python 3.11): Provides pandas and pyarrow
+  - ARN: `arn:aws:lambda:eu-west-2:336392948345:layer:AWSSDKPandas-Python311:11`
+
+Pillow is bundled directly in the deployment package for reliability.
 
 ## IAM Permissions
 

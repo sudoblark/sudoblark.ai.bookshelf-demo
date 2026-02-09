@@ -1,4 +1,4 @@
 aws-lambda-powertools
 boto3
+Pillow
 # Note: pandas and pyarrow are provided by AWS SDK for pandas Lambda layer
-# Pillow is provided by Klayers Pillow Lambda layer
