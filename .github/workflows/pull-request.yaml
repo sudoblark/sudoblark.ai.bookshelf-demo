@@ -91,7 +91,7 @@ jobs:
 
       - name: Read Terraform version
         id: terraform-version
-        working-directory: ./infrastructure/aws-sudoblark-production
+        working-directory: ./infrastructure/aws-sudoblark-development
         run: echo "version=$(cat .terraform-version)" >> $GITHUB_OUTPUT
 
       - name: Setup Terraform
