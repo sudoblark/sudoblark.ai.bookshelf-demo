@@ -30,6 +30,9 @@ locals {
     },
     {
       name = "processed" # Stores Parquet files with extracted metadata
+    },
+    {
+      name = "athena-results" # Stores Athena query results
     }
   ]
 }

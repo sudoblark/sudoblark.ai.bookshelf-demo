@@ -131,6 +131,7 @@ bookshelf-demo/
 - **aws-sudoblark-development-bookshelf-demo-landing**: Accepts ZIP file uploads
 - **aws-sudoblark-development-bookshelf-demo-raw**: Stores extracted images
 - **aws-sudoblark-development-bookshelf-demo-processed**: Stores Parquet metadata files
+- **aws-sudoblark-development-bookshelf-demo-athena-results**: Stores Athena query results
 
 ### Lambda Functions
 
@@ -156,6 +157,25 @@ bookshelf-demo/
 Each Lambda function has a dedicated IAM role with least-privilege permissions:
 - Unzip processor: Read from landing, write to raw
 - Metadata extractor: Read from raw, write to processed, invoke Bedrock model
+- Glue crawler: Read/list processed bucket, write to Glue Data Catalog
+
+### AWS Glue
+
+#### Glue Database
+- **aws-sudoblark-development-bookshelf-demo-bookshelf**: Database for organizing book metadata tables
+
+#### Glue Crawler
+- **aws-sudoblark-development-bookshelf-demo-bookshelf-metadata-crawler**: Automatically discovers schema and partitions from Parquet files
+- **Schedule**: Daily at 3 AM UTC
+- **Target**: Processed bucket with Parquet files
+- **Output**: Tables in the bookshelf database
+
+### AWS Athena
+
+#### Athena Workgroup
+- **aws-sudoblark-development-bookshelf-demo-bookshelf-analytics**: Workgroup for querying book metadata
+- **Query Results**: Stored in athena-results bucket
+- **CloudWatch Metrics**: Enabled for monitoring query performance
 
 ## Metadata Schema
 
@@ -281,44 +301,104 @@ df = pd.read_parquet("metadata_20260209_120000_uuid.parquet")
 print(df)
 ```
 
+### Query with Athena
+
+After the Glue crawler runs (scheduled daily at 3 AM UTC or run manually), query the data with Athena:
+
+```sql
+-- Set workgroup
+-- Use: aws-sudoblark-development-bookshelf-demo-bookshelf-analytics
+
+-- Query all books
+SELECT * FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
+LIMIT 10;
+
+-- Find books by author
+SELECT title, author, published_year, isbn
+FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
+WHERE author LIKE '%author_name%';
+
+-- Count books by publisher
+SELECT publisher, COUNT(*) as book_count
+FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
+GROUP BY publisher
+ORDER BY book_count DESC;
+
+-- Books published after 2020
+SELECT title, author, published_year
+FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
+WHERE published_year > 2020
+ORDER BY published_year DESC;
+```
+
+**Manually run the Glue crawler:**
+```bash
+aws glue start-crawler --name aws-sudoblark-development-bookshelf-demo-bookshelf-metadata-crawler
+```
+
 ## Project Structure
 
 ```
 bookshelf-demo/
-├── infrastructure/               # Terraform infrastructure
-│   └── aws-sudoblark-development/
-│       ├── main.tf              # Provider configuration
-│       ├── data.tf              # Data module instantiation
-│       ├── s3.tf                # S3 resources
-│       ├── iam.tf               # IAM resources
-│       ├── lambda.tf            # Lambda resources
-│       ├── notifications.tf     # S3 notifications
-│       └── variables.tf         # Input variables
-├── modules/
-│   └── data/                    # Data-driven infrastructure definitions
-│       ├── buckets.tf           # Bucket data structures
-│       ├── iam_roles.tf         # IAM role data structures
-│       ├── lambdas.tf           # Lambda data structures
-│       ├── notifications.tf     # Notification data structures
-│       ├── infrastructure.tf    # Data enrichment logic
-│       ├── outputs.tf           # Enriched outputs
-│       └── defaults.tf          # Default values
-├── lambda-packages/             # Lambda function code
+├── infrastructure/                      # Terraform infrastructure code
+│   └── aws-sudoblark-development/      # Environment-specific instantiation
+│       ├── main.tf                     # Provider & backend configuration
+│       ├── data.tf                     # Data module instantiation
+│       ├── s3.tf                       # S3 bucket resources
+│       ├── iam.tf                      # IAM role resources
+│       ├── lambda.tf                   # Lambda function resources
+│       ├── notifications.tf            # S3 event notification resources
+│       ├── athena_workgroups.tf        # Athena workgroup resources
+│       ├── glue_databases.tf           # Glue database resources
+│       ├── glue_crawlers.tf            # Glue crawler resources
+│       ├── glue_catalog_encryption.tf  # Glue Data Catalog encryption
+│       ├── application_registry.tf     # AWS Service Catalog registration
+│       ├── variables.tf                # Input variables
+│       └── outputs.tf                  # Output values
+│
+├── modules/                            # Reusable Terraform modules
+│   └── data/                           # Infrastructure as data definitions
+│       ├── buckets.tf                  # S3 bucket data structures
+│       ├── iam_roles.tf                # IAM role data structures
+│       ├── lambdas.tf                  # Lambda function data structures
+│       ├── notifications.tf            # S3 notification data structures
+│       ├── athena_workgroups.tf        # Athena workgroup data structures
+│       ├── glue_databases.tf           # Glue database data structures
+│       ├── glue_crawlers.tf            # Glue crawler data structures
+│       ├── infrastructure.tf           # Data enrichment & reference resolution
+│       ├── outputs.tf                  # Enriched data outputs
+│       └── defaults.tf                 # Default configuration values
+│
+├── lambda-packages/                    # Lambda function source code
 │   ├── unzip-processor/
-│   │   ├── lambda_function.py
-│   │   ├── requirements.txt
-│   │   └── README.md
+│   │   ├── lambda_function.py          # ZIP extraction handler
+│   │   ├── requirements.txt            # Python dependencies
+│   │   └── README.md                   # Function documentation
 │   └── metadata-extractor/
-│       ├── lambda_function.py
-│       ├── requirements.txt
-│       └── README.md
-├── .github/
-│   ├── copilot-instructions.md  # GitHub Copilot instructions
+│       ├── lambda_function.py          # Bedrock metadata extraction handler
+│       ├── requirements.txt            # Python dependencies (includes Pillow)
+│       └── README.md                   # Function documentation
+│
+├── .github/                            # GitHub configuration
+│   ├── copilot-instructions.md         # GitHub Copilot main instructions
+│   ├── workflows/
+│   │   └── pull-request.yaml           # CI/CD pipeline for Terraform
 │   └── instructions/
-│       ├── terraform.md         # Terraform best practices
-│       ├── python.md            # Python best practices
-│       └── readme.md            # Documentation standards
-└── README.md                    # This file
+│       ├── terraform.md                # Terraform coding standards
+│       ├── python.md                   # Python coding standards
+│       └── readme.md                   # Documentation standards
+│
+├── docs/                               # Project documentation
+│   ├── architecture.md                 # Architecture deep-dive
+│   ├── demo-setup.md                   # Demo setup guide
+│   └── CODEOWNERS                      # Code ownership definitions
+│
+├── .gitignore                          # Git ignore patterns
+├── .pre-commit-config.yaml             # Pre-commit hooks (linting, formatting)
+├── pyproject.toml                      # Python tooling configuration
+├── Makefile                            # Common development commands
+├── LICENSE.txt                         # MIT License
+└── README.md                           # This file
 ```
 
 ## Future Enhancements

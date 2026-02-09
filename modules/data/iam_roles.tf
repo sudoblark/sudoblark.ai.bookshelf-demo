@@ -116,6 +116,39 @@ locals {
       managed_policy_arns = [
         "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
       ]
+    },
+    {
+      name                 = "glue-crawler-role"
+      assume_role_services = ["glue.amazonaws.com"]
+      inline_policies = [
+        {
+          name = "s3-glue-access"
+          policy_statements = [
+            {
+              effect = "Allow"
+              actions = [
+                "s3:GetObject",
+                "s3:PutObject"
+              ]
+              resources = [
+                "arn:aws:s3:::${local.account}-${local.project}-${local.application}-processed/*"
+              ]
+            },
+            {
+              effect = "Allow"
+              actions = [
+                "s3:ListBucket"
+              ]
+              resources = [
+                "arn:aws:s3:::${local.account}-${local.project}-${local.application}-processed"
+              ]
+            }
+          ]
+        }
+      ]
+      managed_policy_arns = [
+        "arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole"
+      ]
     }
   ]
 }

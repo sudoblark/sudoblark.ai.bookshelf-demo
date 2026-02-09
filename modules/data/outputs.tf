@@ -69,3 +69,33 @@ output "iam_roles_map" {
   description = "Map of IAM roles keyed by role name"
   value       = local.iam_roles_map
 }
+
+output "glue_databases" {
+  description = "All Glue databases with enriched metadata and computed values"
+  value       = local.glue_databases_enriched
+}
+
+output "glue_databases_map" {
+  description = "Map of Glue databases keyed by database name"
+  value       = local.glue_databases_map
+}
+
+output "glue_crawlers" {
+  description = "All Glue crawlers with resolved references"
+  value       = local.glue_crawlers_enriched
+}
+
+output "glue_crawlers_map" {
+  description = "Map of Glue crawlers keyed by crawler name"
+  value       = local.glue_crawlers_map
+}
+
+output "athena_workgroups" {
+  description = "All Athena workgroups with resolved references"
+  value       = local.athena_workgroups_enriched
+}
+
+output "athena_workgroups_map" {
+  description = "Map of Athena workgroups keyed by workgroup name"
+  value       = local.athena_workgroups_map
+}
