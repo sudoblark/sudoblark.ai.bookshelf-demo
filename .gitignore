@@ -1,0 +1,252 @@
+# Created by .ignore support plugin (hsz.mobi)
+
+# ============================================================================
+# PYTHON - Processor & Backend Components
+# ============================================================================
+
+### Python template
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*,cover
+.hypothesis/
+
+# Translations
+*.mo
+*.pot
+
+# Django stuff:
+*.log
+local_settings.py
+
+# Flask stuff:
+instance/
+.webassets-cache
+
+# Scrapy stuff:
+.scrapy
+
+# Sphinx documentation
+docs/_build/
+
+# PyBuilder
+target/
+
+# IPython Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# celery beat schedule file
+celerybeat-schedule
+
+# dotenv
+.env
+
+# virtualenv
+venv/
+ENV/
+
+# Spyder project settings
+.spyderproject
+
+# Rope project settings
+.ropeproject
+
+### VirtualEnv template
+[Bb]in
+[Ii]nclude
+[Ll]ocal
+[Ss]cripts
+pyvenv.cfg
+.venv
+pip-selfcheck.json
+
+# PyTest
+**/.pytest_cache
+
+# ============================================================================
+# FLUTTER / DART - User Interface Component
+# ============================================================================
+
+# Flutter
+user_interface/build/
+user_interface/.dart_tool/
+user_interface/.flutter-plugins
+user_interface/.flutter-plugins-dependencies
+user_interface/.packages
+user_interface/pubspec.lock
+user_interface/coverage/
+user_interface/.fvm/
+
+# Android
+user_interface/android/.gradle/
+user_interface/android/key.properties
+user_interface/android/local.properties
+
+# iOS
+user_interface/ios/Pods/
+user_interface/ios/Podfile.lock
+user_interface/ios/.symlinks/
+user_interface/ios/Flutter/Flutter.framework
+user_interface/ios/Flutter/Flutter.podspec
+
+# Web
+user_interface/web/
+
+# ============================================================================
+# EDITOR & IDE
+# ============================================================================
+
+### JetBrains template
+.idea/**/workspace.xml
+.idea/**/tasks.xml
+.idea/**/usage.statistics.xml
+.idea/**/dictionaries
+.idea/**/shelf
+.idea/**/aws.xml
+.idea/**/contentModel.xml
+.idea/**/dataSources/
+.idea/**/dataSources.ids
+.idea/**/dataSources.local.xml
+.idea/**/sqlDataSources.xml
+.idea/**/dynamic.xml
+.idea/**/uiDesigner.xml
+.idea/**/dbnavigator.xml
+.idea/**/gradle.xml
+.idea/**/libraries
+.idea_modules/
+.idea/replstate.xml
+.idea/sonarlint/
+.idea/httpRequests
+.idea/caches/build_file_checksums.ser
+.idea
+
+*.iws
+out/
+atlassian-ide-plugin.xml
+
+# Editor-based Rest Client
+.idea/httpRequests
+
+# CMake
+cmake-build-*/
+
+# Crashlytics plugin
+com_crashlytics_export_strings.xml
+crashlytics.properties
+crashlytics-build.properties
+fabric.properties
+
+### VS Code
+.vscode/settings.json
+
+# ============================================================================
+# PROJECT-SPECIFIC: Bookshelf Demo
+# ============================================================================
+
+# Data directories - never commit raw images or processed parquet files
+data/raw/*
+data/processed/*
+data/demo-images/*
+
+# Processor ETL pipeline
+processor/processor.log
+processor/*.log
+processor/venv/
+
+# Backend REST API
+backend/backend.log
+backend/*.log
+backend/venv/
+
+# Temporary development files
+dev_scratchpad/*
+
+# ============================================================================
+# AWS LAMBDA FUNCTIONS
+# ============================================================================
+
+# Lambda deployment packages (ZIP files)
+lambda-packages/*.zip
+lambda-packages/**/*.zip
+
+# Lambda dependencies installed for packaging
+lambda-packages/**/package/
+lambda-packages/**/.aws-sam/
+
+# ============================================================================
+# TERRAFORM
+# ============================================================================
+
+# Terraform state files
+**/.terraform/
+**/.terraform.lock.hcl
+**/terraform.tfstate
+**/terraform.tfstate.backup
+**/terraform.tfstate.*.backup
+**/.terraform.tfstate.lock.info
+
+# Terraform variable files with sensitive data
+**/*.tfvars
+!**/*example.tfvars
+
+# Crash log files
+**/crash.log
+**/crash.*.log
+
+# Terraform plan output files
+**/*.tfplan
+**/plan.out
+
+# Terraform override files
+**/override.tf
+**/override.tf.json
+**/*_override.tf
+**/*_override.tf.json
+
+# ============================================================================
+# SYSTEM
+# ============================================================================
+
+# MacOS
+.DS_Store
+.ado/templates/query_status.json
