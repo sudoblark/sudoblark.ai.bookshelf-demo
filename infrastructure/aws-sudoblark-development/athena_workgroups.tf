@@ -8,6 +8,10 @@ resource "aws_athena_workgroup" "workgroup" {
   configuration {
     result_configuration {
       output_location = each.value.results_s3_path
+
+      encryption_configuration {
+        encryption_option = "SSE_S3"
+      }
     }
 
     publish_cloudwatch_metrics_enabled = each.value.publish_cloudwatch_metrics_enabled
