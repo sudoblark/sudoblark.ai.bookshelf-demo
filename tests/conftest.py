@@ -1,11 +1,20 @@
 """Shared pytest fixtures for Lambda function tests."""
 
+import os
 from typing import Any, Dict
 from unittest.mock import MagicMock
 
+# Set AWS credentials BEFORE importing boto3 to prevent region errors
+os.environ["AWS_ACCESS_KEY_ID"] = "testing"
+os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
+os.environ["AWS_SECURITY_TOKEN"] = "testing"
+os.environ["AWS_SESSION_TOKEN"] = "testing"
+os.environ["AWS_DEFAULT_REGION"] = "eu-west-2"
+os.environ["LOG_LEVEL"] = "INFO"
+
 import boto3
 import pytest
-from moto import mock_s3
+from moto import mock_aws
 
 
 @pytest.fixture
@@ -22,7 +31,7 @@ def aws_credentials(monkeypatch):
 @pytest.fixture
 def s3_client(aws_credentials):
     """Create mock S3 client."""
-    with mock_s3():
+    with mock_aws():
         client = boto3.client("s3", region_name="eu-west-2")
         yield client
 
