@@ -359,7 +359,7 @@ def parse_bedrock_response(response_text: str) -> Dict[str, Any]:
         # Validate with Pydantic
         validated_metadata: BookMetadata = BookMetadata(**parsed)
         logger.debug(f"Successfully validated JSON response: {validated_metadata}")
-        return cast(Dict[str, Any], validated_metadata.model_dump())
+        return cast(Dict[str, Any], validated_metadata.model_dump())  # type: ignore[redundant-cast]
 
     except json.JSONDecodeError:
         logger.warning("Response was not valid JSON, attempting to extract from text")
@@ -375,7 +375,7 @@ def parse_bedrock_response(response_text: str) -> Dict[str, Any]:
                 # Validate with Pydantic
                 validated_fallback: BookMetadata = BookMetadata(**parsed_fallback)
                 logger.debug(f"Extracted and validated JSON from text: {validated_fallback}")
-                return cast(Dict[str, Any], validated_fallback.model_dump())
+                return cast(Dict[str, Any], validated_fallback.model_dump())  # type: ignore[redundant-cast]
         except (json.JSONDecodeError, ValueError) as e:
             logger.warning(f"Could not extract JSON from response: {e}")
 
@@ -385,7 +385,7 @@ def parse_bedrock_response(response_text: str) -> Dict[str, Any]:
     # Return default model if all parsing fails
     default_metadata: BookMetadata = BookMetadata()
     logger.warning("Using default metadata due to parsing failures")
-    return cast(Dict[str, Any], default_metadata.model_dump())
+    return cast(Dict[str, Any], default_metadata.model_dump())  # type: ignore[redundant-cast]
 
 
 def resize_image_to_jpeg(image_bytes: bytes, max_dim: int = 1024, quality: int = 90) -> bytes:

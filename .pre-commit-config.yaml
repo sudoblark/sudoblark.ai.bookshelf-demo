@@ -28,7 +28,7 @@ repos:
         name: Lint Python with Flake8
         language_version: python3.11
         files: ^(lambda-packages|tests)/.*\.py$
-        args: ["--max-line-length=100", "--extend-ignore=E203,W503"]
+        args: ["--max-line-length=120", "--extend-ignore=E203,W503"]
 
   # Python type checking (per Lambda to avoid module conflicts)
   - repo: https://github.com/pre-commit/mirrors-mypy
@@ -44,7 +44,7 @@ repos:
         name: mypy type check (metadata-extractor)
         language_version: python3.11
         files: ^lambda-packages/metadata-extractor/.*\.py$
-        additional_dependencies: ['boto3-stubs[s3,bedrock-runtime]', 'types-Pillow']
+        additional_dependencies: ['boto3-stubs[s3,bedrock-runtime]', 'types-Pillow', 'pydantic']
 
   # Python security scanning
   - repo: https://github.com/PyCQA/bandit
