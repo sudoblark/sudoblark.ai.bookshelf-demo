@@ -81,8 +81,13 @@ jobs:
           soft_fail: false
 
   python_lint:
-    name: Python Code Quality
+    name: Python Code Quality - ${{ matrix.lambda }}
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        lambda:
+          - unzip-processor
+          - metadata-extractor
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -94,36 +99,42 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dev dependencies
+      - name: Install dependencies
         run: |
+          pip install -r lambda-packages/${{ matrix.lambda }}/requirements.txt
           pip install black==23.11.0 isort==5.12.0 flake8==6.1.0 mypy==1.7.0 bandit==1.7.5
           pip install boto3-stubs[s3,bedrock-runtime]
 
       - name: Run Black
-        run: black --check lambda-packages/
+        run: black --check lambda-packages/${{ matrix.lambda }}/
 
       - name: Run isort
-        run: isort --check-only lambda-packages/
+        run: isort --check-only lambda-packages/${{ matrix.lambda }}/
 
       - name: Run Flake8
-        run: flake8 lambda-packages/
+        run: flake8 lambda-packages/${{ matrix.lambda }}/
 
       - name: Run mypy
-        run: mypy lambda-packages/
+        run: mypy lambda-packages/${{ matrix.lambda }}/
 
       - name: Run Bandit
-        run: bandit -r lambda-packages/ -f json -o bandit-report.json || true
+        run: bandit -r lambda-packages/${{ matrix.lambda }}/ -f json -o bandit-report-${{ matrix.lambda }}.json || true
 
       - name: Upload Bandit Report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: bandit-security-report
-          path: bandit-report.json
+          name: bandit-security-report-${{ matrix.lambda }}
+          path: bandit-report-${{ matrix.lambda }}.json
 
   python_test:
-    name: Python Tests
+    name: Python Tests - ${{ matrix.lambda }}
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        lambda:
+          - unzip-processor
+          - metadata-extractor
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -138,17 +149,19 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pytest==7.4.0 pytest-cov==4.1.0 pytest-mock==3.12.0 moto[s3]==4.2.0
-          pip install -r lambda-packages/unzip-processor/requirements.txt
-          pip install -r lambda-packages/metadata-extractor/requirements.txt
+          pip install -r lambda-packages/${{ matrix.lambda }}/requirements.txt
 
       - name: Run pytest with coverage
-        run: pytest --cov=lambda-packages --cov-report=term-missing --cov-report=html --cov-fail-under=80
+        run: |
+          TEST_FILE="test_${{ matrix.lambda }}.py"
+          TEST_FILE="${TEST_FILE//-/_}"
+          pytest tests/${TEST_FILE} --cov=lambda-packages/${{ matrix.lambda }} --cov-report=term-missing --cov-report=html --cov-fail-under=80
 
       - name: Upload coverage report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
+          name: coverage-report-${{ matrix.lambda }}
           path: htmlcov/
 
   test:
