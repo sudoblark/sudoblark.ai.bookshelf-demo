@@ -45,7 +45,7 @@ locals {
       s3_target_bucket = "processed"
       iam_role_name    = "glue-crawler-role"
       description      = "Automatically discovers schema and partitions from book metadata Parquet files"
-      s3_target_path   = ""
+      s3_target_path   = "processed/"
       schedule         = "cron(0 3 * * ? *)" # Daily at 3 AM UTC
       table_prefix     = ""
     }

@@ -355,7 +355,7 @@ terraform apply  # Type 'yes' to confirm
 
 5. **Run Glue Crawler** (or wait for daily schedule)
    ```sh
-   aws glue start-crawler --name aws-sudoblark-development-bookshelf-demo-bookshelf-crawler
+   aws glue start-crawler --name aws-sudoblark-development-bookshelf-demo-bookshelf-metadata-crawler
    ```
 
 6. **Query with Athena**

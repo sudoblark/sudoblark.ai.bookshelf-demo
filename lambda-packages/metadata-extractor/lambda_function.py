@@ -436,9 +436,16 @@ def write_metadata_to_parquet(metadata: Dict[str, Any], processed_bucket: str) -
         # Convert metadata to DataFrame
         df = pd.DataFrame([metadata])
 
-        # Generate Parquet key with timestamp
-        timestamp: str = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-        parquet_key: str = f"metadata_{timestamp}_{metadata['id']}.parquet"
+        # Generate partitioned Parquet key with year/month/day structure
+        now = datetime.utcnow()
+        year = now.strftime("%Y")
+        month = now.strftime("%m")
+        day = now.strftime("%d")
+        timestamp: str = now.strftime("%Y%m%d_%H%M%S")
+        parquet_key: str = (
+            f"processed/year={year}/month={month}/day={day}/"
+            f"metadata_{timestamp}_{metadata['id']}.parquet"
+        )
 
         # Write to Parquet bytes
         parquet_buffer = io.BytesIO()
