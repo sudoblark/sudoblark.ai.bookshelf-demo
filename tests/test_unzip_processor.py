@@ -50,6 +50,35 @@ class TestGetConfig:
 
         assert config["log_level"] == "INFO"
 
+    def test_get_config_invalid_log_level(self, monkeypatch):
+        """Should raise ValueError for invalid log level."""
+        monkeypatch.setenv("RAW_BUCKET", "test-raw-bucket")
+        monkeypatch.setenv("LOG_LEVEL", "INVALID")
+
+        with pytest.raises(ValueError, match="LOG_LEVEL must be one of"):
+            unzip_lambda.get_config()
+
+
+class TestGetContentType:
+    """Tests for get_content_type function."""
+
+    def test_get_content_type_jpg(self):
+        """Should return correct content type for JPEG files."""
+        assert unzip_lambda.get_content_type("test.jpg") == "image/jpeg"
+        assert unzip_lambda.get_content_type("test.jpeg") == "image/jpeg"
+
+    def test_get_content_type_png(self):
+        """Should return correct content type for PNG files."""
+        assert unzip_lambda.get_content_type("test.png") == "image/png"
+
+    def test_get_content_type_gif(self):
+        """Should return correct content type for GIF files."""
+        assert unzip_lambda.get_content_type("test.gif") == "image/gif"
+
+    def test_get_content_type_default(self):
+        """Should return default for unknown extensions."""
+        assert unzip_lambda.get_content_type("test.txt") == "application/octet-stream"
+
 
 class TestExtractImagesFromZip:
     """Tests for extract_images_from_zip function."""
@@ -124,6 +153,22 @@ class TestExtractImagesFromZip:
             result = unzip_lambda.extract_images_from_zip("aws-sudoblark-development-demos-landing", "test.zip", "raw")
 
             assert len(result) == 0
+
+    def test_extract_images_invalid_bucket_format(self):
+        """Should raise ValueError for invalid bucket format."""
+        with pytest.raises(ValueError, match="Invalid source bucket name format"):
+            unzip_lambda.extract_images_from_zip("short", "test.zip", "raw")
+
+    def test_extract_images_empty_inputs(self):
+        """Should raise ValueError for empty inputs."""
+        with pytest.raises(ValueError, match="source_bucket, zip_key, and raw_bucket_name must not be empty"):
+            unzip_lambda.extract_images_from_zip("", "test.zip", "raw")
+
+        with pytest.raises(ValueError, match="source_bucket, zip_key, and raw_bucket_name must not be empty"):
+            unzip_lambda.extract_images_from_zip("test-bucket", "", "raw")
+
+        with pytest.raises(ValueError, match="source_bucket, zip_key, and raw_bucket_name must not be empty"):
+            unzip_lambda.extract_images_from_zip("test-bucket", "test.zip", "")
 
 
 class TestHandler:

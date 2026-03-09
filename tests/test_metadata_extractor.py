@@ -53,6 +53,74 @@ class TestGetConfig:
         
         assert config["bedrock_model_id"] == "anthropic.claude-3-haiku-20240307-v1:0"
 
+    def test_get_config_invalid_log_level(self, monkeypatch):
+        """Should raise ValueError for invalid LOG_LEVEL."""
+        monkeypatch.setenv("PROCESSED_BUCKET", "test-bucket")
+        monkeypatch.setenv("LOG_LEVEL", "INVALID")
+
+        with pytest.raises(ValueError, match="LOG_LEVEL must be one of"):
+            metadata_lambda.get_config()
+
+
+class TestResizeImageToJpeg:
+    """Tests for resize_image_to_jpeg function."""
+
+    def test_resize_large_image(self):
+        """Should resize large image to max dimension."""
+        img = Image.new("RGB", (2000, 1500), color="blue")
+        img_buffer = io.BytesIO()
+        img.save(img_buffer, format="JPEG")
+        img_bytes = img_buffer.getvalue()
+
+        resized = metadata_lambda.resize_image_to_jpeg(img_bytes, max_dim=1024)
+
+        # Verify it's still valid JPEG
+        resized_img = Image.open(io.BytesIO(resized))
+        assert resized_img.format == "JPEG"
+        assert max(resized_img.size) == 1024
+
+    def test_resize_small_image(self):
+        """Should not upscale small images."""
+        img = Image.new("RGB", (500, 400), color="green")
+        img_buffer = io.BytesIO()
+        img.save(img_buffer, format="JPEG")
+        img_bytes = img_buffer.getvalue()
+
+        resized = metadata_lambda.resize_image_to_jpeg(img_bytes, max_dim=1024)
+
+        resized_img = Image.open(io.BytesIO(resized))
+        assert resized_img.size == (500, 400)
+
+
+class TestEnsureMetadataDefaults:
+    """Tests for ensure_metadata_defaults function."""
+
+    def test_add_missing_fields(self):
+        """Should add missing required fields."""
+        metadata = {"title": "Test Book"}
+        
+        result = metadata_lambda.ensure_metadata_defaults(metadata, "book.jpg")
+        
+        assert "id" in result
+        assert result["filename"] == "book.jpg"
+        assert "processed_at" in result
+        assert result["title"] == "Test Book"
+
+    def test_preserve_existing_fields(self):
+        """Should not overwrite existing fields."""
+        metadata = {
+            "id": "existing-id",
+            "title": "Test",
+            "filename": "original.jpg",
+            "processed_at": "2026-01-01T00:00:00Z"
+        }
+        
+        result = metadata_lambda.ensure_metadata_defaults(metadata, "new.jpg")
+        
+        assert result["id"] == "existing-id"
+        assert result["filename"] == "original.jpg"
+        assert result["processed_at"] == "2026-01-01T00:00:00Z"
+
 
 class TestParseBedRockResponse:
     """Tests for parse_bedrock_response function."""
@@ -102,6 +170,43 @@ class TestParseBedRockResponse:
         assert result["title"] == ""
         assert result["author"] == ""
         assert result["publisher"] == ""
+
+
+class TestWriteMetadataToParquet:
+    """Tests for write_metadata_to_parquet function."""
+
+    def test_write_metadata_success(self, s3_client):
+        """Should convert metadata to Parquet and upload to S3."""
+        s3_client.create_bucket(
+            Bucket="test-processed", CreateBucketConfiguration={"LocationConstraint": "eu-west-2"}
+        )
+
+        metadata = {
+            "id": "test-123",
+            "title": "Test Book",
+            "author": "Test Author",
+            "isbn": "123456789"
+        }
+
+        parquet_key = metadata_lambda.write_metadata_to_parquet(metadata, "test-processed")
+
+        assert parquet_key.endswith(".parquet")
+        assert "metadata_" in parquet_key
+
+        # Verify file was uploaded
+        objects = s3_client.list_objects_v2(Bucket="test-processed")
+        assert objects["KeyCount"] == 1
+
+    def test_write_metadata_empty_metadata(self):
+        """Should raise ValueError for empty metadata."""
+        with pytest.raises(ValueError, match="metadata and processed_bucket must not be empty"):
+            metadata_lambda.write_metadata_to_parquet({}, "test-bucket")
+
+    def test_write_metadata_empty_bucket(self):
+        """Should raise ValueError for empty bucket."""
+        metadata = {"id": "test", "title": "Test"}
+        with pytest.raises(ValueError, match="metadata and processed_bucket must not be empty"):
+            metadata_lambda.write_metadata_to_parquet(metadata, "")
 
 
 class TestProcessImageToParquet:
@@ -181,6 +286,27 @@ class TestProcessImageToParquet:
 
         with pytest.raises(Exception, match="Bedrock API error"):
             metadata_lambda.process_image_to_parquet("aws-sudoblark-development-demos-raw", "book.jpg", config)
+
+    def test_process_image_invalid_bucket_format(self, monkeypatch):
+        """Should raise ValueError for invalid bucket name format."""
+        monkeypatch.setenv("PROCESSED_BUCKET", "processed")
+        monkeypatch.setenv("BEDROCK_MODEL_ID", "test-model")
+
+        config = metadata_lambda.get_config()
+
+        with pytest.raises(ValueError, match="Invalid source bucket name format"):
+            metadata_lambda.process_image_to_parquet("short-bucket", "book.jpg", config)
+
+    def test_process_image_empty_inputs(self, monkeypatch):
+        """Should raise ValueError for empty inputs."""
+        monkeypatch.setenv("PROCESSED_BUCKET", "processed")
+        config = metadata_lambda.get_config()
+
+        with pytest.raises(ValueError, match="source_bucket and image_key must not be empty"):
+            metadata_lambda.process_image_to_parquet("", "book.jpg", config)
+
+        with pytest.raises(ValueError, match="source_bucket and image_key must not be empty"):
+            metadata_lambda.process_image_to_parquet("test-bucket", "", config)
 
 
 class TestHandler:
