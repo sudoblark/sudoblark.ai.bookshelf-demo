@@ -80,6 +80,77 @@ jobs:
           output_format: cli
           soft_fail: false
 
+  python_lint:
+    name: Python Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dev dependencies
+        run: |
+          pip install black==23.11.0 isort==5.12.0 flake8==6.1.0 mypy==1.7.0 bandit==1.7.5
+          pip install boto3-stubs[s3,bedrock-runtime]
+
+      - name: Run Black
+        run: black --check lambda-packages/
+
+      - name: Run isort
+        run: isort --check-only lambda-packages/
+
+      - name: Run Flake8
+        run: flake8 lambda-packages/
+
+      - name: Run mypy
+        run: mypy lambda-packages/
+
+      - name: Run Bandit
+        run: bandit -r lambda-packages/ -f json -o bandit-report.json || true
+
+      - name: Upload Bandit Report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: bandit-security-report
+          path: bandit-report.json
+
+  python_test:
+    name: Python Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pytest==7.4.0 pytest-cov==4.1.0 pytest-mock==3.12.0 moto[s3]==4.2.0
+          pip install -r lambda-packages/unzip-processor/requirements.txt
+          pip install -r lambda-packages/metadata-extractor/requirements.txt
+
+      - name: Run pytest with coverage
+        run: pytest --cov=lambda-packages --cov-report=term-missing --cov-report=html --cov-fail-under=80
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: htmlcov/
+
   test:
     name: Terraform Test
     runs-on: ubuntu-latest

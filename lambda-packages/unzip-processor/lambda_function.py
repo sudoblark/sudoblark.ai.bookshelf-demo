@@ -118,9 +118,7 @@ def handler(event: S3Event, context: Any) -> Dict[str, Any]:
         raise
 
 
-def extract_images_from_zip(
-    source_bucket: str, zip_key: str, raw_bucket_name: str
-) -> List[str]:
+def extract_images_from_zip(source_bucket: str, zip_key: str, raw_bucket_name: str) -> List[str]:
     """
     Download ZIP file from S3, extract image files, and upload to raw bucket.
 

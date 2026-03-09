@@ -13,8 +13,7 @@ import logging
 import os
 import uuid
 from datetime import datetime
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import boto3
 import pandas as pd
@@ -32,9 +31,11 @@ s3_client = boto3.client("s3")
 bedrock_client = boto3.client("bedrock-runtime")
 
 # Bedrock prompt for metadata extraction
-METADATA_EXTRACTION_PROMPT: str = """Extract metadata from this book cover image and return ONLY a valid JSON object.
+METADATA_EXTRACTION_PROMPT: str = """Extract metadata from this book cover image
+and return ONLY a valid JSON object.
 
-CRITICAL: Your response must be ONLY the JSON object - no markdown, no code blocks, no explanation text.
+CRITICAL: Your response must be ONLY the JSON object - no markdown, no code
+blocks, no explanation text.
 
 Required JSON format:
 {
@@ -131,9 +132,7 @@ def handler(event: S3Event, context: Any) -> Dict[str, Any]:
                 logger.info(f"Processing image: s3://{bucket_name}/{object_key}")
 
                 # Extract metadata and write to Parquet
-                parquet_key: str = process_image_to_parquet(
-                    bucket_name, object_key, config
-                )
+                parquet_key: str = process_image_to_parquet(bucket_name, object_key, config)
                 processed_files.append(parquet_key)
 
             except Exception as e:
@@ -157,9 +156,7 @@ def handler(event: S3Event, context: Any) -> Dict[str, Any]:
         raise
 
 
-def process_image_to_parquet(
-    source_bucket: str, image_key: str, config: Dict[str, str]
-) -> str:
+def process_image_to_parquet(source_bucket: str, image_key: str, config: Dict[str, str]) -> str:
     """
     Download image, extract metadata using Bedrock, and write to Parquet.
 

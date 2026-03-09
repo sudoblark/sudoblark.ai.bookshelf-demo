@@ -421,3 +421,14 @@ Distributed under the MIT License. See [LICENSE.txt](LICENSE.txt) for more infor
 <!-- MARKDOWN LINKS & IMAGES -->
 [license-shield]: https://img.shields.io/github/license/sudoblark/sudoblark.ai.bookshelf-demo.svg
 [license-url]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/blob/main/LICENSE.txt
+
+
+
+
+| Component | AWS | GCP | Azure |
+|-----------|-----|-----|-------|
+| **Core Data Lake** | S3 | Cloud Storage | Azure Data Lake Storage Gen2 |
+| **Serverless Compute** | Lambda | Cloud Functions / Cloud Run | Azure Functions |
+| **AI Inference** | Bedrock (Vision) | Vertex AI Vision | Azure AI Vision |
+| **Analytical Layer** | Athena | BigQuery | Synapse Analytics |
+| **File Storage Format** | Parquet | Parquet | Parquet |
