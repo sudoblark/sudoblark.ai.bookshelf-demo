@@ -57,8 +57,6 @@
     <li><a href="#testing">Testing</a></li>
     <li><a href="#deployment">Deployment</a></li>
     <li><a href="#troubleshooting">Troubleshooting</a></li>
-    <li><a href="#roadmap">Roadmap</a></li>
-    <li><a href="#contributing">Contributing</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
     <li><a href="#acknowledgments">Acknowledgments</a></li>
@@ -68,24 +66,33 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-The Bookshelf Demo showcases a production-ready, serverless ETL pipeline built entirely on AWS. Upload a ZIP file containing book cover images, and watch as AI automatically extracts metadata, structures it in Parquet format, and makes it queryable via SQL.
+> **📢 Workshop Demo Repository**
+>
+> This project is designed as a **hands-on workshop demonstration** for learning modern AWS serverless patterns and AI integration.
+> Whether you're attending a live workshop or exploring on your own, this repo provides a complete, fully-functional example you can deploy and experiment with.
 
-Here's why this project is valuable:
-* **Learn Modern AWS Patterns**: Demonstrates event-driven architecture, serverless computing, and data lake design
-* **AI/ML Integration**: Shows practical AWS Bedrock integration for computer vision tasks
-* **Infrastructure as Code**: Implements data-driven Terraform patterns used in enterprise environments
-* **Production-Ready**: Includes testing, CI/CD, monitoring, and comprehensive documentation
+> **⚠️ Infrastructure Configuration**
+>
+> This repository is pre-configured to deploy to **Sudoblark's AWS infrastructure**. If you want to deploy to your own AWS account, you'll need to modify the Terraform configuration files to match your environment (account names, bucket names, state backend, etc.).
 
-This project is perfect for learning serverless ETL pipelines, AWS Bedrock integration, or data-driven infrastructure patterns.
+The Bookshelf Demo showcases a serverless ETL pipeline built entirely on AWS. Upload a ZIP file containing book cover images, and watch as AI automatically extracts metadata, structures it in Parquet format, and makes it queryable via SQL.
+
+**What You'll Learn:**
+* **Event-Driven Architecture**: S3 events trigger Lambda functions in a fully automated pipeline
+* **AI/ML Integration**: Practical AWS Bedrock integration using Claude 3 Haiku for computer vision
+* **Infrastructure as Code**: Data-driven Terraform patterns following Sudoblark's three-tier architecture
+* **Modern DevOps**: Testing, CI/CD, security scanning, and quality gates
+
+**Perfect for:** Software engineers, cloud architects, and DevOps practitioners looking to understand serverless data pipelines and AI integration on AWS.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Built With
 
-* [![Python][Python.org]][Python-url]
-* [![AWS][AWS.com]][AWS-url]
-* [![Terraform][Terraform.io]][Terraform-url]
-* [![GitHub Actions][GitHub.com]][GitHub-url]
+* [![Python][Python-badge]][Python-url]
+* [![AWS][AWS-badge]][AWS-url]
+* [![Terraform][Terraform-badge]][Terraform-url]
+* [![GitHub Actions][GitHub-Actions-badge]][GitHub-Actions-url]
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -163,8 +170,6 @@ This project demonstrates Sudoblark's **three-layer Terraform architecture**:
 - Cross-reference resolution handled automatically
 - Easy to test and validate before deployment
 
-See [Terraform Quality Standards](https://github.com/sudoblark/sudoblark.documentation/blob/main/quality-standards/terraform.md) for details.
-
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### ETL Pipeline Flow
@@ -214,7 +219,13 @@ To get a local copy up and running follow these simple steps.
 
 ### Prerequisites
 
-List of required tools and services:
+**Important Constraints:**
+- ⚠️ **AWS Costs**: Running this infrastructure will incur AWS charges (Lambda, S3, Glue, Athena, Bedrock API calls)
+- 🌍 **Region Lock**: Infrastructure must deploy to `eu-west-2` (London) due to Bedrock model availability
+- 🏗️ **Demo Code**: This is workshop/learning code - not production-hardened (limited error handling, no alerting)
+- 📦 **Manual Packaging**: Lambda functions must be packaged locally before Terraform deployment
+
+**Required Tools & Access:**
 
 * **AWS Account** with Bedrock access enabled in eu-west-2
   ```sh
@@ -603,47 +614,6 @@ aws s3api get-bucket-notification-configuration \
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-<!-- ROADMAP -->
-## Roadmap
-
-- [x] Core ETL pipeline with Bedrock integration
-- [x] Event-driven processing with S3 triggers
-- [x] Parquet storage for efficient querying
-- [x] GitHub Actions CI/CD pipeline
-- [ ] Multi-format support (PDF covers, ePub thumbnails)
-- [ ] Batch processing API for large libraries
-- [ ] Web UI for upload and query
-- [ ] Cost optimization with spot instances
-- [ ] Real-time monitoring dashboard
-- [ ] Support for additional Bedrock models (Claude 3 Sonnet, Opus)
-
-See the [open issues](https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/issues) for a full list of proposed features and known issues.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-<!-- CONTRIBUTING -->
-## Contributing
-
-Contributions are what make the open source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
-
-If you have a suggestion that would make this better, please fork the repo and create a pull request. You can also simply open an issue with the tag "enhancement".
-
-Don't forget to give the project a star! Thanks again!
-
-1. Fork the Project
-2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your Changes (`git commit -m 'feat: add some AmazingFeature'`)
-4. Push to the Branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-**Coding Standards:**
-- Follow [Sudoblark Python Standards](https://github.com/sudoblark/sudoblark.documentation/blob/main/quality-standards/python.md)
-- Follow [Sudoblark Terraform Standards](https://github.com/sudoblark/sudoblark.documentation/blob/main/quality-standards/terraform.md)
-- Maintain >80% test coverage
-- Pass all CI/CD checks (linting, security, tests)
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
 <!-- LICENSE -->
 ## License
 
@@ -677,10 +647,8 @@ This project was built using industry-leading tools and services:
 * [Best-README-Template](https://github.com/othneildrew/Best-README-Template) - README structure
 * [Shields.io](https://shields.io/) - README badges
 
-**Sudoblark Standards:**
-* [Python Quality Standards](https://github.com/sudoblark/sudoblark.documentation/blob/main/quality-standards/python.md)
-* [Terraform Quality Standards](https://github.com/sudoblark/sudoblark.documentation/blob/main/quality-standards/terraform.md)
-* [Git Workflow](https://github.com/sudoblark/sudoblark.documentation/blob/main/workflows/git-workflow.md)
+**Architecture Patterns:**
+This project demonstrates Sudoblark's professional development practices including data-driven infrastructure patterns, comprehensive testing, and modern DevOps workflows.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -718,281 +686,5 @@ This project was built using industry-leading tools and services:
 [Athena-url]: https://aws.amazon.com/athena/
 [Glue-badge]: https://img.shields.io/badge/AWS_Glue-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white
 [Glue-url]: https://aws.amazon.com/glue/
-[CI-badge]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/actions/workflows/pull-request.yaml/badge.svg?style=for-the-badge
-[CI-url]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/actions/workflows/pull-request.yaml
-|----------|-------|-------------|
-| `RAW_BUCKET` | `aws-sudoblark-development-bookshelf-demo-raw` | Target bucket for extracted images |
-
-**Metadata Extractor:**
-
-| Variable | Value | Description |
-|----------|-------|-------------|
-| `PROCESSED_BUCKET` | `aws-sudoblark-development-bookshelf-demo-processed` | Target bucket for Parquet files |
-| `BEDROCK_MODEL_ID` | `anthropic.claude-3-haiku-20240307-v1:0` | Bedrock model to use |
-| `AWS_REGION` | `eu-west-2` | AWS region for Bedrock API |
-
-**Note**: All environment variables are automatically configured by Terraform during deployment.
-
-## Usage Examples
-
-### Example 1: Process Book Covers
-
-```bash
-# Create ZIP with book cover images
-zip books.zip cover1.jpg cover2.jpg cover3.jpg
-
-# Upload to landing bucket
-aws s3 cp books.zip s3://aws-sudoblark-development-bookshelf-demo-landing/
-
-# Monitor processing (optional)
-aws logs tail /aws/lambda/aws-sudoblark-development-bookshelf-demo-unzip-processor --follow
-aws logs tail /aws/lambda/aws-sudoblark-development-bookshelf-demo-metadata-extractor --follow
-
-# List processed files (after ~30 seconds)
-aws s3 ls s3://aws-sudoblark-development-bookshelf-demo-processed/
-```
-
-### Example 2: Read Parquet Files Locally
-
-```python
-import pandas as pd
-import boto3
-
-# Download Parquet file
-s3 = boto3.client('s3')
-s3.download_file(
-    'aws-sudoblark-development-bookshelf-demo-processed',
-    'metadata_20260309_120000_abc123.parquet',
-    'local_metadata.parquet'
-)
-
-# Read and display
-df = pd.read_parquet('local_metadata.parquet')
-print(df[['title', 'author', 'published_year', 'isbn']])
-```
-
-### Example 3: Query with Athena
-
-**Note**: First run Glue crawler to discover schema:
-
-```bash
-# Manually trigger crawler (or wait for daily schedule at 3 AM UTC)
-aws glue start-crawler --name aws-sudoblark-development-bookshelf-demo-bookshelf-metadata-crawler
-
-# Check crawler status
-aws glue get-crawler --name aws-sudoblark-development-bookshelf-demo-bookshelf-metadata-crawler \
-  --query 'Crawler.State'
-```
-
-**SQL Queries in Athena Console:**
-
-```sql
--- Set workgroup: aws-sudoblark-development-bookshelf-demo-bookshelf-analytics
-
--- View all books
-SELECT * FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-LIMIT 10;
-
--- Find books by author
-SELECT title, author, published_year, isbn
-FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-WHERE author LIKE '%Martin Fowler%';
-
--- Count books by publisher
-SELECT publisher, COUNT(*) as book_count
-FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-GROUP BY publisher
-ORDER BY book_count DESC;
-
--- Recent publications
-SELECT title, author, published_year
-FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-WHERE published_year > 2020
-ORDER BY published_year DESC;
-```
-
-## Testing
-
-```bash
-# Run all tests
-pytest
-
-# Run with coverage report
-pytest --cov=lambda-packages --cov-report=html --cov-report=term-missing
-
-# Run specific test file
-pytest tests/test_unzip_processor.py
-
-# Run with verbose output
-pytest -v
-
-# Open HTML coverage report
-open htmlcov/index.html  # macOS
-xdg-open htmlcov/index.html  # Linux
-```
-
-**Coverage Requirements**: Minimum 80% code coverage
-
-## Troubleshooting
-
-### Common Issues
-
-**Issue: Lambda timeout during metadata extraction**
-- **Cause**: Large images or slow Bedrock API response
-- **Solution**: Increase `timeout` in `modules/data/lambdas.tf` (currently 300s)
-- **Check logs**: `aws logs tail /aws/lambda/...-metadata-extractor --follow`
-
-**Issue: "Model not found" error**
-- **Cause**: Bedrock model not enabled in account
-- **Solution**:
-  1. Go to AWS Bedrock console
-  2. Navigate to Model access
-  3. Enable Claude 3 Haiku
-  4. Verify region is `eu-west-2`
-
-**Issue: Glue crawler not finding data**
-- **Cause**: Crawler run before Parquet files created
-- **Solution**:
-  ```bash
-  # Manually trigger after files are processed
-  aws glue start-crawler --name aws-sudoblark-development-bookshelf-demo-bookshelf-metadata-crawler
-  ```
-
-**Issue: Athena query fails with "table not found"**
-- **Cause**: Glue crawler hasn't discovered schema yet
-- **Solution**: Wait for crawler to complete (check in Glue console) or trigger manually
-
-**Issue: Python dependencies missing in Lambda**
-- **Cause**: Dependencies not packaged with ZIP file
-- **Solution**: Re-run packaging steps:
-  ```bash
-  cd lambda-packages/metadata-extractor
-  rm -rf *  # Clean old files
-  # Re-copy source and requirements
-  pip install -r requirements.txt -t .
-  zip -r ../metadata-extractor.zip .
-  terraform apply  # Redeploy
-  ```
-
-See [CloudWatch Logs](https://console.aws.amazon.com/cloudwatch/home?region=eu-west-2#logsV2:log-groups) for detailed error messages.
-
-## Project Structure
-
-```
-sudoblark.ai.bookshelf-demo/
-├── .github/                            # GitHub configuration
-│   ├── copilot-instructions.md         # AI assistant instructions
-│   ├── pull_request_template.md        # PR template
-│   └── workflows/
-│       ├── pull-request.yaml           # CI/CD validation
-│       ├── apply.yaml                  # Manual deployment
-│       └── destroy.yaml                # Manual teardown
-│
-├── infrastructure/                     # Terraform infrastructure
-│   └── aws-sudoblark-development/      # Environment-specific
-│       ├── main.tf                     # Provider & backend config
-│       ├── data.tf                     # Data module instantiation
-│       ├── s3.tf                       # S3 bucket resources
-│       ├── iam.tf                      # IAM role resources
-│       ├── lambda.tf                   # Lambda function resources
-│       ├── notifications.tf            # S3 event notifications
-│       ├── athena_workgroups.tf        # Athena workgroups
-│       ├── glue_databases.tf           # Glue databases
-│       ├── glue_crawlers.tf            # Glue crawlers
-│       ├── glue_catalog_encryption.tf  # Glue encryption
-│       ├── application_registry.tf     # Service catalog
-│       ├── variables.tf                # Input variables
-│       └── outputs.tf                  # Output values
-│
-├── modules/                            # Data-driven modules
-│   └── data/                           # Infrastructure as data
-│       ├── buckets.tf                  # S3 bucket definitions
-│       ├── iam_roles.tf                # IAM role definitions
-│       ├── lambdas.tf                  # Lambda function definitions
-│       ├── notifications.tf            # S3 notification definitions
-│       ├── athena_workgroups.tf        # Athena workgroup definitions
-│       ├── glue_databases.tf           # Glue database definitions
-│       ├── glue_crawlers.tf            # Glue crawler definitions
-│       ├── infrastructure.tf           # Data enrichment logic
-│       ├── outputs.tf                  # Enriched data outputs
-│       └── defaults.tf                 # Default values
-│
-├── lambda-packages/                    # Lambda source code
-│   ├── unzip-processor/
-│   │   ├── lambda_function.py          # ZIP extraction handler
-│   │   ├── requirements.txt            # Python dependencies
-│   │   └── README.md                   # Function docs
-│   └── metadata-extractor/
-│       ├── lambda_function.py          # Bedrock extraction handler
-│       ├── requirements.txt            # Python dependencies (+ Pillow)
-│       └── README.md                   # Function docs
-│
-├── tests/                              # Test suite
-│   ├── conftest.py                     # Pytest configuration
-│   ├── test_unzip_processor.py         # Unzip Lambda tests
-│   └── test_metadata_extractor.py      # Metadata Lambda tests
-│
-├── docs/                               # Documentation
-│   ├── CODEOWNERS                      # Code ownership
-│   ├── architecture.md                 # Detailed architecture
-│   └── demo-setup.md                   # Demo walkthrough
-│
-├── data/                               # Sample data
-│   └── demo-images/                    # Test book covers
-│
-├── .gitignore                          # Git ignore patterns
-├── .pre-commit-config.yaml             # Pre-commit hooks
-├── pyproject.toml                      # Python tool config
-├── LICENSE.txt                         # MIT License
-└── README.md                           # This file
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/add-barcode-scanning`)
-3. Make changes following project standards
-4. Run tests (`pytest --cov=lambda-packages`)
-5. Commit with conventional commits (`git commit -m 'feat: add barcode scanning'`)
-6. Push to branch (`git push origin feature/add-barcode-scanning`)
-7. Open Pull Request
-
-**Standards:**
-- Follow [Python Quality Standards](https://github.com/sudoblark/sudoblark.documentation/blob/main/quality-standards/python.md)
-- Follow [Terraform Quality Standards](https://github.com/sudoblark/sudoblark.documentation/blob/main/quality-standards/terraform.md)
-- Follow [Git Workflow](https://github.com/sudoblark/sudoblark.documentation/blob/main/workflows/git-workflow.md)
-
-## License
-
-This project is licensed under the MIT License - see [LICENSE.txt](LICENSE.txt) for details.
-
-## Contact
-
-- **Organization**: Sudoblark Ltd
-- **Website**: https://sudoblark.com
-- **GitHub**: https://github.com/sudoblark
-```
-
-### Monitor Processing
-
-Watch Lambda logs:
-```bash
-# Unzip processor logs
-aws logs tail /aws/lambda/aws-sudoblark-development-bookshelf-demo-unzip-processor --follow
-
-# Metadata extractor logs
-aws logs tail /aws/lambda/aws-sudoblark-development-bookshelf-demo-metadata-extractor --follow
-```
-
-### Retrieve Results
-
-Download processed Parquet files:
-```bash
-# List processed files
-aws s3 ls s3://aws-sudoblark-development-bookshelf-demo-processed/
-
-## Contact
-
-- **Organization**: Sudoblark Ltd
-- **Website**: https://sudoblark.com
-- **GitHub**: https://github.com/sudoblark
+[ci-badge]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/actions/workflows/pull-request.yaml/badge.svg?style=for-the-badge
+[ci-url]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/actions/workflows/pull-request.yaml
