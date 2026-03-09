@@ -1,5 +1,4 @@
+# Lambda runtime dependencies (deployment)
+# Exclude: boto3 (provided by Lambda runtime), pandas/pyarrow (in AWS SDK for Pandas layer)
 aws-lambda-powertools
-boto3
 Pillow
-pandas
-pyarrow

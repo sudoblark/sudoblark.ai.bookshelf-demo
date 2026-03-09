@@ -1,0 +1,3 @@
+# Additional dependencies for local testing and CI
+# These are provided by Lambda runtime but needed locally
+boto3
