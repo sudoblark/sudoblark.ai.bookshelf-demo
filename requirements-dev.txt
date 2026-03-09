@@ -18,7 +18,7 @@ bandit==1.8.6
 
 # Type stubs
 boto3-stubs[s3,bedrock-runtime]==1.42.64
-types-Pillow==11.0.0.20250311
+types-Pillow==10.2.0.20240822
 
 # Pre-commit
 pre-commit==4.3.0
