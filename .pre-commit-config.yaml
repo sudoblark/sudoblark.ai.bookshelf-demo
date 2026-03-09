@@ -1,3 +1,4 @@
+---
 repos:
   # Python code formatting
   - repo: https://github.com/psf/black
@@ -7,6 +8,7 @@ repos:
         name: Format Python code with Black
         language_version: python3.11
         files: ^(lambda-packages|tests)/.*\.py$
+        args: ["--line-length=100"]
 
   # Python import sorting
   - repo: https://github.com/pycqa/isort
@@ -34,11 +36,13 @@ repos:
     hooks:
       - id: mypy
         name: mypy type check (unzip-processor)
+        language_version: python3.11
         files: ^lambda-packages/unzip-processor/.*\.py$
         additional_dependencies: ['boto3-stubs[s3]']
 
       - id: mypy
         name: mypy type check (metadata-extractor)
+        language_version: python3.11
         files: ^lambda-packages/metadata-extractor/.*\.py$
         additional_dependencies: ['boto3-stubs[s3,bedrock-runtime]', 'types-Pillow']
 
@@ -53,35 +57,51 @@ repos:
         args: ["-r", "--skip", "B101"]
         additional_dependencies: ["pbr"]
 
-  # Terraform formatting
+  # Terraform formatting and validation
   - repo: https://github.com/antonbabenko/pre-commit-terraform
     rev: v1.88.1
     hooks:
       - id: terraform_fmt
+        name: Format Terraform code
         args:
           - --args=-recursive
+
+      - id: terraform_validate
+        name: Validate Terraform configuration
+        files: ^infrastructure/aws-.*/
+        args:
+          - --hook-config=--retry-once-with-cleanup=true
 
   # General file fixes
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
       - id: trailing-whitespace
+        name: Trim trailing whitespace
         types: [text]
       - id: end-of-file-fixer
+        name: Fix end of files
         types: [text]
       - id: check-yaml
+        name: Check YAML syntax
         args: ['--unsafe']
       - id: check-json
+        name: Check JSON syntax
       - id: check-merge-conflict
+        name: Check for merge conflicts
       - id: mixed-line-ending
+        name: Fix mixed line endings
         args: ['--fix=lf']
       - id: check-added-large-files
+        name: Check for large files
         args: ["--maxkb=500"]
       - id: detect-private-key
+        name: Detect private keys
 
   # YAML formatting for workflows
   - repo: https://github.com/adrienverge/yamllint
     rev: v1.35.1
     hooks:
       - id: yamllint
+        name: Lint YAML files
         files: ^\.github/workflows/.*\.ya?ml$
