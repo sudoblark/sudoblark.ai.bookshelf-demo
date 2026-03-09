@@ -1,0 +1,107 @@
+---
+repos:
+  # Python code formatting
+  - repo: https://github.com/psf/black
+    rev: 23.11.0
+    hooks:
+      - id: black
+        name: Format Python code with Black
+        language_version: python3.11
+        files: ^(lambda-packages|tests)/.*\.py$
+        args: ["--line-length=100"]
+
+  # Python import sorting
+  - repo: https://github.com/pycqa/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
+        name: Sort Python imports with isort
+        language_version: python3.11
+        files: ^(lambda-packages|tests)/.*\.py$
+        args: ["--profile", "black", "--line-length", "100"]
+
+  # Python linting
+  - repo: https://github.com/pycqa/flake8
+    rev: 6.1.0
+    hooks:
+      - id: flake8
+        name: Lint Python with Flake8
+        language_version: python3.11
+        files: ^(lambda-packages|tests)/.*\.py$
+        args: ["--max-line-length=100", "--extend-ignore=E203,W503"]
+
+  # Python type checking (per Lambda to avoid module conflicts)
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.7.1
+    hooks:
+      - id: mypy
+        name: mypy type check (unzip-processor)
+        language_version: python3.11
+        files: ^lambda-packages/unzip-processor/.*\.py$
+        additional_dependencies: ['boto3-stubs[s3]']
+
+      - id: mypy
+        name: mypy type check (metadata-extractor)
+        language_version: python3.11
+        files: ^lambda-packages/metadata-extractor/.*\.py$
+        additional_dependencies: ['boto3-stubs[s3,bedrock-runtime]', 'types-Pillow']
+
+  # Python security scanning
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.5
+    hooks:
+      - id: bandit
+        name: Security scan with Bandit
+        language_version: python3.11
+        files: ^lambda-packages/.*\.py$
+        args: ["-r", "--skip", "B101"]
+        additional_dependencies: ["pbr"]
+
+  # Terraform formatting and validation
+  - repo: https://github.com/antonbabenko/pre-commit-terraform
+    rev: v1.88.1
+    hooks:
+      - id: terraform_fmt
+        name: Format Terraform code
+        args:
+          - --args=-recursive
+
+      - id: terraform_validate
+        name: Validate Terraform configuration
+        files: ^infrastructure/aws-.*/
+        args:
+          - --hook-config=--retry-once-with-cleanup=true
+
+  # General file fixes
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        name: Trim trailing whitespace
+        types: [text]
+      - id: end-of-file-fixer
+        name: Fix end of files
+        types: [text]
+      - id: check-yaml
+        name: Check YAML syntax
+        args: ['--unsafe']
+      - id: check-json
+        name: Check JSON syntax
+      - id: check-merge-conflict
+        name: Check for merge conflicts
+      - id: mixed-line-ending
+        name: Fix mixed line endings
+        args: ['--fix=lf']
+      - id: check-added-large-files
+        name: Check for large files
+        args: ["--maxkb=500"]
+      - id: detect-private-key
+        name: Detect private keys
+
+  # YAML formatting for workflows
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        name: Lint YAML files
+        files: ^\.github/workflows/.*\.ya?ml$

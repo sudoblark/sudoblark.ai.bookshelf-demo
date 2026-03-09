@@ -1,0 +1,232 @@
+---
+name: Pull Request Quality Checks
+
+'on':
+  pull_request:
+    branches:
+      - main
+
+env:
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  format_check:
+    name: Terraform Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+
+      - name: Terraform format check
+        uses: dflook/terraform-fmt-check@v2
+        id: fmt-check
+        with:
+          path: ./infrastructure/aws-sudoblark-development
+
+  validate:
+    name: Terraform Validate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Create Lambda deployment packages
+        run: |
+          # Unzip processor
+          cd lambda-packages/unzip-processor
+          pip install -r requirements.txt -t .
+          zip -r ../unzip-processor.zip .
+          cd ../..
+
+          # Metadata extractor
+          cd lambda-packages/metadata-extractor
+          pip install -r requirements.txt -t .
+          zip -r ../metadata-extractor.zip .
+          cd ../..
+
+      - name: terraform validate
+        uses: dflook/terraform-validate@v2
+        id: validate
+        with:
+          path: ./infrastructure/aws-sudoblark-development
+
+  checkov:
+    name: Checkov Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: ./infrastructure/aws-sudoblark-development
+          framework: terraform
+          output_format: cli
+          soft_fail: false
+
+  python_lint:
+    name: Python Code Quality - ${{ matrix.lambda }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        lambda:
+          - unzip-processor
+          - metadata-extractor
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-dev.txt
+          pip install -r lambda-packages/${{ matrix.lambda }}/requirements.txt
+
+      - name: Run Black
+        run: black --check lambda-packages/${{ matrix.lambda }}/
+
+      - name: Run isort
+        run: isort --check-only lambda-packages/${{ matrix.lambda }}/
+
+      - name: Run Flake8
+        run: flake8 lambda-packages/${{ matrix.lambda }}/
+
+      - name: Run mypy
+        run: mypy lambda-packages/${{ matrix.lambda }}/
+
+      - name: Run Bandit
+        run: |
+          bandit -r lambda-packages/${{ matrix.lambda }}/ -f json \
+            -o bandit-report-${{ matrix.lambda }}.json || true
+
+      - name: Upload Bandit Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-security-report-${{ matrix.lambda }}
+          path: bandit-report-${{ matrix.lambda }}.json
+
+  python_test:
+    name: Python Tests - ${{ matrix.lambda }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        lambda:
+          - unzip-processor
+          - metadata-extractor
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements-dev.txt
+          pip install -r lambda-packages/${{ matrix.lambda }}/requirements.txt
+
+      - name: Run pytest with coverage
+        run: |
+          TEST_FILE="test_${{ matrix.lambda }}.py"
+          TEST_FILE="${TEST_FILE//-/_}"
+          pytest tests/${TEST_FILE} \
+            --cov=lambda-packages/${{ matrix.lambda }} \
+            --cov-report=term-missing --cov-report=html \
+            --cov-fail-under=80
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-${{ matrix.lambda }}
+          path: htmlcov/
+
+  test:
+    name: Terraform Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+
+      - name: Read Terraform version
+        id: terraform-version
+        working-directory: ./infrastructure/aws-sudoblark-development
+        run: echo "version=$(cat .terraform-version)" >> $GITHUB_OUTPUT
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ steps.terraform-version.outputs.version }}
+
+      - name: Terraform Init - Data Module
+        run: terraform init
+        working-directory: ./modules/data
+
+      - name: Terraform Test - Data Module
+        run: terraform test
+        working-directory: ./modules/data
+
+  plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Create Lambda deployment packages
+        run: |
+          # Unzip processor
+          cd lambda-packages/unzip-processor
+          pip install -r requirements.txt -t .
+          zip -r ../unzip-processor.zip .
+          cd ../..
+
+          # Metadata extractor
+          cd lambda-packages/metadata-extractor
+          pip install -r requirements.txt -t .
+          zip -r ../metadata-extractor.zip .
+          cd ../..
+
+      - name: terraform plan
+        uses: dflook/terraform-plan@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          path: ./infrastructure/aws-sudoblark-development
