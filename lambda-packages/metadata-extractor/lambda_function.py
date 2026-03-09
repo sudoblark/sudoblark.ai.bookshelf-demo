@@ -23,6 +23,7 @@ from PIL import Image
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.type_defs import GetObjectOutputTypeDef
+    from PIL.Image import Image as PILImage
 
 # Configure logging
 LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
@@ -373,12 +374,13 @@ def resize_image_to_jpeg(image_bytes: bytes, max_dim: int = 1024, quality: int =
         raise ValueError("image_bytes must not be empty")
 
     try:
-        with Image.open(io.BytesIO(image_bytes)) as img:
-            img = img.convert("RGB")
-            img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
+        original_img: "PILImage"
+        with Image.open(io.BytesIO(image_bytes)) as original_img:
+            rgb_img: "PILImage" = original_img.convert("RGB")
+            rgb_img.thumbnail((max_dim, max_dim), Image.Resampling.LANCZOS)
 
-            buffer = io.BytesIO()
-            img.save(buffer, format="JPEG", quality=quality)
+            buffer: io.BytesIO = io.BytesIO()
+            rgb_img.save(buffer, format="JPEG", quality=quality)
             return buffer.getvalue()
 
     except Exception as e:

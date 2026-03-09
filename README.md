@@ -256,10 +256,9 @@ python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install development dependencies
-pip install black isort flake8 mypy bandit pytest pytest-cov pytest-mock moto 'boto3-stubs[s3,bedrock-runtime]'
+pip install -r requirements-dev.txt
 
 # Install pre-commit hooks (highly recommended)
-pip install pre-commit
 pre-commit install
 
 # Install Lambda dependencies for local testing
