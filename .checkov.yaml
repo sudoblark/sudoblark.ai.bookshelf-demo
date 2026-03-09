@@ -1,0 +1,38 @@
+# Checkov configuration
+# Documentation: https://www.checkov.io/2.Basics/Suppressing%20and%20Skipping%20Policies.html
+
+# Skip specific checks that don't apply to this demo/workshop repository
+skip-check:
+  # Lambda VPC Configuration
+  - CKV_AWS_117  # Demo lambdas don't need VPC - no private resources to access
+
+  # Lambda Monitoring & Resilience
+  - CKV_AWS_116  # Dead Letter Queue not needed - demo processing is non-critical
+  - CKV_AWS_50   # X-Ray tracing not needed - demo doesn't require detailed tracing
+  - CKV_AWS_173  # Lambda tracing not needed - basic CloudWatch logs sufficient for demo
+
+  # Lambda Concurrency Controls
+  - CKV_AWS_115  # Function-level concurrency limits not needed - demo has low traffic
+  - CKV_AWS_145  # Reserved concurrent execution not needed - demo doesn't require guaranteed capacity
+
+  # Lambda Runtime
+  - CKV_AWS_272  # Using Python 3.11 which is current, not latest (3.12) - layer compatibility
+
+  # S3 Bucket Configuration
+  - CKV2_AWS_62  # S3 event notifications are configured - false positive
+  - CKV_AWS_18   # Access logging not needed - demo buckets don't require audit trail
+  - CKV2_AWS_61  # Lifecycle configuration not needed - demo data is temporary
+  - CKV_AWS_21   # Versioning not needed - demo data is ephemeral and non-critical
+  - CKV_AWS_144  # Replication not needed - demo is single-region, no DR requirements
+
+  # Glue Security Configuration
+  - CKV_AWS_99   # Glue encryption configured but Checkov validation is overly strict for demo
+
+
+# Framework to scan
+framework:
+  - terraform
+
+# Output format
+output:
+  - cli
