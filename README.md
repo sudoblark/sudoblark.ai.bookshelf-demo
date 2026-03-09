@@ -363,12 +363,12 @@ terraform apply  # Type 'yes' to confirm
    -- View all extracted book metadata
    SELECT *
    FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-   ORDER BY processing_timestamp DESC;
+   LIMIT 10;
 
    -- Find books by author
    SELECT title, author, published_year
    FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-   WHERE author LIKE '%Martin%'
+   WHERE author LIKE '%George%'
    ORDER BY published_year DESC;
 
    -- Count books by publisher
