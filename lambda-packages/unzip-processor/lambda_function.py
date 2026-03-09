@@ -9,11 +9,14 @@ import io
 import logging
 import os
 import zipfile
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, TYPE_CHECKING
 
 import boto3
 from aws_lambda_powertools.utilities.data_classes import S3Event, event_source
 from botocore.exceptions import ClientError
+
+if TYPE_CHECKING:
+    from mypy_boto3_s3.type_defs import GetObjectOutputTypeDef
 
 # Configure logging
 LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
@@ -158,7 +161,7 @@ def extract_images_from_zip(source_bucket: str, zip_key: str, raw_bucket_name: s
     try:
         # Download ZIP file from S3
         logger.debug(f"Downloading ZIP file from s3://{source_bucket}/{zip_key}")
-        zip_obj: Dict[str, Any] = s3_client.get_object(Bucket=source_bucket, Key=zip_key)
+        zip_obj: "GetObjectOutputTypeDef" = s3_client.get_object(Bucket=source_bucket, Key=zip_key)
         zip_content: bytes = zip_obj["Body"].read()
 
         logger.info(f"Downloaded ZIP file: {len(zip_content)} bytes")

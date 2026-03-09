@@ -13,13 +13,16 @@ import logging
 import os
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, TYPE_CHECKING
 
 import boto3
 import pandas as pd
 from aws_lambda_powertools.utilities.data_classes import S3Event, event_source
 from botocore.exceptions import BotoCoreError, ClientError
 from PIL import Image
+
+if TYPE_CHECKING:
+    from mypy_boto3_s3.type_defs import GetObjectOutputTypeDef
 
 # Configure logging
 LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
@@ -194,7 +197,7 @@ def process_image_to_parquet(source_bucket: str, image_key: str, config: Dict[st
 
     try:
         # Download image from S3
-        image_obj: Dict[str, Any] = s3_client.get_object(Bucket=source_bucket, Key=image_key)
+        image_obj: "GetObjectOutputTypeDef" = s3_client.get_object(Bucket=source_bucket, Key=image_key)
         image_bytes: bytes = image_obj["Body"].read()
 
         logger.info(f"Downloaded image: {len(image_bytes)} bytes")
