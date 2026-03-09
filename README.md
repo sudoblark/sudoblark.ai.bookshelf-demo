@@ -197,22 +197,18 @@ Extracted book metadata in Parquet format:
 
 | Field | Type | Description | Example |
 |-------|------|-------------|---------|
+| `id` | string | Unique identifier (UUID) | "a1b2c3d4-e5f6-7890-abcd-ef1234567890" |
 | `title` | string | Book title | "The Pragmatic Programmer" |
 | `author` | string | Author name(s) | "Andrew Hunt, David Thomas" |
-| `isbn` | string | ISBN-10 or ISBN-13 | "978-0135957059" |
+| `isbn` | string | ISBN (digits only, no hyphens) | "9780135957059" |
 | `publisher` | string | Publishing company | "Addison-Wesley" |
 | `published_year` | integer | Year of publication | 2019 |
-| `genre` | string | Book category | "Software Engineering" |
 | `description` | string | Brief synopsis | "Your journey to mastery" |
-| `image_name` | string | Original filename | "cover1.jpg" |
-| `processing_timestamp` | timestamp | When processed | "2026-03-09T10:30:00Z" |
-| `confidence` | float | Extraction confidence | 0.92 |
+| `confidence` | float | AI extraction confidence (0.0-1.0) | 0.95 |
+| `filename` | string | Original filename | "cover1.jpg" |
+| `processed_at` | timestamp | When processed (ISO 8601) | "2026-03-09T10:30:00Z" |
 
-**Note**: Fields may be `null` if Bedrock cannot extract from image.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-<!-- GETTING STARTED -->
+**Note**: Fields extracted by Bedrock (`title`, `author`, `isbn`, `publisher`, `published_year`, `description`, `confidence`) may be empty strings or `null` if not found in the image.
 ## Getting Started
 
 To get a local copy up and running follow these simple steps.
@@ -274,9 +270,9 @@ pre-commit install
 
 # Install Lambda dependencies for local testing
 cd lambda-packages/unzip-processor
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-ci.txt
 cd ../metadata-extractor
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-ci.txt
 cd ../..
 ```
 
@@ -293,12 +289,14 @@ pip install -r requirements.txt -t .
 zip -r ../../unzip-processor.zip .
 cd ../..
 
-# Metadata extractor (includes Pillow for image handling)
+# Metadata extractor
 cd lambda-packages/metadata-extractor
 pip install -r requirements.txt -t .
 zip -r ../../metadata-extractor.zip .
 cd ../..
 ```
+
+> **💡 Lambda Packaging:** `requirements.txt` contains minimal runtime dependencies for deployment. `requirements-ci.txt` contains additional dependencies (boto3, pandas, pyarrow) needed for local testing/CI that are provided by Lambda runtime or AWS layers in production.
 
 **Step 4: Deploy with Terraform**
 
@@ -373,10 +371,10 @@ terraform apply  # Type 'yes' to confirm
    WHERE author LIKE '%Martin%'
    ORDER BY published_year DESC;
 
-   -- Count books by genre
-   SELECT genre, COUNT(*) as book_count
+   -- Count books by publisher
+   SELECT publisher, COUNT(*) as book_count
    FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-   GROUP BY genre
+   GROUP BY publisher
    ORDER BY book_count DESC;
    ```
 
@@ -386,7 +384,7 @@ terraform apply  # Type 'yes' to confirm
 
 **Query books published after 2020:**
 ```sql
-SELECT title, author, published_year, genre
+SELECT title, author, published_year, publisher
 FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
 WHERE published_year > 2020
 ORDER BY published_year DESC, title ASC;
@@ -394,9 +392,9 @@ ORDER BY published_year DESC, title ASC;
 
 **Find books with low confidence scores** (may need manual review):
 ```sql
-SELECT title, author, confidence, image_name
+SELECT title, author, confidence, filename
 FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-WHERE confidence < 0.7
+WHERE confidence < 0.7 OR confidence IS NULL
 ORDER BY confidence ASC;
 ```
 

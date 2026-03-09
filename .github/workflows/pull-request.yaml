@@ -104,6 +104,8 @@ jobs:
         run: |
           pip install -r requirements-dev.txt
           pip install -r lambda-packages/${{ matrix.lambda }}/requirements.txt
+          pip install -r \
+            lambda-packages/${{ matrix.lambda }}/requirements-ci.txt
 
       - name: Run Black
         run: black --check lambda-packages/${{ matrix.lambda }}/
@@ -152,6 +154,8 @@ jobs:
         run: |
           pip install -r requirements-dev.txt
           pip install -r lambda-packages/${{ matrix.lambda }}/requirements.txt
+          pip install -r \
+            lambda-packages/${{ matrix.lambda }}/requirements-ci.txt
 
       - name: Run pytest with coverage
         run: |

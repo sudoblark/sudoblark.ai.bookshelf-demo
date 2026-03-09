@@ -48,7 +48,8 @@ Required JSON format:
   "isbn": "digits only, no hyphens",
   "publisher": "publisher name here",
   "published_year": 2024,
-  "description": "brief description here"
+  "description": "brief description here",
+  "confidence": 0.95
 }
 
 Rules:
@@ -56,7 +57,8 @@ Rules:
 - No trailing commas
 - isbn: digits only (strip hyphens/spaces), use "" if not found
 - published_year: integer (e.g., 2024) or null if not found
-- Empty values: use "" for unknown strings, null for unknown year
+- confidence: float 0.0-1.0 indicating extraction confidence (1.0 = very confident)
+- Empty values: use "" for unknown strings, null for unknown year/confidence
 - Escape special characters in strings (quotes, backslashes, newlines)
 - Do not include any text before or after the JSON object
 
@@ -321,6 +323,7 @@ def parse_bedrock_response(response_text: str) -> Dict[str, Any]:
         "description": "",
         "isbn": "",
         "published_year": None,
+        "confidence": None,
     }
 
     try:

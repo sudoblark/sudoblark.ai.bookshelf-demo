@@ -1,0 +1,5 @@
+# Additional dependencies for local testing and CI
+# These are provided by AWS layers in production but needed locally
+boto3
+pandas
+pyarrow
