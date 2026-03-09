@@ -2,6 +2,7 @@
 
 import importlib.util
 import io
+import json
 import os
 
 # Add lambda-packages to path for imports
@@ -388,3 +389,172 @@ class TestHandler:
         assert response["statusCode"] == 207  # Multi-status
         assert response["processed_count"] == 1
         assert response["failed_count"] == 1
+
+
+class TestExtractMetadataWithBedrock:
+    """Tests for Bedrock metadata extraction."""
+
+    def test_extract_metadata_bedrock_client_error(self, mocker):
+        """Test Bedrock ClientError handling."""
+        from botocore.exceptions import ClientError
+
+        # Mock Bedrock client to raise ClientError
+        mock_bedrock = mocker.patch.object(metadata_lambda, "bedrock_client")
+        mock_bedrock.invoke_model.side_effect = ClientError(
+            {"Error": {"Code": "ThrottlingException", "Message": "Rate exceeded"}}, "InvokeModel"
+        )
+
+        # Create test image
+        img_buffer = io.BytesIO()
+        img = Image.new("RGB", (100, 100), color="red")
+        img.save(img_buffer, format="JPEG")
+        image_bytes = img_buffer.getvalue()
+
+        with pytest.raises(ClientError):
+            metadata_lambda.extract_metadata_with_bedrock(
+                image_bytes, "test.jpg", "anthropic.claude-3-haiku-20240307-v1:0"
+            )
+
+    def test_extract_metadata_empty_image_bytes(self):
+        """Test empty image bytes validation."""
+        with pytest.raises(ValueError, match="image_bytes must not be empty"):
+            metadata_lambda.extract_metadata_with_bedrock(
+                b"", "test.jpg", "anthropic.claude-3-haiku-20240307-v1:0"
+            )
+
+    def test_extract_metadata_unexpected_response_structure(self, mocker):
+        """Test handling of unexpected Bedrock response."""
+        from unittest.mock import MagicMock
+
+        # Mock Bedrock with missing content
+        mock_bedrock = mocker.patch.object(metadata_lambda, "bedrock_client")
+        mock_bedrock.invoke_model.return_value = {
+            "body": MagicMock(read=lambda: json.dumps({"id": "msg_123", "content": []}).encode())
+        }
+
+        img_buffer = io.BytesIO()
+        img = Image.new("RGB", (100, 100), color="red")
+        img.save(img_buffer, format="JPEG")
+        image_bytes = img_buffer.getvalue()
+
+        with pytest.raises(ValueError, match="Bedrock response missing content"):
+            metadata_lambda.extract_metadata_with_bedrock(
+                image_bytes, "test.jpg", "anthropic.claude-3-haiku-20240307-v1:0"
+            )
+
+
+class TestResizeImageEdgeCases:
+    """Tests for image resizing edge cases."""
+
+    def test_resize_image_empty_bytes(self):
+        """Test resize with empty bytes."""
+        with pytest.raises(ValueError, match="image_bytes must not be empty"):
+            metadata_lambda.resize_image_to_jpeg(b"")
+
+    def test_resize_image_invalid_image_data(self):
+        """Test resize with invalid image data."""
+        with pytest.raises(Exception):  # PIL will raise various exceptions
+            metadata_lambda.resize_image_to_jpeg(b"not an image")
+
+
+class TestProcessImageToParquetErrors:
+    """Tests for process_image_to_parquet error paths."""
+
+    def test_process_s3_client_error(self, s3_client, mocker, monkeypatch):
+        """Test S3 ClientError handling."""
+        import json
+
+        from botocore.exceptions import ClientError
+
+        monkeypatch.setenv("PROCESSED_BUCKET", "test-account-project-app-processed")
+
+        # Mock Bedrock to return valid response
+        mock_bedrock = mocker.patch.object(metadata_lambda, "bedrock_client")
+        mock_bedrock.invoke_model.return_value = {
+            "body": mocker.MagicMock(
+                read=lambda: json.dumps(
+                    {
+                        "id": "msg_123",
+                        "content": [
+                            {
+                                "text": json.dumps(
+                                    {
+                                        "title": "Test Book",
+                                        "author": "Test Author",
+                                        "isbn": "1234567890",
+                                        "publisher": "Test Publisher",
+                                        "published_year": 2024,
+                                        "description": "Test description",
+                                    }
+                                )
+                            }
+                        ],
+                    }
+                ).encode()
+            )
+        }
+
+        # Create bucket and image with proper region configuration
+        source_bucket = "test-account-project-app-source"
+        s3_client.create_bucket(
+            Bucket=source_bucket, CreateBucketConfiguration={"LocationConstraint": "eu-west-2"}
+        )
+        img_buffer = io.BytesIO()
+        img = Image.new("RGB", (100, 100), color="blue")
+        img.save(img_buffer, format="JPEG")
+        s3_client.put_object(Bucket=source_bucket, Key="test.jpg", Body=img_buffer.getvalue())
+
+        # Mock S3 client to fail on put_object
+        mock_s3 = mocker.patch.object(metadata_lambda, "s3_client")
+        mock_s3.get_object.return_value = {
+            "Body": mocker.MagicMock(read=lambda: img_buffer.getvalue())
+        }
+        mock_s3.put_object.side_effect = ClientError(
+            {"Error": {"Code": "AccessDenied", "Message": "Access Denied"}}, "PutObject"
+        )
+
+        config = {
+            "processed_bucket": "test-account-project-app-processed",
+            "bedrock_model_id": "model-id",
+        }
+
+        with pytest.raises(ClientError):
+            metadata_lambda.process_image_to_parquet(source_bucket, "test.jpg", config)
+
+
+class TestHandlerErrors:
+    """Tests for handler error paths."""
+
+    def test_handler_path_traversal_attack(self, lambda_context, monkeypatch):
+        """Test path traversal validation."""
+        monkeypatch.setenv("PROCESSED_BUCKET", "test-processed")
+
+        event = {
+            "Records": [
+                {
+                    "eventVersion": "2.1",
+                    "eventSource": "aws:s3",
+                    "s3": {
+                        "bucket": {"name": "test-bucket"},
+                        "object": {"key": "../../../etc/passwd"},
+                    },
+                }
+            ]
+        }
+
+        response = metadata_lambda.handler(event, lambda_context)
+
+        # Should handle gracefully and report failure
+        assert response["failed_count"] == 1
+        assert "path traversal" in str(response["failed_files"][0]["error"]).lower()
+
+    def test_handler_general_exception(self, lambda_context, monkeypatch):
+        """Test handler with general exception."""
+        monkeypatch.setenv("PROCESSED_BUCKET", "test-processed")
+
+        # Invalid event structure (missing required fields)
+        event = {"Records": [{}]}
+
+        # Should raise exception at handler level
+        with pytest.raises(Exception):
+            metadata_lambda.handler(event, lambda_context)
