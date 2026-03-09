@@ -1,6 +1,7 @@
+---
 name: Pull Request Quality Checks
 
-on:
+'on':
   pull_request:
     branches:
       - main
@@ -102,7 +103,8 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r lambda-packages/${{ matrix.lambda }}/requirements.txt
-          pip install black==23.11.0 isort==5.12.0 flake8==6.1.0 mypy==1.7.0 bandit==1.7.5
+          pip install black==23.11.0 isort==5.12.0 flake8==6.1.0 \
+            mypy==1.7.0 bandit==1.7.5
           pip install boto3-stubs[s3,bedrock-runtime]
 
       - name: Run Black
@@ -118,7 +120,9 @@ jobs:
         run: mypy lambda-packages/${{ matrix.lambda }}/
 
       - name: Run Bandit
-        run: bandit -r lambda-packages/${{ matrix.lambda }}/ -f json -o bandit-report-${{ matrix.lambda }}.json || true
+        run: |
+          bandit -r lambda-packages/${{ matrix.lambda }}/ -f json \
+            -o bandit-report-${{ matrix.lambda }}.json || true
 
       - name: Upload Bandit Report
         if: always()
@@ -148,14 +152,18 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytest==7.4.0 pytest-cov==4.1.0 pytest-mock==3.12.0 moto[s3]==4.2.0
+          pip install pytest==7.4.0 pytest-cov==4.1.0 \
+            pytest-mock==3.12.0 moto[s3]==4.2.0
           pip install -r lambda-packages/${{ matrix.lambda }}/requirements.txt
 
       - name: Run pytest with coverage
         run: |
           TEST_FILE="test_${{ matrix.lambda }}.py"
           TEST_FILE="${TEST_FILE//-/_}"
-          pytest tests/${TEST_FILE} --cov=lambda-packages/${{ matrix.lambda }} --cov-report=term-missing --cov-report=html --cov-fail-under=80
+          pytest tests/${TEST_FILE} \
+            --cov=lambda-packages/${{ matrix.lambda }} \
+            --cov-report=term-missing --cov-report=html \
+            --cov-fail-under=80
 
       - name: Upload coverage report
         if: always()

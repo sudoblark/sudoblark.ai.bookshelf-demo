@@ -14,7 +14,9 @@ import pytest
 # Dynamically import lambda_function from unzip-processor directory
 spec = importlib.util.spec_from_file_location(
     "unzip_lambda_function",
-    os.path.join(os.path.dirname(__file__), "../lambda-packages/unzip-processor/lambda_function.py")
+    os.path.join(
+        os.path.dirname(__file__), "../lambda-packages/unzip-processor/lambda_function.py"
+    ),
 )
 unzip_lambda = importlib.util.module_from_spec(spec)
 sys.modules["unzip_lambda_function"] = unzip_lambda
@@ -85,13 +87,13 @@ class TestExtractImagesFromZip:
 
     def test_extract_images_from_zip_success(self, aws_credentials, monkeypatch):
         """Should extract image files from ZIP and upload to S3."""
-        from moto import mock_aws
         import boto3
-        
+        from moto import mock_aws
+
         with mock_aws():
             # Create S3 client inside mock context
             s3_client = boto3.client("s3", region_name="eu-west-2")
-            
+
             # Create test ZIP file with images
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, "w") as zf:
@@ -103,17 +105,23 @@ class TestExtractImagesFromZip:
 
             # Create source bucket and upload ZIP
             s3_client.create_bucket(
-                Bucket="aws-sudoblark-development-demos-landing", CreateBucketConfiguration={"LocationConstraint": "eu-west-2"}
+                Bucket="aws-sudoblark-development-demos-landing",
+                CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
             )
-            s3_client.put_object(Bucket="aws-sudoblark-development-demos-landing", Key="test.zip", Body=zip_content)
+            s3_client.put_object(
+                Bucket="aws-sudoblark-development-demos-landing", Key="test.zip", Body=zip_content
+            )
 
             # Create destination bucket
             s3_client.create_bucket(
-                Bucket="aws-sudoblark-development-demos-raw", CreateBucketConfiguration={"LocationConstraint": "eu-west-2"}
+                Bucket="aws-sudoblark-development-demos-raw",
+                CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
             )
 
             # Extract images
-            result = unzip_lambda.extract_images_from_zip("aws-sudoblark-development-demos-landing", "test.zip", "raw")
+            result = unzip_lambda.extract_images_from_zip(
+                "aws-sudoblark-development-demos-landing", "test.zip", "raw"
+            )
 
             # Verify results
             assert len(result) == 2
@@ -126,13 +134,13 @@ class TestExtractImagesFromZip:
 
     def test_extract_images_from_zip_no_images(self, aws_credentials, monkeypatch):
         """Should return empty list when no images in ZIP."""
-        from moto import mock_aws
         import boto3
-        
+        from moto import mock_aws
+
         with mock_aws():
             # Create S3 client inside mock context
             s3_client = boto3.client("s3", region_name="eu-west-2")
-            
+
             # Create ZIP with only text files
             zip_buffer = io.BytesIO()
             with zipfile.ZipFile(zip_buffer, "w") as zf:
@@ -142,15 +150,21 @@ class TestExtractImagesFromZip:
             zip_content = zip_buffer.getvalue()
 
             s3_client.create_bucket(
-                Bucket="aws-sudoblark-development-demos-landing", CreateBucketConfiguration={"LocationConstraint": "eu-west-2"}
+                Bucket="aws-sudoblark-development-demos-landing",
+                CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
             )
-            s3_client.put_object(Bucket="aws-sudoblark-development-demos-landing", Key="test.zip", Body=zip_content)
+            s3_client.put_object(
+                Bucket="aws-sudoblark-development-demos-landing", Key="test.zip", Body=zip_content
+            )
 
             s3_client.create_bucket(
-                Bucket="aws-sudoblark-development-demos-raw", CreateBucketConfiguration={"LocationConstraint": "eu-west-2"}
+                Bucket="aws-sudoblark-development-demos-raw",
+                CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
             )
 
-            result = unzip_lambda.extract_images_from_zip("aws-sudoblark-development-demos-landing", "test.zip", "raw")
+            result = unzip_lambda.extract_images_from_zip(
+                "aws-sudoblark-development-demos-landing", "test.zip", "raw"
+            )
 
             assert len(result) == 0
 
@@ -161,13 +175,19 @@ class TestExtractImagesFromZip:
 
     def test_extract_images_empty_inputs(self):
         """Should raise ValueError for empty inputs."""
-        with pytest.raises(ValueError, match="source_bucket, zip_key, and raw_bucket_name must not be empty"):
+        with pytest.raises(
+            ValueError, match="source_bucket, zip_key, and raw_bucket_name must not be empty"
+        ):
             unzip_lambda.extract_images_from_zip("", "test.zip", "raw")
 
-        with pytest.raises(ValueError, match="source_bucket, zip_key, and raw_bucket_name must not be empty"):
+        with pytest.raises(
+            ValueError, match="source_bucket, zip_key, and raw_bucket_name must not be empty"
+        ):
             unzip_lambda.extract_images_from_zip("test-bucket", "", "raw")
 
-        with pytest.raises(ValueError, match="source_bucket, zip_key, and raw_bucket_name must not be empty"):
+        with pytest.raises(
+            ValueError, match="source_bucket, zip_key, and raw_bucket_name must not be empty"
+        ):
             unzip_lambda.extract_images_from_zip("test-bucket", "test.zip", "")
 
 

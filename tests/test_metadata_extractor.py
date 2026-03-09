@@ -14,7 +14,9 @@ from PIL import Image
 # Dynamically import lambda_function from metadata-extractor directory
 spec = importlib.util.spec_from_file_location(
     "metadata_lambda_function",
-    os.path.join(os.path.dirname(__file__), "../lambda-packages/metadata-extractor/lambda_function.py")
+    os.path.join(
+        os.path.dirname(__file__), "../lambda-packages/metadata-extractor/lambda_function.py"
+    ),
 )
 metadata_lambda = importlib.util.module_from_spec(spec)
 sys.modules["metadata_lambda_function"] = metadata_lambda
@@ -50,7 +52,7 @@ class TestGetConfig:
         monkeypatch.delenv("BEDROCK_MODEL_ID", raising=False)
 
         config = metadata_lambda.get_config()
-        
+
         assert config["bedrock_model_id"] == "anthropic.claude-3-haiku-20240307-v1:0"
 
     def test_get_config_invalid_log_level(self, monkeypatch):
@@ -98,9 +100,9 @@ class TestEnsureMetadataDefaults:
     def test_add_missing_fields(self):
         """Should add missing required fields."""
         metadata = {"title": "Test Book"}
-        
+
         result = metadata_lambda.ensure_metadata_defaults(metadata, "book.jpg")
-        
+
         assert "id" in result
         assert result["filename"] == "book.jpg"
         assert "processed_at" in result
@@ -112,11 +114,11 @@ class TestEnsureMetadataDefaults:
             "id": "existing-id",
             "title": "Test",
             "filename": "original.jpg",
-            "processed_at": "2026-01-01T00:00:00Z"
+            "processed_at": "2026-01-01T00:00:00Z",
         }
-        
+
         result = metadata_lambda.ensure_metadata_defaults(metadata, "new.jpg")
-        
+
         assert result["id"] == "existing-id"
         assert result["filename"] == "original.jpg"
         assert result["processed_at"] == "2026-01-01T00:00:00Z"
@@ -185,7 +187,7 @@ class TestWriteMetadataToParquet:
             "id": "test-123",
             "title": "Test Book",
             "author": "Test Author",
-            "isbn": "123456789"
+            "isbn": "123456789",
         }
 
         parquet_key = metadata_lambda.write_metadata_to_parquet(metadata, "test-processed")
@@ -226,12 +228,16 @@ class TestProcessImageToParquet:
 
         # Upload to S3
         s3_client.create_bucket(
-            Bucket="aws-sudoblark-development-demos-raw", CreateBucketConfiguration={"LocationConstraint": "eu-west-2"}
+            Bucket="aws-sudoblark-development-demos-raw",
+            CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
         )
-        s3_client.put_object(Bucket="aws-sudoblark-development-demos-raw", Key="book.jpg", Body=img_bytes)
+        s3_client.put_object(
+            Bucket="aws-sudoblark-development-demos-raw", Key="book.jpg", Body=img_bytes
+        )
 
         s3_client.create_bucket(
-            Bucket="aws-sudoblark-development-demos-processed", CreateBucketConfiguration={"LocationConstraint": "eu-west-2"}
+            Bucket="aws-sudoblark-development-demos-processed",
+            CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
         )
 
         # Mock Bedrock response
@@ -241,16 +247,18 @@ class TestProcessImageToParquet:
             "author": "Test Author",
             "isbn": "123-456-789",
             "filename": "book.jpg",
-            "processed_at": "2026-03-09T10:00:00Z"
+            "processed_at": "2026-03-09T10:00:00Z",
         }
 
         # Process image
         config = metadata_lambda.get_config()
-        parquet_key = metadata_lambda.process_image_to_parquet("aws-sudoblark-development-demos-raw", "book.jpg", config)
+        parquet_key = metadata_lambda.process_image_to_parquet(
+            "aws-sudoblark-development-demos-raw", "book.jpg", config
+        )
 
         # Verify parquet key is returned
         assert parquet_key.endswith(".parquet")
-        
+
         # Verify Bedrock was called with correct parameters
         mock_bedrock.assert_called_once()
 
@@ -271,12 +279,16 @@ class TestProcessImageToParquet:
         img_bytes = img_buffer.getvalue()
 
         s3_client.create_bucket(
-            Bucket="aws-sudoblark-development-demos-raw", CreateBucketConfiguration={"LocationConstraint": "eu-west-2"}
+            Bucket="aws-sudoblark-development-demos-raw",
+            CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
         )
-        s3_client.put_object(Bucket="aws-sudoblark-development-demos-raw", Key="book.jpg", Body=img_bytes)
+        s3_client.put_object(
+            Bucket="aws-sudoblark-development-demos-raw", Key="book.jpg", Body=img_bytes
+        )
 
         s3_client.create_bucket(
-            Bucket="aws-sudoblark-development-demos-processed", CreateBucketConfiguration={"LocationConstraint": "eu-west-2"}
+            Bucket="aws-sudoblark-development-demos-processed",
+            CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
         )
 
         # Mock Bedrock to raise error
@@ -285,7 +297,9 @@ class TestProcessImageToParquet:
         config = metadata_lambda.get_config()
 
         with pytest.raises(Exception, match="Bedrock API error"):
-            metadata_lambda.process_image_to_parquet("aws-sudoblark-development-demos-raw", "book.jpg", config)
+            metadata_lambda.process_image_to_parquet(
+                "aws-sudoblark-development-demos-raw", "book.jpg", config
+            )
 
     def test_process_image_invalid_bucket_format(self, monkeypatch):
         """Should raise ValueError for invalid bucket name format."""

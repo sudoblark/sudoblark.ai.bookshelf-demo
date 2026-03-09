@@ -9,7 +9,7 @@ import io
 import logging
 import os
 import zipfile
-from typing import Any, Dict, List, Tuple, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Tuple
 
 import boto3
 from aws_lambda_powertools.utilities.data_classes import S3Event, event_source

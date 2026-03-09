@@ -4,6 +4,10 @@ import os
 from typing import Any, Dict
 from unittest.mock import MagicMock
 
+import boto3  # noqa: E402
+import pytest  # noqa: E402
+from moto import mock_aws  # noqa: E402
+
 # Set AWS credentials BEFORE importing boto3 to prevent region errors
 os.environ["AWS_ACCESS_KEY_ID"] = "testing"
 os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
@@ -11,10 +15,6 @@ os.environ["AWS_SECURITY_TOKEN"] = "testing"
 os.environ["AWS_SESSION_TOKEN"] = "testing"
 os.environ["AWS_DEFAULT_REGION"] = "eu-west-2"
 os.environ["LOG_LEVEL"] = "INFO"
-
-import boto3
-import pytest
-from moto import mock_aws
 
 
 @pytest.fixture

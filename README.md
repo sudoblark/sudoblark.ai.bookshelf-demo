@@ -11,7 +11,7 @@
 <br />
 <div align="center">
   <h1>📚</h1>
-  
+
   <h3 align="center">Bookshelf Demo</h3>
 
   <p align="center">
@@ -100,33 +100,33 @@ graph TB
     subgraph "User Actions"
         A[Upload ZIP]
     end
-    
+
     subgraph "AWS Cloud - Event-Driven Pipeline"
         subgraph "Landing Zone"
             B[S3: Landing Bucket]
         end
-        
+
         subgraph "Processing Layer"
             C[Lambda: Unzip Processor]
             D[S3: Raw Bucket]
             E[Lambda: Metadata Extractor]
         end
-        
+
         subgraph "Storage Layer"
             F[S3: Processed Bucket]
             G[Glue: Crawler]
             H[Glue: Data Catalog]
         end
-        
+
         subgraph "Query Layer"
             I[Athena: Workgroup]
         end
-        
+
         subgraph "AI Services"
             J[Bedrock: Claude 3 Haiku]
         end
     end
-    
+
     A -->|books.zip| B
     B -->|S3 Event| C
     C -->|Extract images| D
@@ -137,11 +137,11 @@ graph TB
     G -->|Discover schema| F
     G -->|Update| H
     I -->|Query| H
-    
+
     classDef storage fill:#569A31,stroke:#232F3E,color:#fff
     classDef compute fill:#FF6600,stroke:#232F3E,color:#fff
     classDef ai fill:#8C4FFF,stroke:#232F3E,color:#fff
-    
+
     class B,D,F storage
     class C,E,G compute
     class J ai
@@ -256,7 +256,11 @@ python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
 # Install development dependencies
-pip install black isort flake8 mypy bandit pytest pytest-cov pytest-mock moto
+pip install black isort flake8 mypy bandit pytest pytest-cov pytest-mock moto 'boto3-stubs[s3,bedrock-runtime]'
+
+# Install pre-commit hooks (highly recommended)
+pip install pre-commit
+pre-commit install
 
 # Install Lambda dependencies for local testing
 cd lambda-packages/unzip-processor
@@ -265,6 +269,10 @@ cd ../metadata-extractor
 pip install -r requirements.txt
 cd ../..
 ```
+
+> **💡 Pre-commit hooks:** Automatically run code formatters and linters before each commit. This catches issues early before CI/CD.
+>
+> Run manually: `pre-commit run --all-files`
 
 **Step 3: Package Lambda functions**
 
@@ -332,7 +340,7 @@ terraform apply  # Type 'yes' to confirm
    ```sh
    # Watch CloudWatch logs for unzip-processor
    aws logs tail /aws/lambda/aws-sudoblark-development-bookshelf-demo-unzip-processor --follow
-   
+
    # Watch metadata-extractor logs
    aws logs tail /aws/lambda/aws-sudoblark-development-bookshelf-demo-metadata-extractor --follow
    ```
@@ -345,16 +353,16 @@ terraform apply  # Type 'yes' to confirm
 6. **Query with Athena**
    ```sql
    -- View all extracted book metadata
-   SELECT * 
+   SELECT *
    FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
    ORDER BY processing_timestamp DESC;
-   
+
    -- Find books by author
    SELECT title, author, published_year
    FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
    WHERE author LIKE '%Martin%'
    ORDER BY published_year DESC;
-   
+
    -- Count books by genre
    SELECT genre, COUNT(*) as book_count
    FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
@@ -438,7 +446,8 @@ isort lambda-packages/ tests/
 # Lint with Flake8
 flake8 lambda-packages/ tests/
 
-# Type checking with mypy
+# Type checking with mypy (requires boto3-stubs)
+pip install 'boto3-stubs[s3,bedrock-runtime]'
 mypy lambda-packages/
 
 # Security scan with Bandit
@@ -836,7 +845,7 @@ xdg-open htmlcov/index.html  # Linux
 
 **Issue: "Model not found" error**
 - **Cause**: Bedrock model not enabled in account
-- **Solution**: 
+- **Solution**:
   1. Go to AWS Bedrock console
   2. Navigate to Model access
   3. Enable Claude 3 Haiku
@@ -844,7 +853,7 @@ xdg-open htmlcov/index.html  # Linux
 
 **Issue: Glue crawler not finding data**
 - **Cause**: Crawler run before Parquet files created
-- **Solution**: 
+- **Solution**:
   ```bash
   # Manually trigger after files are processed
   aws glue start-crawler --name aws-sudoblark-development-bookshelf-demo-bookshelf-metadata-crawler

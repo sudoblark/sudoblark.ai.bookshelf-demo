@@ -13,7 +13,7 @@ import logging
 import os
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List
 
 import boto3
 import pandas as pd
@@ -197,7 +197,9 @@ def process_image_to_parquet(source_bucket: str, image_key: str, config: Dict[st
 
     try:
         # Download image from S3
-        image_obj: "GetObjectOutputTypeDef" = s3_client.get_object(Bucket=source_bucket, Key=image_key)
+        image_obj: "GetObjectOutputTypeDef" = s3_client.get_object(
+            Bucket=source_bucket, Key=image_key
+        )
         image_bytes: bytes = image_obj["Body"].read()
 
         logger.info(f"Downloaded image: {len(image_bytes)} bytes")
