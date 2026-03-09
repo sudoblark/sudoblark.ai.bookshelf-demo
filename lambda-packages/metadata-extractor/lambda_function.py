@@ -13,17 +13,52 @@ import logging
 import os
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
 import boto3
 import pandas as pd
 from aws_lambda_powertools.utilities.data_classes import S3Event, event_source
 from botocore.exceptions import BotoCoreError, ClientError
 from PIL import Image
+from pydantic import BaseModel, Field, field_validator
 
 if TYPE_CHECKING:
     from mypy_boto3_s3.type_defs import GetObjectOutputTypeDef
     from PIL.Image import Image as PILImage
+
+
+class BookMetadata(BaseModel):
+    """Pydantic model for book metadata extracted from covers."""
+
+    title: str = Field(default="", description="Book title")
+    author: str = Field(default="", description="Author name(s)")
+    isbn: str = Field(default="", description="ISBN (digits only, no hyphens)")
+    publisher: str = Field(default="", description="Publisher name")
+    published_year: Optional[int] = Field(default=None, description="Year of publication")
+    description: str = Field(default="", description="Brief book description")
+    confidence: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="AI extraction confidence (0.0-1.0)",
+    )
+
+    @field_validator("isbn")
+    @classmethod
+    def validate_isbn(cls, v: str) -> str:
+        """Remove hyphens and spaces from ISBN."""
+        if v:
+            return v.replace("-", "").replace(" ", "")
+        return v
+
+    @field_validator("published_year")
+    @classmethod
+    def validate_year(cls, v: Optional[int]) -> Optional[int]:
+        """Validate year is reasonable."""
+        if v is not None and (v < 1000 or v > 2100):
+            return None
+        return v
+
 
 # Configure logging
 LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
@@ -308,32 +343,23 @@ def extract_metadata_with_bedrock(
 
 def parse_bedrock_response(response_text: str) -> Dict[str, Any]:
     """
-    Parse Bedrock model response into metadata dictionary.
+    Parse Bedrock model response into validated metadata dictionary.
+
+    Uses Pydantic for schema validation and type coercion.
 
     Args:
         response_text: Raw text response from Bedrock
 
     Returns:
-        Dictionary with parsed metadata
+        Dictionary with validated metadata
     """
-    metadata: Dict[str, Any] = {
-        "title": "",
-        "author": "",
-        "publisher": "",
-        "description": "",
-        "isbn": "",
-        "published_year": None,
-        "confidence": None,
-    }
-
     try:
         # Try to parse as JSON first
         parsed: Dict[str, Any] = json.loads(response_text.strip())
-        for key in metadata.keys():
-            if key in parsed:
-                metadata[key] = parsed[key]
-        logger.debug(f"Successfully parsed JSON response: {metadata}")
-        return metadata
+        # Validate with Pydantic
+        validated_metadata: BookMetadata = BookMetadata(**parsed)
+        logger.debug(f"Successfully validated JSON response: {validated_metadata}")
+        return cast(Dict[str, Any], validated_metadata.model_dump())
 
     except json.JSONDecodeError:
         logger.warning("Response was not valid JSON, attempting to extract from text")
@@ -345,16 +371,21 @@ def parse_bedrock_response(response_text: str) -> Dict[str, Any]:
             end: int = response_text.rfind("}") + 1
             if start >= 0 and end > start:
                 json_str: str = response_text[start:end]
-                parsed = json.loads(json_str)
-                for key in metadata.keys():
-                    if key in parsed:
-                        metadata[key] = parsed[key]
-                logger.debug(f"Extracted JSON from text: {metadata}")
-                return metadata
+                parsed_fallback: Dict[str, Any] = json.loads(json_str)
+                # Validate with Pydantic
+                validated_fallback: BookMetadata = BookMetadata(**parsed_fallback)
+                logger.debug(f"Extracted and validated JSON from text: {validated_fallback}")
+                return cast(Dict[str, Any], validated_fallback.model_dump())
         except (json.JSONDecodeError, ValueError) as e:
             logger.warning(f"Could not extract JSON from response: {e}")
 
-    return metadata
+    except Exception as e:
+        logger.warning(f"Pydantic validation failed: {e}")
+
+    # Return default model if all parsing fails
+    default_metadata: BookMetadata = BookMetadata()
+    logger.warning("Using default metadata due to parsing failures")
+    return cast(Dict[str, Any], default_metadata.model_dump())
 
 
 def resize_image_to_jpeg(image_bytes: bytes, max_dim: int = 1024, quality: int = 90) -> bytes:
