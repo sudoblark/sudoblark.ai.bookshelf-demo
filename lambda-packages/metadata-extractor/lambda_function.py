@@ -84,7 +84,7 @@ Required JSON format:
   "publisher": "publisher name here",
   "published_year": 2024,
   "description": "brief description here",
-  "confidence": 0.95
+  "confidence": <see rules below>
 }
 
 Rules:
@@ -92,10 +92,17 @@ Rules:
 - No trailing commas
 - isbn: digits only (strip hyphens/spaces), use "" if not found
 - published_year: integer (e.g., 2024) or null if not found
-- confidence: float 0.0-1.0 indicating extraction confidence (1.0 = very confident)
+- confidence: YOUR assessment as float 0.0-1.0 based on text visibility and clarity:
+  * 0.9-1.0: All text clearly visible, high certainty on all fields
+  * 0.7-0.9: Most fields visible but some text unclear or partially obscured
+  * 0.5-0.7: Several fields missing or text quality poor, making guesses
+  * 0.0-0.5: Very poor image quality, most fields are guesses
 - Empty values: use "" for unknown strings, null for unknown year/confidence
 - Escape special characters in strings (quotes, backslashes, newlines)
 - Do not include any text before or after the JSON object
+
+IMPORTANT: Set confidence based on the actual image quality and text visibility,
+not a default value. Different books will have different confidence scores.
 
 Return ONLY the JSON object."""
 
