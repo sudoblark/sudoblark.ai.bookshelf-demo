@@ -187,6 +187,7 @@ fabric.properties
 data/raw/*
 data/processed/*
 data/demo-images/*
+!data/demo-images/download_covers.sh
 
 # Processor ETL pipeline
 processor/processor.log
@@ -208,6 +209,10 @@ dev_scratchpad/*
 # Lambda deployment packages (ZIP files)
 lambda-packages/*.zip
 lambda-packages/**/*.zip
+
+# Book cover image ZIPs for demo/testing
+*.zip
+books.zip
 
 # Lambda dependencies installed for packaging
 lambda-packages/**/package/

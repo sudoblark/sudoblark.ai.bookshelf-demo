@@ -325,17 +325,19 @@ terraform apply  # Type 'yes' to confirm
 
 1. **Prepare book cover images**
    ```sh
-   # Create a directory with your book cover images
-   mkdir book-covers
-   cp /path/to/cover1.jpg book-covers/
-   cp /path/to/cover2.jpg book-covers/
+   # Navigate to demo images directory
+   cd data/demo-images
+
+   # Download sample book covers (optional - skip if images already exist)
+   # This downloads ~400-600 book covers from Open Library
+   ./download_covers.sh
    ```
 
 2. **Create ZIP file**
    ```sh
-   cd book-covers
-   zip -r ../books.zip *.jpg *.jpeg *.png
-   cd ..
+   # ZIP all images, excluding the download script
+   zip -r ../../books.zip *.jpg
+   cd ../..
    ```
 
 3. **Upload to S3 Landing bucket**

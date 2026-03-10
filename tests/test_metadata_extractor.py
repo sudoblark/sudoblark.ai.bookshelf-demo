@@ -144,7 +144,7 @@ class TestParseBedRockResponse:
 
         assert result["title"] == "The Great Gatsby"
         assert result["author"] == "F. Scott Fitzgerald"
-        assert result["isbn"] == "978-0-7432-7356-5"
+        assert result["isbn"] == "9780743273565"  # Pydantic normalizes ISBN (removes hyphens)
 
     def test_parse_json_with_markdown_wrapper(self):
         """Should extract JSON from markdown code blocks."""
