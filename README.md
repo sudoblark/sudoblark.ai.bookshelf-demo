@@ -384,29 +384,120 @@ terraform apply  # Type 'yes' to confirm
 
 ### Advanced Examples
 
-**Query books published after 2020:**
+**Group books by author:**
 ```sql
-SELECT title, author, published_year, publisher
+SELECT
+    author,
+    COUNT(*) as book_count,
+    MIN(published_year) as earliest_publication,
+    MAX(published_year) as latest_publication,
+    ROUND(AVG(confidence), 2) as avg_confidence
 FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-WHERE published_year > 2020
-ORDER BY published_year DESC, title ASC;
+WHERE author IS NOT NULL AND author != ''
+GROUP BY author
+ORDER BY book_count DESC, author ASC;
 ```
 
-**Find books with low confidence scores** (may need manual review):
+**Group books by publication year:**
 ```sql
-SELECT title, author, confidence, filename
+SELECT
+    published_year,
+    COUNT(*) as book_count,
+    COUNT(DISTINCT author) as unique_authors,
+    COUNT(DISTINCT publisher) as unique_publishers,
+    ROUND(AVG(confidence), 2) as avg_confidence
 FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-WHERE confidence < 0.7 OR confidence IS NULL
-ORDER BY confidence ASC;
+WHERE published_year IS NOT NULL
+GROUP BY published_year
+ORDER BY published_year DESC;
 ```
 
-**Export results to S3:**
+**Data quality metrics:**
 ```sql
--- Create a new table with query results
-CREATE TABLE export_books_2020s AS
-SELECT *
-FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-WHERE published_year BETWEEN 2020 AND 2029;
+WITH base_stats AS (
+    SELECT
+        COUNT(*) as total_rows,
+        COUNT(DISTINCT id) as unique_ids,
+        COUNT(DISTINCT LOWER(TRIM(title || '|' || author))) as unique_books
+    FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
+),
+field_stats AS (
+    SELECT
+        -- Title analysis
+        COUNT(CASE WHEN title IS NOT NULL AND title != '' THEN 1 END) as titles_present,
+        COUNT(CASE WHEN title IS NULL OR title = '' THEN 1 END) as titles_missing,
+
+        -- Author analysis
+        COUNT(CASE WHEN author IS NOT NULL AND author != '' THEN 1 END) as authors_present,
+        COUNT(CASE WHEN author IS NULL OR author = '' THEN 1 END) as authors_missing,
+
+        -- ISBN analysis
+        COUNT(CASE WHEN isbn IS NOT NULL AND isbn != '' THEN 1 END) as isbns_present,
+        COUNT(CASE WHEN isbn IS NULL OR isbn = '' THEN 1 END) as isbns_missing,
+
+        -- Publisher analysis
+        COUNT(CASE WHEN publisher IS NOT NULL AND publisher != '' THEN 1 END) as publishers_present,
+        COUNT(CASE WHEN publisher IS NULL OR publisher = '' THEN 1 END) as publishers_missing,
+
+        -- Year analysis
+        COUNT(CASE WHEN published_year IS NOT NULL THEN 1 END) as years_present,
+        COUNT(CASE WHEN published_year IS NULL THEN 1 END) as years_missing,
+
+        -- Description analysis
+        COUNT(CASE WHEN description IS NOT NULL AND description != '' THEN 1 END) as descriptions_present,
+        COUNT(CASE WHEN description IS NULL OR description = '' THEN 1 END) as descriptions_missing,
+
+        -- Confidence analysis
+        ROUND(AVG(confidence), 3) as avg_confidence,
+        ROUND(MIN(confidence), 3) as min_confidence,
+        ROUND(MAX(confidence), 3) as max_confidence,
+        COUNT(CASE WHEN confidence < 0.7 THEN 1 END) as low_confidence_count,
+
+        -- Completeness score (books with all core fields)
+        COUNT(CASE
+            WHEN title IS NOT NULL AND title != ''
+            AND author IS NOT NULL AND author != ''
+            AND published_year IS NOT NULL
+            THEN 1
+        END) as complete_records
+    FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
+)
+SELECT
+    b.total_rows,
+    b.unique_ids,
+    b.total_rows - b.unique_ids as duplicate_ids,
+    b.unique_books,
+    b.total_rows - b.unique_books as duplicate_books,
+
+    f.titles_present,
+    f.titles_missing,
+    ROUND(CAST(f.titles_present AS DOUBLE) / b.total_rows * 100, 1) as title_completeness_pct,
+
+    f.authors_present,
+    f.authors_missing,
+    ROUND(CAST(f.authors_present AS DOUBLE) / b.total_rows * 100, 1) as author_completeness_pct,
+
+    f.isbns_present,
+    f.isbns_missing,
+    ROUND(CAST(f.isbns_present AS DOUBLE) / b.total_rows * 100, 1) as isbn_completeness_pct,
+
+    f.publishers_present,
+    f.publishers_missing,
+
+    f.years_present,
+    f.years_missing,
+
+    f.descriptions_present,
+    f.descriptions_missing,
+
+    f.avg_confidence,
+    f.min_confidence,
+    f.max_confidence,
+    f.low_confidence_count,
+
+    f.complete_records,
+    ROUND(CAST(f.complete_records AS DOUBLE) / b.total_rows * 100, 1) as complete_records_pct
+FROM base_stats b, field_stats f;
 ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>

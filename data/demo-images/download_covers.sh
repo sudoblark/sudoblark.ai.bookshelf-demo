@@ -10,7 +10,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 START_NUM=5
-END_NUM=504
+END_NUM=45
 TOTAL_IMAGES=$((END_NUM - START_NUM + 1))
 
 echo "📚 Downloading $TOTAL_IMAGES book covers from Open Library..."
