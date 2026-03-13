@@ -220,6 +220,7 @@ To get a local copy up and running follow these simple steps.
 - 🌍 **Region Lock**: Infrastructure must deploy to `eu-west-2` (London) due to Bedrock model availability
 - 🏗️ **Demo Code**: This is workshop/learning code - not production-hardened (limited error handling, no alerting)
 - 📦 **Manual Packaging**: Lambda functions must be packaged locally before Terraform deployment
+- 🗑️ **Force Destroy**: All S3 buckets and Athena workgroups are configured with `force_destroy = true` — running the destroy pipeline will permanently delete all bucket contents and query history without confirmation. This is intentional for a demo environment but should never be used in production.
 
 **Required Tools & Access:**
 
@@ -777,5 +778,5 @@ This project demonstrates Sudoblark's professional development practices includi
 [Athena-url]: https://aws.amazon.com/athena/
 [Glue-badge]: https://img.shields.io/badge/AWS_Glue-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white
 [Glue-url]: https://aws.amazon.com/glue/
-[ci-badge]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/actions/workflows/pull-request.yaml/badge.svg?style=for-the-badge
+[ci-shield]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/actions/workflows/pull-request.yaml/badge.svg?style=for-the-badge
 [ci-url]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/actions/workflows/pull-request.yaml

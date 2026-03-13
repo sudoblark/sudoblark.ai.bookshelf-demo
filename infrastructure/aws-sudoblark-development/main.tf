@@ -15,7 +15,7 @@ terraform {
     encrypt = true
     region  = "eu-west-2"
     assume_role = {
-      role_arn     = "arn:aws:iam::796012663443:role/aws-sudoblark-development-github-cicd-role"
+      role_arn     = "arn:aws:iam::796012663443:role/aws-sudoblark-development-terraform-github-cicd-role"
       session_name = "sudoblark.ai.bookshelf-demo"
       external_id  = "CI_CD_PLATFORM"
     }
@@ -26,7 +26,7 @@ provider "aws" {
   region = "eu-west-2"
 
   assume_role {
-    role_arn     = "arn:aws:iam::796012663443:role/aws-sudoblark-development-github-cicd-role"
+    role_arn     = "arn:aws:iam::796012663443:role/aws-sudoblark-development-terraform-github-cicd-role"
     session_name = "sudoblark.ai.bookshelf-demo"
     external_id  = "CI_CD_PLATFORM"
   }

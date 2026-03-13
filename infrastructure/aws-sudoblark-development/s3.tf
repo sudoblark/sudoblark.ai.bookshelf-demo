@@ -2,7 +2,8 @@
 resource "aws_s3_bucket" "bucket" {
   for_each = { for bucket in module.data.buckets : bucket.name => bucket }
 
-  bucket = each.value.full_name
+  bucket        = each.value.full_name
+  force_destroy = true
 
   tags = {
     Name = each.value.full_name

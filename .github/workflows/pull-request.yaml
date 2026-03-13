@@ -6,13 +6,10 @@ name: Pull Request Quality Checks
     branches:
       - main
 
-env:
-  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-
 permissions:
   contents: read
   pull-requests: write
+  id-token: write
 
 jobs:
   format_check:
@@ -57,6 +54,12 @@ jobs:
           pip install -r requirements.txt -t .
           zip -r ../metadata-extractor.zip .
           cd ../..
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::741139166799:role/service-accounts/aws-sudoblark-management-github-cicd-role
+          aws-region: eu-west-2
 
       - name: terraform validate
         uses: dflook/terraform-validate@v2
@@ -227,6 +230,12 @@ jobs:
           pip install -r requirements.txt -t .
           zip -r ../metadata-extractor.zip .
           cd ../..
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::741139166799:role/service-accounts/aws-sudoblark-management-github-cicd-role
+          aws-region: eu-west-2
 
       - name: terraform plan
         uses: dflook/terraform-plan@v2
