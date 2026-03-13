@@ -220,7 +220,7 @@ To get a local copy up and running follow these simple steps.
 - 🌍 **Region Lock**: Infrastructure must deploy to `eu-west-2` (London) due to Bedrock model availability
 - 🏗️ **Demo Code**: This is workshop/learning code - not production-hardened (limited error handling, no alerting)
 - 📦 **Manual Packaging**: Lambda functions must be packaged locally before Terraform deployment
-- 🗑️ **Force Destroy**: All S3 buckets are configured with `force_destroy = true` — running the destroy pipeline will permanently delete all bucket contents without confirmation. This is intentional for a demo environment but should never be used in production.
+- 🗑️ **Force Destroy**: All S3 buckets and Athena workgroups are configured with `force_destroy = true` — running the destroy pipeline will permanently delete all bucket contents and query history without confirmation. This is intentional for a demo environment but should never be used in production.
 
 **Required Tools & Access:**
 

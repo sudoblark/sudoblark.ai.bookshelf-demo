@@ -42,15 +42,6 @@ jobs:
           role-to-assume: arn:aws:iam::741139166799:role/service-accounts/aws-sudoblark-management-github-cicd-role
           aws-region: eu-west-2
 
-      - name: Empty S3 buckets
-        run: |
-          for bucket in $(aws s3api list-buckets --query \
-            'Buckets[?starts_with(Name, `aws-sudoblark-development-bookshelf`)].Name' \
-            --output text); do
-            echo "Emptying ${bucket}..."
-            aws s3 rm s3://${bucket} --recursive
-          done
-
       - name: terraform destroy
         uses: dflook/terraform-destroy@v1
         with:

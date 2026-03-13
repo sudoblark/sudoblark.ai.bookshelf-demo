@@ -2,8 +2,9 @@
 resource "aws_athena_workgroup" "workgroup" {
   for_each = { for wg in module.data.athena_workgroups : wg.name => wg }
 
-  name        = each.value.full_name
-  description = each.value.description
+  name          = each.value.full_name
+  description   = each.value.description
+  force_destroy = true
 
   configuration {
     result_configuration {
