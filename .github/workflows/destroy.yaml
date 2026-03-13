@@ -17,11 +17,39 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Create Lambda deployment packages
+        run: |
+          # Unzip processor
+          cd lambda-packages/unzip-processor
+          pip install -r requirements.txt -t .
+          zip -r ../unzip-processor.zip .
+          cd ../..
+
+          # Metadata extractor
+          cd lambda-packages/metadata-extractor
+          pip install -r requirements.txt -t .
+          zip -r ../metadata-extractor.zip .
+          cd ../..
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::741139166799:role/service-accounts/aws-sudoblark-management-github-cicd-role
           aws-region: eu-west-2
+
+      - name: Empty S3 buckets
+        run: |
+          for bucket in $(aws s3api list-buckets --query \
+            'Buckets[?starts_with(Name, `aws-sudoblark-development-bookshelf`)].Name' \
+            --output text); do
+            echo "Emptying ${bucket}..."
+            aws s3 rm s3://${bucket} --recursive
+          done
 
       - name: terraform destroy
         uses: dflook/terraform-destroy@v1
