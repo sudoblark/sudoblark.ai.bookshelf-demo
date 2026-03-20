@@ -1,6 +1,9 @@
 # Lambda runtime dependencies (deployment)
-# Exclude: boto3 (provided by Lambda runtime), pandas/pyarrow (in AWS SDK for Pandas layer)
-aws-lambda-powertools
+# Exclude: boto3 (provided by Lambda runtime), pandas/pyarrow (in AWS SDK for Pandas layer),
+#          aws-lambda-powertools (provided by the AWS Lambda Powertools layer)
+# pydantic-ai-slim[bedrock] includes only the core framework and the boto3-backed
+# BedrockConverseModel provider. Avoids bundling unused provider SDKs (Anthropic,
+# OpenAI, Google, etc.) that would push the ZIP over Lambda's 50 MB direct-upload limit.
 Pillow
 pydantic
-pydantic-ai
+pydantic-ai-slim[bedrock]
