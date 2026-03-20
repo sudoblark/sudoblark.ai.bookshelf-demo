@@ -2,15 +2,21 @@
 
 import importlib.util
 import io
-import json
 import os
 
 # Add lambda-packages/metadata-extractor to sys.path so local imports resolve
 import sys
 from unittest.mock import MagicMock, patch
 
+import pydantic_ai.models as pydantic_ai_models
 import pytest
 from PIL import Image
+from pydantic_ai import UnexpectedModelBehavior
+from pydantic_ai.messages import ModelMessage
+from pydantic_ai.models.function import AgentInfo, FunctionModel
+from pydantic_ai.models.test import TestModel
+
+pydantic_ai_models.ALLOW_MODEL_REQUESTS = False
 
 _LAMBDA_DIR = os.path.join(os.path.dirname(__file__), "../lambda-packages/metadata-extractor")
 if _LAMBDA_DIR not in sys.path:
@@ -143,54 +149,6 @@ class TestBedrockMetadataExtractor:
         assert result["filename"] == "original.jpg"
         assert result["processed_at"] == "2026-01-01T00:00:00Z"
 
-    # --- _parse_response ---
-
-    def test_parse_response_valid_json(self):
-        """Should parse valid JSON metadata."""
-        extractor = self._make_extractor()
-        response_text = json.dumps(
-            {
-                "title": "The Great Gatsby",
-                "author": "F. Scott Fitzgerald",
-                "isbn": "978-0-7432-7356-5",
-                "publisher": "Scribner",
-            }
-        )
-
-        result = extractor._parse_response(response_text)
-
-        assert result["title"] == "The Great Gatsby"
-        assert result["author"] == "F. Scott Fitzgerald"
-        assert result["isbn"] == "9780743273565"  # Pydantic strips hyphens
-
-    def test_parse_response_json_with_markdown_wrapper(self):
-        """Should extract JSON from markdown code blocks."""
-        extractor = self._make_extractor()
-        response_text = """
-        Here's the metadata:
-        ```json
-        {
-            "title": "1984",
-            "author": "George Orwell"
-        }
-        ```
-        """
-
-        result = extractor._parse_response(response_text)
-
-        assert result["title"] == "1984"
-        assert result["author"] == "George Orwell"
-
-    def test_parse_response_invalid_json_returns_defaults(self):
-        """Should return empty metadata fields when response is not parseable JSON."""
-        extractor = self._make_extractor()
-
-        result = extractor._parse_response("This is not JSON")
-
-        assert result["title"] == ""
-        assert result["author"] == ""
-        assert result["publisher"] == ""
-
     # --- extract ---
 
     def test_extract_empty_image_bytes(self):
@@ -200,35 +158,47 @@ class TestBedrockMetadataExtractor:
         with pytest.raises(ValueError, match="image_bytes must not be empty"):
             extractor.extract(b"", "test.jpg")
 
-    def test_extract_bedrock_client_error(self):
-        """Should propagate ClientError from Bedrock."""
-        from botocore.exceptions import ClientError
-
-        mock_client = MagicMock()
-        mock_client.invoke_model.side_effect = ClientError(
-            {"Error": {"Code": "ThrottlingException", "Message": "Rate exceeded"}}, "InvokeModel"
-        )
-        extractor = self._make_extractor(mock_client)
+    def test_extract_returns_metadata_with_defaults(self):
+        """Should return validated metadata with id, filename, and processed_at populated."""
+        extractor = self._make_extractor()
 
         img_buffer = io.BytesIO()
         Image.new("RGB", (100, 100), color="red").save(img_buffer, format="JPEG")
 
-        with pytest.raises(ClientError):
-            extractor.extract(img_buffer.getvalue(), "test.jpg")
+        with extractor._agent.override(
+            model=TestModel(
+                custom_output_args={
+                    "title": "The Great Gatsby",
+                    "author": "F. Scott Fitzgerald",
+                    "isbn": "9780743273565",
+                    "publisher": "Scribner",
+                    "published_year": 1925,
+                    "description": "A classic novel.",
+                    "confidence": 0.95,
+                }
+            )
+        ):
+            result = extractor.extract(img_buffer.getvalue(), "test.jpg")
 
-    def test_extract_unexpected_response_structure(self):
-        """Should raise ValueError when Bedrock returns empty content."""
-        mock_client = MagicMock()
-        mock_client.invoke_model.return_value = {
-            "body": MagicMock(read=lambda: json.dumps({"content": []}).encode())
-        }
-        extractor = self._make_extractor(mock_client)
+        assert result["title"] == "The Great Gatsby"
+        assert result["author"] == "F. Scott Fitzgerald"
+        assert result["filename"] == "test.jpg"
+        assert "id" in result
+        assert "processed_at" in result
+
+    def test_extract_model_failure_propagates(self):
+        """Should propagate exceptions raised by the underlying model."""
+        extractor = self._make_extractor()
 
         img_buffer = io.BytesIO()
         Image.new("RGB", (100, 100), color="red").save(img_buffer, format="JPEG")
 
-        with pytest.raises(ValueError, match="Bedrock response missing content"):
-            extractor.extract(img_buffer.getvalue(), "test.jpg")
+        def failing_model(messages: list[ModelMessage], info: AgentInfo) -> None:
+            raise UnexpectedModelBehavior("Model unavailable")
+
+        with extractor._agent.override(model=FunctionModel(failing_model)):
+            with pytest.raises(Exception):
+                extractor.extract(img_buffer.getvalue(), "test.jpg")
 
 
 class TestParquetWriter:
@@ -283,31 +253,19 @@ class TestBookshelfProcessor:
         Image.new("RGB", (100, 100), color="red").save(buf, format="JPEG")
         return buf.getvalue()
 
-    def _make_bedrock_mock(self, mocker, title="Test Book"):
-        mock_bedrock = MagicMock()
-        mock_bedrock.invoke_model.return_value = {
-            "body": MagicMock(
-                read=lambda: json.dumps(
-                    {
-                        "content": [
-                            {
-                                "text": json.dumps(
-                                    {
-                                        "title": title,
-                                        "author": "Test Author",
-                                        "isbn": "1234567890",
-                                        "publisher": "Test Publisher",
-                                        "published_year": 2024,
-                                        "description": "Test description",
-                                    }
-                                )
-                            }
-                        ]
-                    }
-                ).encode()
-            )
+    def _make_extract_return_value(self, title: str = "Test Book") -> dict:
+        return {
+            "id": "test-id-123",
+            "title": title,
+            "author": "Test Author",
+            "isbn": "1234567890",
+            "publisher": "Test Publisher",
+            "published_year": 2024,
+            "description": "Test description",
+            "confidence": 0.9,
+            "filename": "book.jpg",
+            "processed_at": "2026-01-01T00:00:00Z",
         }
-        return mock_bedrock
 
     def test_process_success(self, s3_client, mocker, monkeypatch):
         """Should download image, extract metadata, and write a Parquet file."""
@@ -326,8 +284,12 @@ class TestBookshelfProcessor:
             CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
         )
 
-        mock_bedrock = self._make_bedrock_mock(mocker)
-        processor = metadata_lambda.BookshelfProcessor(config, s3_client, mock_bedrock)
+        mocker.patch.object(
+            metadata_lambda.BedrockMetadataExtractor,
+            "extract",
+            return_value=self._make_extract_return_value(),
+        )
+        processor = metadata_lambda.BookshelfProcessor(config, s3_client, MagicMock())
 
         parquet_key = processor.process("aws-sudoblark-development-demos-raw", "book.jpg")
 
@@ -335,8 +297,8 @@ class TestBookshelfProcessor:
         objects = s3_client.list_objects_v2(Bucket="aws-sudoblark-development-demos-processed")
         assert objects["KeyCount"] >= 1
 
-    def test_process_bedrock_failure(self, s3_client, monkeypatch):
-        """Should propagate exceptions from the Bedrock extractor."""
+    def test_process_extractor_failure(self, s3_client, monkeypatch, mocker):
+        """Should propagate exceptions from the metadata extractor."""
         config = self._make_config(monkeypatch)
         image_bytes = self._make_image_bytes()
 
@@ -348,9 +310,12 @@ class TestBookshelfProcessor:
             Bucket="aws-sudoblark-development-demos-raw", Key="book.jpg", Body=image_bytes
         )
 
-        mock_bedrock = MagicMock()
-        mock_bedrock.invoke_model.side_effect = Exception("Bedrock API error")
-        processor = metadata_lambda.BookshelfProcessor(config, s3_client, mock_bedrock)
+        mocker.patch.object(
+            metadata_lambda.BedrockMetadataExtractor,
+            "extract",
+            side_effect=Exception("Bedrock API error"),
+        )
+        processor = metadata_lambda.BookshelfProcessor(config, s3_client, MagicMock())
 
         with pytest.raises(Exception, match="Bedrock API error"):
             processor.process("aws-sudoblark-development-demos-raw", "book.jpg")
@@ -393,8 +358,12 @@ class TestBookshelfProcessor:
             {"Error": {"Code": "AccessDenied", "Message": "Access Denied"}}, "PutObject"
         )
 
-        mock_bedrock = self._make_bedrock_mock(mocker)
-        processor = metadata_lambda.BookshelfProcessor(config, mock_s3, mock_bedrock)
+        mocker.patch.object(
+            metadata_lambda.BedrockMetadataExtractor,
+            "extract",
+            return_value=self._make_extract_return_value(),
+        )
+        processor = metadata_lambda.BookshelfProcessor(config, mock_s3, MagicMock())
 
         with pytest.raises(ClientError):
             processor.process(source_bucket, "test.jpg")
