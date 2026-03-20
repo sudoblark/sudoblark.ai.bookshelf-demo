@@ -33,6 +33,9 @@ jobs:
           # Metadata extractor
           cd lambda-packages/metadata-extractor
           pip install -r requirements.txt -t .
+          # Remove packages provided by AWSSDKPandas layer to stay under 262MB limit
+          rm -rf boto3 boto3-*.dist-info botocore botocore-*.dist-info
+          rm -rf s3transfer s3transfer-*.dist-info jmespath jmespath-*.dist-info
           zip -r ../metadata-extractor.zip .
           cd ../..
 

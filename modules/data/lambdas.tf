@@ -68,7 +68,10 @@ locals {
         # AWS SDK for pandas (includes pandas, pyarrow, numpy, etc.)
         # Version 11 for Python 3.11 in eu-west-2
         # See: https://aws-sdk-pandas.readthedocs.io/en/stable/layers.html
-        "arn:aws:lambda:eu-west-2:336392948345:layer:AWSSDKPandas-Python311:11"
+        "arn:aws:lambda:eu-west-2:336392948345:layer:AWSSDKPandas-Python311:11",
+        # AWS Lambda Powertools for Python (eu-west-2, Python 3.11)
+        # See: https://docs.powertools.aws.dev/lambda/python/latest/#lambda-layer
+        "arn:aws:lambda:eu-west-2:017000801446:layer:AWSLambdaPowertoolsPythonV3-python311-x86_64:7"
         # Pillow bundled directly in deployment ZIP due to layer permission restrictions
       ]
       environment_variables = {
