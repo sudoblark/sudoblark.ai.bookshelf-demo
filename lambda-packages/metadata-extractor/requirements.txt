@@ -3,3 +3,4 @@
 aws-lambda-powertools
 Pillow
 pydantic
+pydantic-ai
