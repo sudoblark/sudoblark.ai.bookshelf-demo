@@ -27,25 +27,46 @@ class TestGetConfig:
     """Tests for get_config function."""
 
     def test_get_config_success(self, monkeypatch):
-        """Should return config when RAW_BUCKET is set."""
+        """Should return config when all required env vars are set."""
         monkeypatch.setenv("RAW_BUCKET", "test-raw-bucket")
+        monkeypatch.setenv(
+            "STATE_MACHINE_ARN", "arn:aws:states:eu-west-2:123456789012:stateMachine:test-sm"
+        )
         monkeypatch.setenv("LOG_LEVEL", "INFO")
 
         config = unzip_lambda.get_config()
 
         assert config["raw_bucket"] == "test-raw-bucket"
+        assert (
+            config["state_machine_arn"]
+            == "arn:aws:states:eu-west-2:123456789012:stateMachine:test-sm"
+        )
         assert config["log_level"] == "INFO"
 
     def test_get_config_missing_raw_bucket(self, monkeypatch):
         """Should raise ValueError when RAW_BUCKET is missing."""
         monkeypatch.delenv("RAW_BUCKET", raising=False)
+        monkeypatch.setenv(
+            "STATE_MACHINE_ARN", "arn:aws:states:eu-west-2:123456789012:stateMachine:test-sm"
+        )
 
         with pytest.raises(ValueError, match="RAW_BUCKET environment variable is required"):
+            unzip_lambda.get_config()
+
+    def test_get_config_missing_state_machine_arn(self, monkeypatch):
+        """Should raise ValueError when STATE_MACHINE_ARN is missing."""
+        monkeypatch.setenv("RAW_BUCKET", "test-raw-bucket")
+        monkeypatch.delenv("STATE_MACHINE_ARN", raising=False)
+
+        with pytest.raises(ValueError, match="STATE_MACHINE_ARN environment variable is required"):
             unzip_lambda.get_config()
 
     def test_get_config_default_log_level(self, monkeypatch):
         """Should use default log level when not specified."""
         monkeypatch.setenv("RAW_BUCKET", "test-raw-bucket")
+        monkeypatch.setenv(
+            "STATE_MACHINE_ARN", "arn:aws:states:eu-west-2:123456789012:stateMachine:test-sm"
+        )
         monkeypatch.delenv("LOG_LEVEL", raising=False)
 
         config = unzip_lambda.get_config()
@@ -55,6 +76,9 @@ class TestGetConfig:
     def test_get_config_invalid_log_level(self, monkeypatch):
         """Should raise ValueError for invalid log level."""
         monkeypatch.setenv("RAW_BUCKET", "test-raw-bucket")
+        monkeypatch.setenv(
+            "STATE_MACHINE_ARN", "arn:aws:states:eu-west-2:123456789012:stateMachine:test-sm"
+        )
         monkeypatch.setenv("LOG_LEVEL", "INVALID")
 
         with pytest.raises(ValueError, match="LOG_LEVEL must be one of"):
@@ -191,13 +215,51 @@ class TestExtractImagesFromZip:
             unzip_lambda.extract_images_from_zip("test-bucket", "test.zip", "")
 
 
+class TestStartEnrichment:
+    """Tests for start_enrichment function."""
+
+    def test_start_enrichment_success(self):
+        """Should call start_execution with correct payload."""
+        with patch("unzip_lambda_function.sfn_client") as mock_sfn:
+            unzip_lambda.start_enrichment(
+                "arn:aws:states:eu-west-2:123:stateMachine:test-sm",
+                "raw",
+                "aws-sudoblark-development-bookshelf-demo-landing",
+                "cover1.jpg",
+            )
+
+            mock_sfn.start_execution.assert_called_once_with(
+                stateMachineArn="arn:aws:states:eu-west-2:123:stateMachine:test-sm",
+                input='{"bucket": "aws-sudoblark-development-bookshelf-demo-raw", "key": "cover1.jpg"}',
+            )
+
+    def test_start_enrichment_failure_does_not_raise(self):
+        """Should log error but not propagate when start_execution fails."""
+        with patch("unzip_lambda_function.sfn_client") as mock_sfn:
+            mock_sfn.start_execution.side_effect = Exception("SFN throttle")
+
+            # Should not raise
+            unzip_lambda.start_enrichment(
+                "arn:aws:states:eu-west-2:123:stateMachine:test-sm",
+                "raw",
+                "aws-sudoblark-development-bookshelf-demo-landing",
+                "cover1.jpg",
+            )
+
+
 class TestHandler:
     """Tests for Lambda handler function."""
 
+    @patch("unzip_lambda_function.start_enrichment")
     @patch("unzip_lambda_function.extract_images_from_zip")
-    def test_handler_success(self, mock_extract, sample_s3_event, lambda_context, monkeypatch):
-        """Should process S3 event and extract images."""
+    def test_handler_success(
+        self, mock_extract, mock_start_enrichment, sample_s3_event, lambda_context, monkeypatch
+    ):
+        """Should process S3 event, extract images, and start enrichment per image."""
         monkeypatch.setenv("RAW_BUCKET", "test-raw-bucket")
+        monkeypatch.setenv(
+            "STATE_MACHINE_ARN", "arn:aws:states:eu-west-2:123456789012:stateMachine:test-sm"
+        )
         monkeypatch.setenv("LOG_LEVEL", "INFO")
 
         mock_extract.return_value = ["image1.jpg", "image2.png"]
@@ -205,16 +267,34 @@ class TestHandler:
         response = unzip_lambda.handler(sample_s3_event, lambda_context)
 
         assert response["statusCode"] == 200
-        assert response["processed_count"] == 2  # Count of extracted images, not records
+        assert response["processed_count"] == 2
         assert response["failed_count"] == 0
 
-        # Verify extract was called with correct args
         mock_extract.assert_called_once_with("test-bucket", "test-file.zip", "test-raw-bucket")
+        assert mock_start_enrichment.call_count == 2
+        mock_start_enrichment.assert_any_call(
+            "arn:aws:states:eu-west-2:123456789012:stateMachine:test-sm",
+            "test-raw-bucket",
+            "test-bucket",
+            "image1.jpg",
+        )
+        mock_start_enrichment.assert_any_call(
+            "arn:aws:states:eu-west-2:123456789012:stateMachine:test-sm",
+            "test-raw-bucket",
+            "test-bucket",
+            "image2.png",
+        )
 
+    @patch("unzip_lambda_function.start_enrichment")
     @patch("unzip_lambda_function.extract_images_from_zip")
-    def test_handler_partial_failure(self, mock_extract, lambda_context, monkeypatch):
+    def test_handler_partial_failure(
+        self, mock_extract, mock_start_enrichment, lambda_context, monkeypatch
+    ):
         """Should handle partial failures gracefully."""
         monkeypatch.setenv("RAW_BUCKET", "test-raw-bucket")
+        monkeypatch.setenv(
+            "STATE_MACHINE_ARN", "arn:aws:states:eu-west-2:123456789012:stateMachine:test-sm"
+        )
         monkeypatch.setenv("LOG_LEVEL", "INFO")
 
         # Create event with multiple records
@@ -233,10 +313,12 @@ class TestHandler:
         assert response["statusCode"] == 207  # Multi-status
         assert response["processed_count"] == 1
         assert response["failed_count"] == 1
+        assert mock_start_enrichment.call_count == 1
 
     def test_handler_missing_config(self, sample_s3_event, lambda_context, monkeypatch):
         """Should raise error when configuration is invalid."""
         monkeypatch.delenv("RAW_BUCKET", raising=False)
+        monkeypatch.delenv("STATE_MACHINE_ARN", raising=False)
 
         with pytest.raises(ValueError):
             unzip_lambda.handler(sample_s3_event, lambda_context)
