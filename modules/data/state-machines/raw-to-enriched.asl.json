@@ -1,0 +1,34 @@
+{
+  "Comment": "Enrichment pipeline for a single book cover image. Receives bucket/key from unzip-processor and invokes metadata-extractor to write Parquet output to the processed bucket.",
+  "StartAt": "EnrichMetadata",
+  "States": {
+    "EnrichMetadata": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${metadata_extractor_arn}",
+        "Payload.$": "$"
+      },
+      "ResultSelector": {
+        "bucket.$": "$.Payload.bucket",
+        "key.$": "$.Payload.key",
+        "parquet_key.$": "$.Payload.parquet_key"
+      },
+      "ResultPath": "$.enrichmentResult",
+      "Retry": [
+        {
+          "ErrorEquals": [
+            "Lambda.ServiceException",
+            "Lambda.AWSLambdaException",
+            "Lambda.SdkClientException",
+            "Lambda.TooManyRequestsException"
+          ],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "End": true
+    }
+  }
+}

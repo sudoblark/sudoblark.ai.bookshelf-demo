@@ -99,3 +99,13 @@ output "athena_workgroups_map" {
   description = "Map of Athena workgroups keyed by workgroup name"
   value       = local.athena_workgroups_map
 }
+
+output "state_machines" {
+  description = "All Step Functions state machines with enriched metadata and computed values"
+  value       = local.state_machines_enriched
+}
+
+output "state_machines_map" {
+  description = "Map of Step Functions state machines keyed by name"
+  value       = local.state_machines_map
+}

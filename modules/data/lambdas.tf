@@ -51,8 +51,9 @@ locals {
       memory_size   = 512
       role_name     = "unzip-processor-role"
       environment_variables = {
-        RAW_BUCKET = "raw"
-        LOG_LEVEL  = "INFO"
+        RAW_BUCKET        = "raw"
+        STATE_MACHINE_ARN = "arn:aws:states:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:stateMachine:${local.account}-${local.project}-${local.application}-raw-to-enriched"
+        LOG_LEVEL         = "INFO"
       }
     },
     {

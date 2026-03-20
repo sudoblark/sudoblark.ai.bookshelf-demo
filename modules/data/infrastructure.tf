@@ -212,4 +212,23 @@ locals {
   athena_workgroups_map = {
     for wg in local.athena_workgroups_enriched : wg.name => wg
   }
+
+  # Enrich Step Functions state machine configurations
+  state_machines_enriched = [
+    for sm in local.state_machines : merge(
+      sm,
+      {
+        account     = local.account
+        project     = local.project
+        application = local.application
+        full_name   = lower("${local.account}-${local.project}-${local.application}-${sm.name}")
+        role_arn    = local.iam_roles_map[sm.iam_role_name].full_name != "" ? "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${lower("${local.account}-${local.project}-${local.application}-${sm.iam_role_name}")}" : ""
+      }
+    )
+  ]
+
+  # Create a map of state machines keyed by name
+  state_machines_map = {
+    for sm in local.state_machines_enriched : sm.name => sm
+  }
 }

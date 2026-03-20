@@ -149,6 +149,51 @@ locals {
       managed_policy_arns = [
         "arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole"
       ]
+    },
+    {
+      name                 = "raw-to-enriched-role"
+      assume_role_services = ["states.amazonaws.com"]
+      inline_policies = [
+        {
+          name = "sfn-raw-to-enriched-access"
+          policy_statements = [
+            {
+              effect = "Allow"
+              actions = [
+                "lambda:InvokeFunction"
+              ]
+              resources = [
+                "arn:aws:lambda:*:*:function:${local.account}-${local.project}-${local.application}-metadata-extractor"
+              ]
+            },
+            {
+              effect = "Allow"
+              actions = [
+                "logs:CreateLogDelivery",
+                "logs:GetLogDelivery",
+                "logs:UpdateLogDelivery",
+                "logs:DeleteLogDelivery",
+                "logs:ListLogDeliveries",
+                "logs:PutResourcePolicy",
+                "logs:DescribeResourcePolicies",
+                "logs:DescribeLogGroups"
+              ]
+              resources = ["*"]
+            },
+            {
+              effect = "Allow"
+              actions = [
+                "xray:PutTraceSegments",
+                "xray:PutTelemetryRecords",
+                "xray:GetSamplingRules",
+                "xray:GetSamplingTargets"
+              ]
+              resources = ["*"]
+            }
+          ]
+        }
+      ]
+      managed_policy_arns = []
     }
   ]
 }

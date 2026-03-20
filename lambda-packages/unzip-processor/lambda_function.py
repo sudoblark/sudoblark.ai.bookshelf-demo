@@ -6,6 +6,7 @@ and extracts image files from uploaded ZIP archives to the raw bucket.
 """
 
 import io
+import json
 import logging
 import os
 import zipfile
@@ -23,8 +24,9 @@ LOG_LEVEL: str = os.environ.get("LOG_LEVEL", "INFO")
 logger = logging.getLogger()
 logger.setLevel(LOG_LEVEL)
 
-# Initialize S3 client
+# Initialize clients
 s3_client = boto3.client("s3")
+sfn_client = boto3.client("stepfunctions")
 
 # Supported image extensions
 IMAGE_EXTENSIONS: Tuple[str, ...] = (".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".webp")
@@ -44,12 +46,20 @@ def get_config() -> Dict[str, str]:
     if not raw_bucket:
         raise ValueError("RAW_BUCKET environment variable is required")
 
+    state_machine_arn: str = os.environ.get("STATE_MACHINE_ARN", "")
+    if not state_machine_arn:
+        raise ValueError("STATE_MACHINE_ARN environment variable is required")
+
     log_level: str = os.environ.get("LOG_LEVEL", "INFO").upper()
     allowed_levels: List[str] = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
     if log_level not in allowed_levels:
         raise ValueError(f"LOG_LEVEL must be one of {allowed_levels}")
 
-    return {"raw_bucket": raw_bucket, "log_level": log_level}
+    return {
+        "raw_bucket": raw_bucket,
+        "state_machine_arn": state_machine_arn,
+        "log_level": log_level,
+    }
 
 
 @event_source(data_class=S3Event)
@@ -100,6 +110,15 @@ def handler(event: S3Event, context: Any) -> Dict[str, Any]:
                 )
                 processed_files.extend(extracted)
 
+                # Start enrichment execution for each extracted image
+                for image_key in extracted:
+                    start_enrichment(
+                        config["state_machine_arn"],
+                        config["raw_bucket"],
+                        bucket_name,
+                        image_key,
+                    )
+
             except Exception as e:
                 logger.error(f"Failed to process record: {str(e)}", exc_info=True)
                 failed_files.append({"key": record.s3.get_object.key, "error": str(e)})
@@ -119,6 +138,37 @@ def handler(event: S3Event, context: Any) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Handler execution failed: {str(e)}", exc_info=True)
         raise
+
+
+def start_enrichment(
+    state_machine_arn: str, raw_bucket_short_name: str, source_bucket: str, image_key: str
+) -> None:
+    """
+    Start a Step Functions enrichment execution for an extracted image.
+
+    Failures are logged but do not propagate — extraction is considered complete
+    regardless of whether the enrichment execution starts successfully.
+
+    Args:
+        state_machine_arn: ARN of the raw-to-enriched state machine
+        raw_bucket_short_name: Short bucket name used to resolve the full raw bucket name
+        source_bucket: Landing bucket name (used to derive the raw bucket prefix)
+        image_key: S3 key of the extracted image in the raw bucket
+    """
+    # Resolve full raw bucket name using the same prefix-derivation as extract_images_from_zip
+    bucket_parts: List[str] = source_bucket.split("-")
+    prefix: str = "-".join(bucket_parts[:-1])
+    raw_bucket: str = f"{prefix}-{raw_bucket_short_name}"
+
+    payload: str = json.dumps({"bucket": raw_bucket, "key": image_key})
+    try:
+        sfn_client.start_execution(stateMachineArn=state_machine_arn, input=payload)
+        logger.info(f"Started enrichment execution for s3://{raw_bucket}/{image_key}")
+    except Exception as e:
+        logger.error(
+            f"Failed to start enrichment execution for {image_key}: {str(e)}",
+            exc_info=True,
+        )
 
 
 def extract_images_from_zip(source_bucket: str, zip_key: str, raw_bucket_name: str) -> List[str]:
