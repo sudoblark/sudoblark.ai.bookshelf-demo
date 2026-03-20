@@ -68,6 +68,13 @@ locals {
               resources = [
                 "arn:aws:s3:::${local.account}-${local.project}-${local.application}-raw/*"
               ]
+            },
+            {
+              effect  = "Allow"
+              actions = ["states:StartExecution"]
+              resources = [
+                "arn:aws:states:*:*:stateMachine:${local.account}-${local.project}-${local.application}-raw-to-enriched"
+              ]
             }
           ]
         }
