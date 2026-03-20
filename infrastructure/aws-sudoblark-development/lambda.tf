@@ -2,14 +2,15 @@
 resource "aws_lambda_function" "lambda" {
   for_each = { for lambda in module.data.lambdas : lambda.name => lambda }
 
-  function_name = each.value.full_name
-  description   = each.value.description
-  role          = each.value.role_arn
-  handler       = each.value.handler
-  runtime       = each.value.runtime
-  timeout       = each.value.timeout
-  memory_size   = each.value.memory_size
-  layers        = each.value.layers
+  function_name                  = each.value.full_name
+  description                    = each.value.description
+  role                           = each.value.role_arn
+  handler                        = each.value.handler
+  runtime                        = each.value.runtime
+  timeout                        = each.value.timeout
+  memory_size                    = each.value.memory_size
+  layers                         = each.value.layers
+  reserved_concurrent_executions = each.value.reserved_concurrent_executions
 
   filename         = each.value.zip_file_path
   source_code_hash = filebase64sha256(each.value.zip_file_path)

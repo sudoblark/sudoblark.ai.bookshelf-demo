@@ -10,11 +10,12 @@ locals {
 
   # Default Lambda configurations
   lambda_defaults = {
-    runtime               = "python3.11"
-    timeout               = 30
-    memory_size           = 256
-    layers                = []
-    environment_variables = {}
+    runtime                        = "python3.11"
+    timeout                        = 30
+    memory_size                    = 256
+    layers                         = []
+    environment_variables          = {}
+    reserved_concurrent_executions = -1
   }
 
   # Default S3 bucket configurations

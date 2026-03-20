@@ -28,14 +28,15 @@ locals {
   lambdas_enriched = [
     for lambda in local.lambdas : merge(
       {
-        account               = local.account
-        project               = local.project
-        application           = local.application
-        runtime               = local.lambda_defaults.runtime
-        timeout               = local.lambda_defaults.timeout
-        memory_size           = local.lambda_defaults.memory_size
-        layers                = local.lambda_defaults.layers
-        environment_variables = local.lambda_defaults.environment_variables
+        account                        = local.account
+        project                        = local.project
+        application                    = local.application
+        runtime                        = local.lambda_defaults.runtime
+        timeout                        = local.lambda_defaults.timeout
+        memory_size                    = local.lambda_defaults.memory_size
+        layers                         = local.lambda_defaults.layers
+        environment_variables          = local.lambda_defaults.environment_variables
+        reserved_concurrent_executions = local.lambda_defaults.reserved_concurrent_executions
       },
       lambda,
       {

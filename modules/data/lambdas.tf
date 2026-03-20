@@ -57,14 +57,15 @@ locals {
       }
     },
     {
-      name          = "metadata-extractor"
-      description   = "Extracts book metadata from images using Bedrock and writes to Parquet format"
-      zip_file_path = "../../lambda-packages/metadata-extractor.zip"
-      handler       = "lambda_function.handler"
-      runtime       = "python3.11"
-      timeout       = 300 # 5 minutes for LLM processing
-      memory_size   = 1024
-      role_name     = "metadata-extractor-role"
+      name                           = "metadata-extractor"
+      description                    = "Extracts book metadata from images using Bedrock and writes to Parquet format"
+      zip_file_path                  = "../../lambda-packages/metadata-extractor.zip"
+      handler                        = "lambda_function.handler"
+      runtime                        = "python3.11"
+      timeout                        = 300 # 5 minutes for LLM processing
+      memory_size                    = 1024
+      reserved_concurrent_executions = 10
+      role_name                      = "metadata-extractor-role"
       layers = [
         # AWS SDK for pandas (includes pandas, pyarrow, numpy, etc.)
         # Version 11 for Python 3.11 in eu-west-2
