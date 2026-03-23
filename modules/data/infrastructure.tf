@@ -41,8 +41,8 @@ locals {
       {
         # Computed full Lambda function name
         full_name = lower("${local.account}-${local.project}-${local.application}-${lambda.name}")
-        # Computed role ARN
-        role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${lower("${local.account}-${local.project}-${local.application}-${lambda.role_name}")}"
+        # Computed IAM role name — created by the lambda infrastructure module
+        role_name = lower("${local.account}-${local.project}-${local.application}-${lambda.name}")
       }
     )
   ]
@@ -81,57 +81,6 @@ locals {
   # Create a map of notifications keyed by bucket name
   notifications_map = {
     for notification in local.notifications_enriched : notification.bucket_name => notification
-  }
-
-  # Enrich IAM roles with computed values and trust policies
-  iam_roles_enriched = [
-    for role in local.iam_roles : merge(
-      {
-        account             = local.account
-        project             = local.project
-        application         = local.application
-        managed_policy_arns = []
-      },
-      role,
-      {
-        # Computed full role name
-        full_name = lower("${local.account}-${local.project}-${local.application}-${role.name}")
-        # Computed assume role policy document
-        assume_role_policy = jsonencode({
-          Version = "2012-10-17"
-          Statement = [
-            {
-              Effect = "Allow"
-              Principal = {
-                Service = role.assume_role_services
-              }
-              Action = "sts:AssumeRole"
-            }
-          ]
-        })
-        # Transform inline policies to policy documents
-        inline_policies = [
-          for policy in role.inline_policies : {
-            name = policy.name
-            policy = jsonencode({
-              Version = "2012-10-17"
-              Statement = [
-                for statement in policy.policy_statements : {
-                  Effect   = statement.effect
-                  Action   = statement.actions
-                  Resource = statement.resources
-                }
-              ]
-            })
-          }
-        ]
-      }
-    )
-  ]
-
-  # Create a map of IAM roles keyed by name for easy lookup
-  iam_roles_map = {
-    for role in local.iam_roles_enriched : role.name => role
   }
 
   # Enrich Glue databases with computed full names
@@ -176,8 +125,8 @@ locals {
         database_full_name = local.glue_databases_map[crawler.database_name].full_name
         # Resolved S3 target path
         s3_target_full_path = "s3://${local.buckets_map[crawler.s3_target_bucket].full_name}${crawler.s3_target_path != "" ? "/${crawler.s3_target_path}" : ""}"
-        # Resolved IAM role ARN
-        role_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:role/${local.iam_roles_map[crawler.iam_role_name].full_name}"
+        # Computed IAM role name — created by the glue infrastructure module
+        role_name = lower("${local.account}-${local.project}-${local.application}-${crawler.name}")
       }
     )
   ]
@@ -212,4 +161,7 @@ locals {
   athena_workgroups_map = {
     for wg in local.athena_workgroups_enriched : wg.name => wg
   }
+
+  # Glue security configuration name
+  glue_security_config_name = "${local.account}-glue-security-config"
 }

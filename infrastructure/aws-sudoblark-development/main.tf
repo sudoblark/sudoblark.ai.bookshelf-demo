@@ -33,7 +33,7 @@ provider "aws" {
 
   default_tags {
     tags = {
-      environment = "development"
+      environment = var.environment
       managed_by  = "sudoblark.ai.bookshelf-demo"
       project     = "bookshelf-demo"
     }

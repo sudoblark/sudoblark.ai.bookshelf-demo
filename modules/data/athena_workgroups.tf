@@ -32,7 +32,7 @@ locals {
   athena_workgroups = [
     {
       name                               = "bookshelf-analytics"
-      results_bucket                     = "athena-results"
+      results_bucket                     = "athena-results" # Output lands at athena-results/ root; queries partition by user_id via Glue table
       description                        = "Workgroup for querying book metadata from processed Parquet files"
       publish_cloudwatch_metrics_enabled = true
       bytes_scanned_cutoff_per_query     = 0 # No limit

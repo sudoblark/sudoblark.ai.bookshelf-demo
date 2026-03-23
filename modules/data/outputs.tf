@@ -14,6 +14,11 @@ output "application" {
   value       = local.application
 }
 
+output "environment" {
+  description = "Deployment environment"
+  value       = local.environment
+}
+
 output "lambda_defaults" {
   description = "Default Lambda configuration values"
   value       = local.lambda_defaults
@@ -60,16 +65,6 @@ output "notifications_map" {
   value       = local.notifications_map
 }
 
-output "iam_roles" {
-  description = "All IAM roles with enriched metadata and computed values"
-  value       = local.iam_roles_enriched
-}
-
-output "iam_roles_map" {
-  description = "Map of IAM roles keyed by role name"
-  value       = local.iam_roles_map
-}
-
 output "glue_databases" {
   description = "All Glue databases with enriched metadata and computed values"
   value       = local.glue_databases_enriched
@@ -93,6 +88,11 @@ output "glue_crawlers_map" {
 output "athena_workgroups" {
   description = "All Athena workgroups with resolved references"
   value       = local.athena_workgroups_enriched
+}
+
+output "glue_security_config_name" {
+  description = "Name for the Glue security configuration resource"
+  value       = local.glue_security_config_name
 }
 
 output "athena_workgroups_map" {

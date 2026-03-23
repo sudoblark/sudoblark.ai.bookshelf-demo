@@ -23,7 +23,8 @@ locals {
   # Define S3 buckets for the ETL pipeline
   buckets = [
     {
-      name = "landing" # Receives ZIP files
+      name         = "landing" # Receives file uploads
+      folder_paths = ["uploads", "archive"]
     },
     {
       name = "raw" # Stores extracted images from ZIPs

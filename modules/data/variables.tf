@@ -1,23 +1,19 @@
 variable "account" {
   description = "AWS account name (e.g. aws-sudoblark-development)"
   type        = string
-  default     = "aws-sudoblark-development"
 }
 
 variable "project" {
-  description = "Project name"
+  description = "Project name (e.g. bookshelf)"
   type        = string
-  default     = "bookshelf"
 }
 
 variable "application" {
-  description = "Application name"
+  description = "Application name (e.g. demo)"
   type        = string
-  default     = "demo"
 }
 
 variable "environment" {
   description = "Deployment environment (development, staging, production)"
   type        = string
-  default     = "development"
 }

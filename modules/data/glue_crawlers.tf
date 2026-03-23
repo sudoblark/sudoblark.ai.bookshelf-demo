@@ -40,14 +40,27 @@
 locals {
   glue_crawlers = [
     {
-      name             = "bookshelf-metadata-crawler"
+      name             = "metadata-crawler"
       database_name    = "bookshelf"
       s3_target_bucket = "processed"
-      iam_role_name    = "glue-crawler-role"
       description      = "Automatically discovers schema and partitions from book metadata Parquet files"
       s3_target_path   = "processed/"
       schedule         = "cron(0 3 * * ? *)" # Daily at 3 AM UTC
       table_prefix     = ""
+      iam_policy_statements = [
+        {
+          sid       = "ProcessedBucketReadWrite"
+          effect    = "Allow"
+          actions   = ["s3:GetObject", "s3:PutObject"]
+          resources = ["arn:aws:s3:::${var.account}-${local.project}-${local.application}-processed/*"]
+        },
+        {
+          sid       = "ProcessedBucketList"
+          effect    = "Allow"
+          actions   = ["s3:ListBucket"]
+          resources = ["arn:aws:s3:::${var.account}-${local.project}-${local.application}-processed"]
+        }
+      ]
     }
   ]
 }

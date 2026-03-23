@@ -42,18 +42,37 @@ locals {
   # Define Lambda functions for the ETL pipeline
   lambdas = [
     {
-      name          = "unzip-processor"
-      description   = "Extracts image files from ZIP archives in landing bucket to raw bucket"
-      zip_file_path = "../../lambda-packages/unzip-processor.zip"
+      name          = "av-scanner"
+      description   = "AV scans uploads from landing and passes clean files to raw bucket"
+      zip_file_path = "../../lambda-packages/unzip-processor.zip" # TODO: replace with av-scanner package in lambda refactor
       handler       = "lambda_function.handler"
       runtime       = "python3.11"
       timeout       = 60
       memory_size   = 512
-      role_name     = "unzip-processor-role"
       environment_variables = {
         RAW_BUCKET = "raw"
         LOG_LEVEL  = "INFO"
       }
+      iam_policy_statements = [
+        {
+          sid       = "LandingBucketRead"
+          effect    = "Allow"
+          actions   = ["s3:GetObject"]
+          resources = ["arn:aws:s3:::${var.account}-${local.project}-${local.application}-landing/*"]
+        },
+        {
+          sid       = "LandingBucketDelete"
+          effect    = "Allow"
+          actions   = ["s3:DeleteObject"]
+          resources = ["arn:aws:s3:::${var.account}-${local.project}-${local.application}-landing/*"]
+        },
+        {
+          sid       = "RawBucketWrite"
+          effect    = "Allow"
+          actions   = ["s3:PutObject"]
+          resources = ["arn:aws:s3:::${var.account}-${local.project}-${local.application}-raw/*"]
+        }
+      ]
     },
     {
       name          = "metadata-extractor"
@@ -63,7 +82,6 @@ locals {
       runtime       = "python3.11"
       timeout       = 300 # 5 minutes for LLM processing
       memory_size   = 1024
-      role_name     = "metadata-extractor-role"
       layers = [
         # AWS SDK for pandas (includes pandas, pyarrow, numpy, etc.)
         # Version 11 for Python 3.11 in eu-west-2
@@ -79,6 +97,26 @@ locals {
         LOG_LEVEL        = "INFO"
         BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
       }
+      iam_policy_statements = [
+        {
+          sid       = "RawBucketRead"
+          effect    = "Allow"
+          actions   = ["s3:GetObject"]
+          resources = ["arn:aws:s3:::${var.account}-${local.project}-${local.application}-raw/*"]
+        },
+        {
+          sid       = "ProcessedBucketWrite"
+          effect    = "Allow"
+          actions   = ["s3:PutObject"]
+          resources = ["arn:aws:s3:::${var.account}-${local.project}-${local.application}-processed/*"]
+        },
+        {
+          sid       = "BedrockInvokeModel"
+          effect    = "Allow"
+          actions   = ["bedrock:InvokeModel"]
+          resources = ["arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"]
+        }
+      ]
     }
   ]
 }

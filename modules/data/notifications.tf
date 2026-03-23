@@ -40,10 +40,10 @@ locals {
       bucket_name = "landing"
       lambda_notifications = [
         {
-          lambda_name   = "unzip-processor"
+          lambda_name   = "av-scanner"
           events        = ["s3:ObjectCreated:*"]
           filter_prefix = ""
-          filter_suffix = ".zip"
+          filter_suffix = ""
         }
       ]
     },
