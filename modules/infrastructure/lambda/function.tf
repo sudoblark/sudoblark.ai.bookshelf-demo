@@ -60,7 +60,7 @@ resource "aws_cloudwatch_log_group" "lambda" {
   for_each = local.lambdas_map
 
   name              = "/aws/lambda/${each.value.full_name}"
-  retention_in_days = 30
+  retention_in_days = 365
 }
 
 resource "aws_lambda_function" "function" {

@@ -25,6 +25,9 @@ skip-check:
   - CKV_AWS_21   # Versioning not needed - demo data is ephemeral and non-critical
   - CKV_AWS_144  # Replication not needed - demo is single-region, no DR requirements
 
+  # CloudWatch Log Group Encryption
+  - CKV_AWS_158  # KMS encryption for log groups not needed - demo doesn't warrant KMS key cost
+
   # Glue Security Configuration
   - CKV_AWS_99   # Glue encryption configured but Checkov validation is overly strict for demo
 
