@@ -14,26 +14,26 @@ terraform {
     key     = "aws/aws-sudoblark-development/sudoblark.ai.bookshelf-demo/terraform.tfstate"
     encrypt = true
     region  = "eu-west-2"
-    assume_role = {
-      role_arn     = "arn:aws:iam::796012663443:role/aws-sudoblark-development-terraform-github-cicd-role"
-      session_name = "sudoblark.ai.bookshelf-demo"
-      external_id  = "CI_CD_PLATFORM"
-    }
+    #  assume_role = {
+    #    role_arn     = "arn:aws:iam::796012663443:role/aws-sudoblark-development-terraform-github-cicd-role"
+    #    session_name = "sudoblark.ai.bookshelf-demo"
+    #    external_id  = "CI_CD_PLATFORM"
+    #  }
   }
 }
 
 provider "aws" {
   region = "eu-west-2"
 
-  assume_role {
-    role_arn     = "arn:aws:iam::796012663443:role/aws-sudoblark-development-terraform-github-cicd-role"
-    session_name = "sudoblark.ai.bookshelf-demo"
-    external_id  = "CI_CD_PLATFORM"
-  }
+  #assume_role {
+  #   role_arn     = "arn:aws:iam::796012663443:role/aws-sudoblark-development-terraform-github-cicd-role"
+  #   session_name = "sudoblark.ai.bookshelf-demo"
+  #   external_id  = "CI_CD_PLATFORM"
+  # }
 
   default_tags {
     tags = {
-      environment = "development"
+      environment = var.environment
       managed_by  = "sudoblark.ai.bookshelf-demo"
       project     = "bookshelf-demo"
     }

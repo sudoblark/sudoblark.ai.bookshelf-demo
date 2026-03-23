@@ -1,12 +1,21 @@
+# S3 key convention (all tiers):
+#   {user_id}/{upload_id}/{filename}
+#
+# user_id   = Cognito user sub (UUID)
+# upload_id = UUID generated at upload time by the pre-signed URL Lambda
+# filename  = Original source filename
+#
+# ZIPs land at:  landing/uploads/{user_id}/{upload_id}/{archive}.zip
+# Images land at: landing/uploads/{user_id}/{upload_id}/{filename}
+# Raw objects:   raw/{user_id}/{upload_id}/{filename}
+# Parquet:       processed/{user_id}/{upload_id}/{filename}.parquet
+
 locals {
-  # Default account identifier
-  account = "aws-sudoblark-development"
-
-  # Default project identifier
-  project = "bookshelf"
-
-  # Default application identifier
-  application = "demo"
+  # Resolved from input variables — promotes environment parity across dev/staging/prod
+  account     = var.account
+  project     = var.project
+  application = var.application
+  environment = var.environment
 
   # Default Lambda configurations
   lambda_defaults = {
@@ -18,6 +27,8 @@ locals {
   }
 
   # Default S3 bucket configurations
+  # (glue_security_config_name is computed in infrastructure.tf once local.account is available)
+
   s3_defaults = {
     folder_paths = []
   }
