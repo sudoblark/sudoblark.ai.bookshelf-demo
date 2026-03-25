@@ -106,7 +106,7 @@ jobs:
         run: isort --settings-path pyproject.toml --check-only lambda-packages/${{ matrix.lambda }}/
 
       - name: Run Flake8
-        run: flake8 --config pyproject.toml lambda-packages/${{ matrix.lambda }}/
+        run: flake8 lambda-packages/${{ matrix.lambda }}/
 
       - name: Run mypy
         run: mypy lambda-packages/${{ matrix.lambda }}/
