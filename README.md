@@ -75,15 +75,31 @@
 >
 > This repository is pre-configured to deploy to **Sudoblark's AWS infrastructure**. If you want to deploy to your own AWS account, you'll need to modify the Terraform configuration files to match your environment (account names, bucket names, state backend, etc.).
 
-The Bookshelf Demo showcases a serverless ETL pipeline built entirely on AWS. Upload a ZIP file containing book cover images, and watch as AI automatically extracts metadata, structures it in Parquet format, and makes it queryable via SQL.
+The Bookshelf Demo showcases a serverless ETL pipeline built entirely on AWS. Upload a single book cover image, and watch as AI automatically extracts metadata, structures it in Parquet format, and makes it queryable via SQL.
 
 **What You'll Learn:**
-* **Event-Driven Architecture**: S3 events trigger Lambda functions in a fully automated pipeline
-* **AI/ML Integration**: Practical AWS Bedrock integration using Claude 3 Haiku for computer vision
-* **Infrastructure as Code**: Data-driven Terraform patterns following Sudoblark's three-tier architecture
-* **Modern DevOps**: Testing, CI/CD, security scanning, and quality gates
 
-**Perfect for:** Software engineers, cloud architects, and DevOps practitioners looking to understand serverless data pipelines and AI integration on AWS.
+| Topic | What the demo teaches |
+|---|---|
+| **Event-Driven Pipeline Design** | How to build fully decoupled processing stages where each component communicates only via storage events — no direct service-to-service calls, no orchestration layer |
+| **Cloud-Portable Patterns** | The underlying pattern (object storage event → serverless compute → object storage) maps cleanly across clouds — see table below |
+| **AI/ML Integration** | How to wire a foundation model into a serverless pipeline for practical vision tasks, and where the equivalent service sits on other clouds |
+| **Infrastructure as Code** | Data-driven Terraform patterns that keep resource definitions as simple data structures — easy to replicate, extend, or port |
+| **Production Engineering** | OOP handlers with shared code modules, automated testing (pytest + moto), CI/CD, and security scanning |
+
+**Cloud equivalence — the same pattern, different providers:**
+
+| Concept | AWS (this demo) | GCP | Azure |
+|---|---|---|---|
+| Object storage | S3 | Cloud Storage | Blob Storage |
+| Storage events | S3 Event Notifications | Eventarc / Pub/Sub | Event Grid |
+| Serverless compute | Lambda | Cloud Functions | Azure Functions |
+| Managed AI model | Bedrock (Claude 3 Haiku) | Vertex AI | Azure OpenAI |
+| Columnar query engine | Athena | BigQuery | Synapse Analytics |
+| Schema discovery | Glue Crawler | Dataplex / BigQuery auto-detect | Purview |
+| IaC | Terraform | Terraform | Terraform |
+
+**Perfect for:** Software engineers and cloud architects who want to understand event-driven pipeline design as a reusable pattern, demonstrated end-to-end on AWS.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -105,7 +121,7 @@ The system uses an **event-driven, serverless ETL pipeline**:
 ```mermaid
 graph TB
     subgraph "User Actions"
-        A[Upload ZIP]
+        A[Upload Image]
     end
 
     subgraph "AWS Cloud - Event-Driven Pipeline"
@@ -114,7 +130,7 @@ graph TB
         end
 
         subgraph "Processing Layer"
-            C[Lambda: Unzip Processor]
+            C[Lambda: File Router]
             D[S3: Raw Bucket]
             E[Lambda: Metadata Extractor]
         end
@@ -134,9 +150,9 @@ graph TB
         end
     end
 
-    A -->|books.zip| B
+    A -->|cover.jpg| B
     B -->|S3 Event| C
-    C -->|Extract images| D
+    C -->|Copy image| D
     D -->|S3 Event| E
     E -->|Extract metadata| J
     J -->|Return JSON| E
@@ -176,8 +192,8 @@ This project demonstrates Sudoblark's **three-layer Terraform architecture**:
 
 **Step-by-step processing:**
 
-1. **Upload**: User uploads `books.zip` to Landing bucket
-2. **Extract**: S3 event triggers Unzip Lambda → extracts images to Raw bucket
+1. **Upload**: User uploads a single image to `landing/uploads/{user_id}/{upload_id}/` in the Landing bucket
+2. **Route**: S3 event triggers File Router Lambda → copies image to Raw bucket
 3. **Analyze**: S3 event triggers Metadata Extractor Lambda for each image
 4. **AI Processing**: Lambda sends image to Bedrock Claude 3 Haiku with vision prompt
 5. **Store**: Lambda writes extracted metadata as Parquet to Processed bucket
@@ -185,7 +201,7 @@ This project demonstrates Sudoblark's **three-layer Terraform architecture**:
 7. **Query**: Users query metadata via Athena SQL
 
 **Processing Time:**
-- Unzip: ~2-5 seconds for typical ZIP (10-50 images)
+- File routing: ~1-2 seconds per image
 - Metadata extraction: ~3-8 seconds per image (Bedrock API call)
 - Glue crawl: ~30-60 seconds (scheduled, not blocking)
 
@@ -193,22 +209,9 @@ This project demonstrates Sudoblark's **three-layer Terraform architecture**:
 
 ### Metadata Schema
 
-Extracted book metadata in Parquet format:
+Extracted metadata is defined as the [`BookMetadata`](lambda-packages/metadata-extractor/models.py) Pydantic model in `lambda-packages/metadata-extractor/models.py`. That file is the single source of truth for field names, types, validation rules, and defaults — refer to it directly rather than any secondary table.
 
-| Field | Type | Description | Example |
-|-------|------|-------------|---------|
-| `id` | string | Unique identifier (UUID) | "a1b2c3d4-e5f6-7890-abcd-ef1234567890" |
-| `title` | string | Book title | "The Pragmatic Programmer" |
-| `author` | string | Author name(s) | "Andrew Hunt, David Thomas" |
-| `isbn` | string | ISBN (digits only, no hyphens) | "9780135957059" |
-| `publisher` | string | Publishing company | "Addison-Wesley" |
-| `published_year` | integer | Year of publication | 2019 |
-| `description` | string | Brief synopsis | "Your journey to mastery" |
-| `confidence` | float | AI extraction confidence (0.0-1.0) | 0.95 |
-| `filename` | string | Original filename | "cover1.jpg" |
-| `processed_at` | timestamp | When processed (ISO 8601) | "2026-03-09T10:30:00Z" |
-
-**Note**: Fields extracted by Bedrock (`title`, `author`, `isbn`, `publisher`, `published_year`, `description`, `confidence`) may be empty strings or `null` if not found in the image.
+Each processed record also includes `id` (UUID), `filename`, and `processed_at` (ISO 8601 timestamp) added by the processor at write time.
 ## Getting Started
 
 To get a local copy up and running follow these simple steps.
@@ -270,7 +273,9 @@ pip install -r requirements-dev.txt
 pre-commit install
 
 # Install Lambda dependencies for local testing
-cd lambda-packages/unzip-processor
+cd lambda-packages/common
+pip install -r requirements.txt -r requirements-ci.txt
+cd ../file-router
 pip install -r requirements.txt -r requirements-ci.txt
 cd ../metadata-extractor
 pip install -r requirements.txt -r requirements-ci.txt
@@ -284,23 +289,10 @@ cd ../..
 **Step 3: Package Lambda functions**
 
 ```sh
-# Unzip processor
-cd lambda-packages/unzip-processor
-pip install -r requirements.txt -t .
-zip -r ../../unzip-processor.zip .
-cd ../..
-
-# Metadata extractor
-cd lambda-packages/metadata-extractor
-pip install -r requirements.txt -t .
-zip -r ../../metadata-extractor.zip .
-cd ../..
+bash scripts/bundle-lambdas.sh
 ```
 
-> **💡 Lambda Packaging:** `requirements.txt` contains minimal runtime dependencies for deployment. `requirements-ci.txt` contains additional dependencies (boto3, pandas, pyarrow) needed for local testing/CI that are provided by Lambda runtime or AWS layers in production.
-
-**Step 4: Deploy with Terraform**
-
+> **💡 Lambda Packaging:** The bundle script packages each Lambda and automatically copies `lambda-packages/common/` into every ZIP so shared utilities are importable at runtime. `requirements.txt` contains minimal runtime dependencies for deployment; `requirements-ci.txt` contains additional dependencies (boto3, pandas, pyarrow) needed for local testing/CI that are provided by Lambda runtime or AWS layers in production.
 ```sh
 cd infrastructure/aws-sudoblark-development
 terraform init
@@ -310,9 +302,9 @@ terraform apply  # Type 'yes' to confirm
 
 **Expected resources created:**
 - 3 S3 buckets (landing, raw, processed)
-- 2 Lambda functions (unzip-processor, metadata-extractor)
+- 2 Lambda functions (file-router, metadata-extractor)
 - 2 IAM roles with appropriate permissions
-- 2 S3 event notifications
+- 3 S3 event notifications (one per supported image extension on the landing bucket)
 - 1 Glue database
 - 1 Glue crawler (scheduled daily at 02:00 UTC)
 - 1 Athena workgroup
@@ -324,7 +316,7 @@ terraform apply  # Type 'yes' to confirm
 
 ### Basic Workflow
 
-1. **Prepare book cover images**
+1. **Prepare a book cover image**
    ```sh
    # Navigate to demo images directory
    cd data/demo-images
@@ -334,34 +326,28 @@ terraform apply  # Type 'yes' to confirm
    ./download_covers.sh
    ```
 
-2. **Create ZIP file**
-   ```sh
-   # ZIP all images, excluding the download script
-   zip -r ../../books.zip *.jpg
-   cd ../..
-   ```
-
-3. **Upload to S3 Landing bucket**
+2. **Upload a single image to S3 Landing bucket**
    ```sh
    LANDING_BUCKET=$(aws s3 ls | grep landing | awk '{print $3}')
-   aws s3 cp books.zip s3://${LANDING_BUCKET}/books.zip
+   # Key format: uploads/{user_id}/{upload_id}/{filename}
+   aws s3 cp cover.jpg s3://${LANDING_BUCKET}/uploads/default/demo-upload/cover.jpg
    ```
 
-4. **Monitor processing** (optional)
+3. **Monitor processing** (optional)
    ```sh
-   # Watch CloudWatch logs for unzip-processor
-   aws logs tail /aws/lambda/aws-sudoblark-development-bookshelf-demo-unzip-processor --follow
+   # Watch CloudWatch logs for file-router
+   aws logs tail /aws/lambda/aws-sudoblark-development-bookshelf-demo-file-router --follow
 
    # Watch metadata-extractor logs
    aws logs tail /aws/lambda/aws-sudoblark-development-bookshelf-demo-metadata-extractor --follow
    ```
 
-5. **Run Glue Crawler** (or wait for daily schedule)
+4. **Run Glue Crawler** (or wait for daily schedule)
    ```sh
    aws glue start-crawler --name aws-sudoblark-development-bookshelf-demo-bookshelf-metadata-crawler
    ```
 
-6. **Query with Athena**
+5. **Query with Athena**
    ```sql
    -- View all extracted book metadata
    SELECT *
@@ -518,7 +504,7 @@ pytest --cov=lambda-packages --cov-report=html --cov-report=term-missing
 pytest tests/test_metadata_extractor.py -v
 
 # Run with mocked AWS services
-pytest tests/test_unzip_processor.py -v
+pytest tests/test_file_router.py -v
 ```
 
 ### Test Coverage Requirements
@@ -532,7 +518,8 @@ pytest tests/test_unzip_processor.py -v
 ```
 tests/
 ├── conftest.py                   # Pytest fixtures and configuration
-├── test_unzip_processor.py       # Tests for ZIP extraction Lambda
+├── test_common.py                # Tests for shared common utilities
+├── test_file_router.py           # Tests for image routing Lambda
 └── test_metadata_extractor.py    # Tests for Bedrock metadata extraction
 ```
 
@@ -618,7 +605,7 @@ aws glue get-crawler --name aws-sudoblark-development-bookshelf-demo-bookshelf-c
 
 # Test Lambda invocation
 aws lambda invoke \
-  --function-name aws-sudoblark-development-bookshelf-demo-unzip-processor \
+  --function-name aws-sudoblark-development-bookshelf-demo-file-router \
   --payload '{}' \
   response.json
 ```
@@ -640,7 +627,7 @@ Error: An error occurred (ResourceNotFoundException) when calling the InvokeMode
 ```
 Task timed out after 60.00 seconds
 ```
-**Solution:** Large ZIP files may exceed Lambda timeout. Split into smaller batches or increase Lambda timeout in Terraform configuration.
+**Solution:** Bedrock API calls may occasionally be slow. Increase the `metadata-extractor` Lambda timeout in `modules/data/lambdas.tf`.
 
 **Issue: "Glue Crawler not finding data"**
 ```
@@ -692,10 +679,11 @@ aws logs filter-log-events \
 source .venv/bin/activate
 
 # Set environment variables
-export RAW_BUCKET=test-bucket
+export RAW_BUCKET=raw
+export LOG_LEVEL=DEBUG
 
-# Run function
-python lambda-packages/unzip-processor/handler.py
+# Run unit tests
+python -m pytest tests/test_file_router.py -v
 ```
 
 **Check S3 event notifications:**
@@ -720,7 +708,7 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 
 - 🌐 Website: [sudoblark.com](https://sudoblark.com)
 - 💼 LinkedIn: [Sudoblark](https://linkedin.com/company/sudoblark)
-- 📧 Email: [info@sudoblark.com](mailto:info@sudoblark.com)
+- 📧 Email: [hello@sudoblark.com](mailto:hello@sudoblark.com)
 - 🐙 GitHub: [@sudoblark](https://github.com/sudoblark)
 
 **Project Link:** [https://github.com/sudoblark/sudoblark.ai.bookshelf-demo](https://github.com/sudoblark/sudoblark.ai.bookshelf-demo)
