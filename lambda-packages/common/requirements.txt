@@ -1,0 +1,3 @@
+# Lambda runtime dependencies for common/handler.py
+# Exclude: boto3 (provided by Lambda runtime)
+aws-lambda-powertools

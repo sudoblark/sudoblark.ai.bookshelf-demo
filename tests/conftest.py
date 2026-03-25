@@ -1,8 +1,16 @@
 """Shared pytest fixtures for Lambda function tests."""
 
 import os
+import sys
 from typing import Any, Dict
 from unittest.mock import MagicMock
+
+# Add lambda-packages/ to sys.path so `import common` resolves when Lambda
+# modules are loaded dynamically via importlib.
+sys.path.insert(
+    0,
+    os.path.join(os.path.dirname(__file__), "../lambda-packages"),
+)
 
 import boto3  # noqa: E402
 import pytest  # noqa: E402
@@ -15,6 +23,9 @@ os.environ["AWS_SECURITY_TOKEN"] = "testing"
 os.environ["AWS_SESSION_TOKEN"] = "testing"
 os.environ["AWS_DEFAULT_REGION"] = "eu-west-2"
 os.environ["LOG_LEVEL"] = "INFO"
+# Required by FileRouterHandler and MetadataExtractorHandler at module-load time
+os.environ["RAW_BUCKET"] = "raw"
+os.environ["PROCESSED_BUCKET"] = "processed"
 
 
 @pytest.fixture
