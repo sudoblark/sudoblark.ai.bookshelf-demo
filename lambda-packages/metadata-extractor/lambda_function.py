@@ -6,74 +6,32 @@ and uses Claude 3 Haiku via AWS Bedrock to extract book metadata from
 images, then writes the results to Parquet format in the processed bucket.
 """
 
-import logging
-import os
-from typing import Any, Dict, List
+from typing import Any
 
 import boto3
-from aws_lambda_powertools.utilities.data_classes import S3Event, event_source
 from bedrock_extractor import BedrockMetadataExtractor  # noqa: F401
+from common.handler import BaseS3BatchHandler
 from config import Config
 from image_processor import ImageProcessor  # noqa: F401
 from parquet_writer import ParquetWriter  # noqa: F401
 from processor import BookshelfProcessor
 
-logger = logging.getLogger()
-logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
 
-# Module-level clients for connection reuse across Lambda invocations
-_s3_client = boto3.client("s3")
-_bedrock_client = boto3.client("bedrock-runtime")
+class MetadataExtractorHandler(BaseS3BatchHandler):
+    """Extracts book metadata from S3 image objects using Bedrock."""
 
-
-@event_source(data_class=S3Event)
-def handler(event: S3Event, context: Any) -> Dict[str, Any]:
-    """Lambda handler to process S3 events and extract metadata from images.
-
-    Returns:
-        Response with statusCode (200 or 207), processed/failed counts, and file details.
-    """
-    logger.info("Received S3 event for processing")
-
-    try:
-        config: Config = Config.from_env()
-        processor = BookshelfProcessor(
+    def __init__(self, s3_client: Any = None, bedrock_client: Any = None) -> None:
+        super().__init__(s3_client)
+        _bedrock_client = bedrock_client or boto3.client("bedrock-runtime")
+        config = Config.from_env()
+        self._processor = BookshelfProcessor(
             config=config,
-            s3_client=_s3_client,
+            s3_client=self.s3_client,
             bedrock_client=_bedrock_client,
         )
 
-        processed_files: List[str] = []
-        failed_files: List[Dict[str, str]] = []
+    def process_record(self, bucket: str, key: str) -> str:
+        return self._processor.process(bucket, key)
 
-        for record in event.records:
-            try:
-                bucket_name: str = record.s3.bucket.name
-                object_key: str = record.s3.get_object.key
 
-                if ".." in object_key:
-                    raise ValueError(f"Invalid S3 key (path traversal): {object_key}")
-
-                logger.info(f"Processing image: s3://{bucket_name}/{object_key}")
-
-                parquet_key: str = processor.process(bucket_name, object_key)
-                processed_files.append(parquet_key)
-
-            except Exception as e:
-                logger.error(f"Failed to process record: {str(e)}", exc_info=True)
-                failed_files.append({"key": record.s3.get_object.key, "error": str(e)})
-
-        response: Dict[str, Any] = {
-            "statusCode": 200 if not failed_files else 207,
-            "processed_count": len(processed_files),
-            "failed_count": len(failed_files),
-            "processed_files": processed_files,
-            "failed_files": failed_files,
-        }
-
-        logger.info(f"Processing complete: {response}")
-        return response
-
-    except Exception as e:
-        logger.error(f"Handler execution failed: {str(e)}", exc_info=True)
-        raise
+handler = MetadataExtractorHandler()

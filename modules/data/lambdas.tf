@@ -42,9 +42,9 @@ locals {
   # Define Lambda functions for the ETL pipeline
   lambdas = [
     {
-      name          = "av-scanner"
-      description   = "AV scans uploads from landing and passes clean files to raw bucket"
-      zip_file_path = "../../lambda-packages/unzip-processor.zip" # TODO: replace with av-scanner package in lambda refactor
+      name          = "file-router"
+      description   = "Routes single image uploads from landing to the raw bucket"
+      zip_file_path = "../../lambda-packages/file-router.zip"
       handler       = "lambda_function.handler"
       runtime       = "python3.11"
       timeout       = 60

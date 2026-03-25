@@ -1,14 +1,22 @@
+locals {
+  # Deduplicate bucket→lambda pairs — multiple suffix filters for the same lambda
+  # produce one IAM permission, not one per filter.
+  unique_lambda_permissions = {
+    for item in distinct(flatten([
+      for notification in var.notifications : [
+        for lambda_notif in notification.lambda_notifications_resolved : {
+          key                 = "${notification.bucket_name}/${lambda_notif.lambda_name}"
+          bucket_name         = notification.bucket_name
+          lambda_name         = lambda_notif.lambda_name
+          lambda_function_arn = lambda_notif.lambda_function_arn
+        }
+      ]
+    ])) : item.key => item
+  }
+}
+
 resource "aws_lambda_permission" "s3_invoke" {
-  for_each = merge([
-    for notification in var.notifications : {
-      for lambda_notif in notification.lambda_notifications_resolved :
-      "${notification.bucket_name}/${lambda_notif.lambda_name}" => {
-        bucket_name         = notification.bucket_name
-        lambda_name         = lambda_notif.lambda_name
-        lambda_function_arn = lambda_notif.lambda_function_arn
-      }
-    }
-  ]...)
+  for_each = local.unique_lambda_permissions
 
   statement_id  = "AllowS3Invoke-${each.value.bucket_name}"
   action        = "lambda:InvokeFunction"

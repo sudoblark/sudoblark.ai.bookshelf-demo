@@ -40,10 +40,22 @@ locals {
       bucket_name = "landing"
       lambda_notifications = [
         {
-          lambda_name   = "av-scanner"
+          lambda_name   = "file-router"
           events        = ["s3:ObjectCreated:*"]
-          filter_prefix = ""
-          filter_suffix = ""
+          filter_prefix = "uploads/"
+          filter_suffix = ".jpg"
+        },
+        {
+          lambda_name   = "file-router"
+          events        = ["s3:ObjectCreated:*"]
+          filter_prefix = "uploads/"
+          filter_suffix = ".jpeg"
+        },
+        {
+          lambda_name   = "file-router"
+          events        = ["s3:ObjectCreated:*"]
+          filter_prefix = "uploads/"
+          filter_suffix = ".png"
         }
       ]
     },

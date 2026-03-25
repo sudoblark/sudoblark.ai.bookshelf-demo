@@ -23,18 +23,7 @@ jobs:
           python-version: '3.11'
 
       - name: Create Lambda deployment packages
-        run: |
-          # Unzip processor
-          cd lambda-packages/unzip-processor
-          pip install -r requirements.txt -t .
-          zip -r ../unzip-processor.zip .
-          cd ../..
-
-          # Metadata extractor
-          cd lambda-packages/metadata-extractor
-          pip install -r requirements.txt -t .
-          zip -r ../metadata-extractor.zip .
-          cd ../..
+        run: bash scripts/bundle-lambdas.sh
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

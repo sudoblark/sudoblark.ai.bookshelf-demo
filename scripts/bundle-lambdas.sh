@@ -28,9 +28,25 @@ TEMP_DIR="${OUTPUT_DIR}/tmp"
 
 # Lambda functions to bundle
 LAMBDAS=(
-  "unzip-processor"   # TODO: rename to av-scanner once lambda code is refactored
+  "file-router"
   "metadata-extractor"
 )
+
+# Returns space-separated glob patterns for packages to remove after pip install
+# for a given Lambda. These packages are already provided by an attached Lambda
+# layer and count against the 262 MB unzipped deployment limit.
+# Uses a case statement for bash 3 compatibility (macOS ships bash 3.2).
+layer_exclude_packages() {
+  local lambda_name=$1
+  case "$lambda_name" in
+    metadata-extractor)
+      echo "boto3 boto3-*.dist-info botocore botocore-*.dist-info s3transfer s3transfer-*.dist-info jmespath jmespath-*.dist-info"
+      ;;
+    *)
+      echo ""
+      ;;
+  esac
+}
 
 # Function to bundle a Lambda with dependencies
 bundle_lambda() {
@@ -57,6 +73,13 @@ bundle_lambda() {
         "${temp_build_dir}/requirements-ci.txt" \
         "${temp_build_dir}/README.md"
 
+  # Copy shared common modules so they are importable within the Lambda package
+  if [ -d "${LAMBDA_SOURCE_DIR}/common" ]; then
+    echo -e "${YELLOW}  →${NC} Including common shared modules..."
+    cp -r "${LAMBDA_SOURCE_DIR}/common" "${temp_build_dir}/"
+    echo -e "${GREEN}  ✓${NC} Common modules included"
+  fi
+
   # Install dependencies if requirements.txt exists
   if [ -f "$requirements_file" ]; then
     echo -e "${YELLOW}  →${NC} Installing dependencies from requirements.txt..."
@@ -72,6 +95,16 @@ bundle_lambda() {
     echo -e "${GREEN}  ✓${NC} Dependencies installed (linux/x86_64)"
   else
     echo -e "${YELLOW}  →${NC} No requirements.txt found, skipping dependency installation"
+  fi
+
+  # Remove packages already provided by Lambda layers to stay under 262 MB limit
+  local exclude_pkgs
+  exclude_pkgs=$(layer_exclude_packages "$lambda_name")
+  if [ -n "$exclude_pkgs" ]; then
+    echo -e "${YELLOW}  →${NC} Removing layer-provided packages..."
+    # shellcheck disable=SC2086
+    (cd "$temp_build_dir" && rm -rf $exclude_pkgs)
+    echo -e "${GREEN}  ✓${NC} Layer-provided packages removed"
   fi
 
   # Create ZIP file

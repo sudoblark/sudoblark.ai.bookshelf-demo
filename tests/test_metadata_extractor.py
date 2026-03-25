@@ -6,7 +6,7 @@ import os
 
 # Add lambda-packages/metadata-extractor to sys.path so local imports resolve
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pydantic_ai.models as pydantic_ai_models
 import pytest
@@ -372,35 +372,31 @@ class TestBookshelfProcessor:
 class TestHandler:
     """Tests for the Lambda handler function."""
 
-    @patch("metadata_lambda_function.BookshelfProcessor")
-    def test_handler_success(
-        self, mock_processor_class, sample_s3_event, lambda_context, monkeypatch
-    ):
+    def test_handler_success(self, sample_s3_event, lambda_context, monkeypatch):
         """Should process an S3 event and return a success response."""
         monkeypatch.setenv("PROCESSED_BUCKET", "processed-bucket")
         monkeypatch.setenv("BEDROCK_MODEL_ID", "test-model")
         monkeypatch.setenv("LOG_LEVEL", "INFO")
 
-        mock_instance = MagicMock()
-        mock_instance.process.return_value = "processed/year=2026/test.parquet"
-        mock_processor_class.return_value = mock_instance
+        mock_processor = MagicMock()
+        mock_processor.process.return_value = "processed/year=2026/test.parquet"
+        monkeypatch.setattr(metadata_lambda.handler, "_processor", mock_processor)
 
         response = metadata_lambda.handler(sample_s3_event, lambda_context)
 
         assert response["statusCode"] == 200
         assert response["processed_count"] == 1
         assert response["failed_count"] == 0
-        mock_instance.process.assert_called_once_with("test-bucket", "test-file.zip")
+        mock_processor.process.assert_called_once_with("test-bucket", "test-file.zip")
 
-    @patch("metadata_lambda_function.BookshelfProcessor")
-    def test_handler_multiple_records(self, mock_processor_class, lambda_context, monkeypatch):
+    def test_handler_multiple_records(self, lambda_context, monkeypatch):
         """Should process multiple S3 records."""
         monkeypatch.setenv("PROCESSED_BUCKET", "processed-bucket")
         monkeypatch.setenv("BEDROCK_MODEL_ID", "test-model")
 
-        mock_instance = MagicMock()
-        mock_instance.process.return_value = "processed/key.parquet"
-        mock_processor_class.return_value = mock_instance
+        mock_processor = MagicMock()
+        mock_processor.process.return_value = "processed/key.parquet"
+        monkeypatch.setattr(metadata_lambda.handler, "_processor", mock_processor)
 
         event = {
             "Records": [
@@ -413,20 +409,19 @@ class TestHandler:
 
         assert response["processed_count"] == 2
         assert response["failed_count"] == 0
-        assert mock_instance.process.call_count == 2
+        assert mock_processor.process.call_count == 2
 
-    @patch("metadata_lambda_function.BookshelfProcessor")
-    def test_handler_partial_failure(self, mock_processor_class, lambda_context, monkeypatch):
+    def test_handler_partial_failure(self, lambda_context, monkeypatch):
         """Should handle partial failures and return a multi-status response."""
         monkeypatch.setenv("PROCESSED_BUCKET", "processed-bucket")
         monkeypatch.setenv("BEDROCK_MODEL_ID", "test-model")
 
-        mock_instance = MagicMock()
-        mock_instance.process.side_effect = [
+        mock_processor = MagicMock()
+        mock_processor.process.side_effect = [
             "processed/key.parquet",
             Exception("Processing error"),
         ]
-        mock_processor_class.return_value = mock_instance
+        monkeypatch.setattr(metadata_lambda.handler, "_processor", mock_processor)
 
         event = {
             "Records": [

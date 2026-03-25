@@ -1,8 +1,9 @@
 import logging
-from typing import TYPE_CHECKING, Any, Dict, List
+from typing import TYPE_CHECKING, Any, Dict
 
 from bedrock_extractor import BedrockMetadataExtractor
 from botocore.exceptions import ClientError
+from common.s3 import resolve_bucket
 from config import Config
 from parquet_writer import ParquetWriter
 
@@ -38,7 +39,7 @@ class BookshelfProcessor:
         if not source_bucket or not image_key:
             raise ValueError("source_bucket and image_key must not be empty")
 
-        processed_bucket: str = self._resolve_processed_bucket(source_bucket)
+        processed_bucket: str = resolve_bucket(source_bucket, self._config.processed_bucket)
         logger.info(f"Extracting metadata from s3://{source_bucket}/{image_key}")
 
         try:
@@ -59,15 +60,3 @@ class BookshelfProcessor:
             error_code: str = e.response.get("Error", {}).get("Code", "Unknown")
             logger.error(f"S3 operation failed: {error_code}", exc_info=True)
             raise
-
-    def _resolve_processed_bucket(self, source_bucket: str) -> str:
-        """Derive the processed bucket name from the source bucket's naming convention.
-
-        Expected format: account-project-application-bucket_type
-        Strips the last segment and appends the configured processed bucket suffix.
-        """
-        parts: List[str] = source_bucket.split("-")
-        if len(parts) < 4:
-            raise ValueError(f"Invalid source bucket name format: {source_bucket}")
-        prefix: str = "-".join(parts[:-1])
-        return f"{prefix}-{self._config.processed_bucket}"
