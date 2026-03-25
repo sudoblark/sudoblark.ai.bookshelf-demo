@@ -38,16 +38,16 @@ def _make_s3_event(bucket: str, key: str) -> dict:
     }
 
 
-class TestGetConfig:
-    def test_returns_config_when_raw_bucket_set(self, monkeypatch):
+class TestFileRouterHandlerInit:
+    def test_initialises_with_raw_bucket_set(self, monkeypatch):
         monkeypatch.setenv("RAW_BUCKET", "raw")
-        config = file_router_lambda.get_config()
-        assert config["raw_bucket"] == "raw"
+        h = file_router_lambda.FileRouterHandler()
+        assert h._raw_bucket_tier == "raw"
 
     def test_raises_when_raw_bucket_missing(self, monkeypatch):
         monkeypatch.delenv("RAW_BUCKET", raising=False)
         with pytest.raises(ValueError, match="RAW_BUCKET environment variable is required"):
-            file_router_lambda.get_config()
+            file_router_lambda.FileRouterHandler()
 
 
 class TestParseUploadKey:
@@ -90,18 +90,6 @@ class TestIsSupportedExtension:
 
     def test_case_insensitive(self):
         assert file_router_lambda.is_supported_extension("cover.JPG") is True
-
-
-class TestResolveRawBucket:
-    def test_resolves_correctly(self):
-        result = file_router_lambda.resolve_raw_bucket(
-            "aws-sudoblark-development-bookshelf-demo-landing", "raw"
-        )
-        assert result == "aws-sudoblark-development-bookshelf-demo-raw"
-
-    def test_raises_for_short_bucket_name(self):
-        with pytest.raises(ValueError, match="Invalid source bucket name format"):
-            file_router_lambda.resolve_raw_bucket("bad-name", "raw")
 
 
 class TestHandler:
