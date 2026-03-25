@@ -78,6 +78,7 @@ jobs:
     strategy:
       matrix:
         lambda:
+          - common
           - file-router
           - metadata-extractor
     steps:
@@ -128,6 +129,7 @@ jobs:
     strategy:
       matrix:
         lambda:
+          - common
           - file-router
           - metadata-extractor
     steps:
