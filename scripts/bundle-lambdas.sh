@@ -28,9 +28,15 @@ TEMP_DIR="${OUTPUT_DIR}/tmp"
 
 # Lambda functions to bundle
 LAMBDAS=(
-  "unzip-processor"   # TODO: rename to av-scanner once lambda code is refactored
+  "file-router"
   "metadata-extractor"
 )
+
+# Packages to remove after pip install for each Lambda, because they are
+# already provided by an attached Lambda layer and count against the 262 MB
+# unzipped deployment limit.  Space-separated glob patterns per lambda name.
+declare -A LAYER_EXCLUDE_PACKAGES
+LAYER_EXCLUDE_PACKAGES["metadata-extractor"]="boto3 boto3-*.dist-info botocore botocore-*.dist-info s3transfer s3transfer-*.dist-info jmespath jmespath-*.dist-info"
 
 # Function to bundle a Lambda with dependencies
 bundle_lambda() {
@@ -72,6 +78,14 @@ bundle_lambda() {
     echo -e "${GREEN}  ✓${NC} Dependencies installed (linux/x86_64)"
   else
     echo -e "${YELLOW}  →${NC} No requirements.txt found, skipping dependency installation"
+  fi
+
+  # Remove packages already provided by Lambda layers to stay under 262 MB limit
+  if [[ -n "${LAYER_EXCLUDE_PACKAGES[$lambda_name]+x}" ]]; then
+    echo -e "${YELLOW}  →${NC} Removing layer-provided packages..."
+    # shellcheck disable=SC2086
+    (cd "$temp_build_dir" && rm -rf ${LAYER_EXCLUDE_PACKAGES[$lambda_name]})
+    echo -e "${GREEN}  ✓${NC} Layer-provided packages removed"
   fi
 
   # Create ZIP file
