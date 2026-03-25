@@ -1,4 +1,5 @@
 """Shared Lambda response builder for S3 batch-processing functions."""
+
 from typing import Any, Dict, List
 
 

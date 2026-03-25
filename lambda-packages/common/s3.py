@@ -1,4 +1,5 @@
 """Shared S3 utilities for bookshelf-demo Lambda functions."""
+
 import logging
 from typing import List
 
