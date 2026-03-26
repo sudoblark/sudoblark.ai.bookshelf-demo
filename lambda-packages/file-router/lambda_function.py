@@ -7,34 +7,13 @@ raw bucket preserving the full S3 key, then deletes the source object.
 """
 
 import os
-from typing import Any, Tuple
+from typing import Any
 
 from common.handler import BaseS3BatchHandler
-from common.s3 import resolve_bucket
+from common.s3 import parse_upload_key, resolve_bucket
 from common.tracker import BookshelfTracker, UploadStage
 
 SUPPORTED_EXTENSIONS: frozenset = frozenset({".jpg", ".jpeg", ".png"})
-
-
-def parse_upload_key(key: str) -> Tuple[str, str, str]:
-    """
-    Parse user_id, upload_id, and filename from the S3 key.
-
-    Expected format: uploads/{user_id}/{upload_id}/{filename}
-
-    Returns:
-        Tuple of (user_id, upload_id, filename).
-
-    Raises:
-        ValueError: If the key does not match the expected format.
-    """
-    parts = key.split("/")
-    if len(parts) != 4 or parts[0] != "uploads":
-        raise ValueError(
-            f"Key does not match expected format uploads/user_id/upload_id/filename: {key}"
-        )
-    _, user_id, upload_id, filename = parts
-    return user_id, upload_id, filename
 
 
 def is_supported_extension(filename: str) -> bool:
