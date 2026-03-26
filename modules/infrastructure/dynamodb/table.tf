@@ -6,18 +6,9 @@ resource "aws_dynamodb_table" "table" {
   for_each = local.tables_map
 
   name         = each.value.full_name
+  hash_key     = each.value.hash_key
+  range_key    = each.value.range_key
   billing_mode = each.value.billing_mode
-
-  dynamic "key_schema" {
-    for_each = concat(
-      [{ attribute_name = each.value.hash_key, key_type = "HASH" }],
-      each.value.range_key != null ? [{ attribute_name = each.value.range_key, key_type = "RANGE" }] : []
-    )
-    content {
-      attribute_name = key_schema.value.attribute_name
-      key_type       = key_schema.value.key_type
-    }
-  }
 
   dynamic "attribute" {
     for_each = each.value.attributes
@@ -33,18 +24,9 @@ resource "aws_dynamodb_table" "table" {
 
     content {
       name            = global_secondary_index.value.name
+      hash_key        = global_secondary_index.value.hash_key
+      range_key       = global_secondary_index.value.range_key != null ? global_secondary_index.value.range_key : null
       projection_type = global_secondary_index.value.projection_type
-
-      dynamic "key_schema" {
-        for_each = concat(
-          [{ attribute_name = global_secondary_index.value.hash_key, key_type = "HASH" }],
-          global_secondary_index.value.range_key != null ? [{ attribute_name = global_secondary_index.value.range_key, key_type = "RANGE" }] : []
-        )
-        content {
-          attribute_name = key_schema.value.attribute_name
-          key_type       = key_schema.value.key_type
-        }
-      }
     }
   }
 
