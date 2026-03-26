@@ -79,7 +79,7 @@ jobs:
       matrix:
         lambda:
           - common
-          - file-router
+          - landing-to-raw
           - metadata-extractor
     steps:
       - name: Checkout
