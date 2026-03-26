@@ -25,8 +25,9 @@ landing_to_raw_lambda = importlib.util.module_from_spec(spec)
 sys.modules["landing_to_raw_lambda_function"] = landing_to_raw_lambda
 spec.loader.exec_module(landing_to_raw_lambda)
 
-LANDING_BUCKET = "aws-sudoblark-development-bookshelf-demo-landing"
-RAW_BUCKET = "aws-sudoblark-development-bookshelf-demo-raw"
+DATA_LAKE_PREFIX = "aws-sudoblark-development-bookshelf-demo"
+LANDING_BUCKET = f"{DATA_LAKE_PREFIX}-landing"
+RAW_BUCKET = f"{DATA_LAKE_PREFIX}-raw"
 TRACKING_TABLE = "test-tracking"
 STATE_MACHINE_ARN = "arn:aws:states:eu-west-2:123456789012:stateMachine:test-raw-to-enriched"
 REGION = "eu-west-2"
@@ -49,9 +50,9 @@ def _make_s3_event(bucket: str, key: str) -> dict:
 
 
 class TestLandingToRawHandlerInit:
-    def test_raises_when_raw_bucket_missing(self, monkeypatch):
-        monkeypatch.delenv("RAW_BUCKET", raising=False)
-        with pytest.raises(ValueError, match="RAW_BUCKET environment variable is required"):
+    def test_raises_when_data_lake_prefix_missing(self, monkeypatch):
+        monkeypatch.delenv("DATA_LAKE_PREFIX", raising=False)
+        with pytest.raises(ValueError, match="DATA_LAKE_PREFIX environment variable is required"):
             landing_to_raw_lambda.LandingToRawHandler()
 
     def test_raises_when_tracking_table_missing(self, monkeypatch):
@@ -67,9 +68,7 @@ class TestLandingToRawHandlerInit:
 
 class TestHandlerCleanFile:
     @mock_aws
-    def test_copies_file_to_raw_bucket(self, monkeypatch, lambda_context):
-        monkeypatch.setenv("RAW_BUCKET", "raw")
-        monkeypatch.setenv("STATE_MACHINE_ARN", STATE_MACHINE_ARN)
+    def test_copies_file_to_raw_bucket(self, lambda_context):
         mock_sfn = MagicMock()
 
         s3 = boto3.client("s3", region_name=REGION)
@@ -97,10 +96,7 @@ class TestHandlerCleanFile:
         assert obj["Body"].read() == b"imgdata"
 
     @mock_aws
-    def test_does_not_delete_source_from_landing(self, monkeypatch, lambda_context):
-        monkeypatch.setenv("RAW_BUCKET", "raw")
-        monkeypatch.setenv("STATE_MACHINE_ARN", STATE_MACHINE_ARN)
-
+    def test_does_not_delete_source_from_landing(self, lambda_context):
         s3 = boto3.client("s3", region_name=REGION)
         for bucket in (LANDING_BUCKET, RAW_BUCKET):
             s3.create_bucket(
@@ -122,9 +118,7 @@ class TestHandlerCleanFile:
         assert obj["Body"].read() == b"imgdata"
 
     @mock_aws
-    def test_calls_start_execution_with_correct_payload(self, monkeypatch, lambda_context):
-        monkeypatch.setenv("RAW_BUCKET", "raw")
-        monkeypatch.setenv("STATE_MACHINE_ARN", STATE_MACHINE_ARN)
+    def test_calls_start_execution_with_correct_payload(self, lambda_context):
         mock_sfn = MagicMock()
 
         s3 = boto3.client("s3", region_name=REGION)
@@ -150,9 +144,7 @@ class TestHandlerCleanFile:
         )
 
     @mock_aws
-    def test_complete_stage_called(self, monkeypatch, lambda_context):
-        monkeypatch.setenv("RAW_BUCKET", "raw")
-        monkeypatch.setenv("STATE_MACHINE_ARN", STATE_MACHINE_ARN)
+    def test_complete_stage_called(self, lambda_context):
         mock_tracker = MagicMock()
 
         s3 = boto3.client("s3", region_name=REGION)
@@ -180,8 +172,6 @@ class TestHandlerCleanFile:
 class TestHandlerInfectedFile:
     @mock_aws
     def test_deletes_source_from_landing(self, monkeypatch, lambda_context):
-        monkeypatch.setenv("RAW_BUCKET", "raw")
-        monkeypatch.setenv("STATE_MACHINE_ARN", STATE_MACHINE_ARN)
         monkeypatch.setattr(landing_to_raw_lambda.scanner, "scan", lambda data: False)
 
         s3 = boto3.client("s3", region_name=REGION)
@@ -206,8 +196,6 @@ class TestHandlerInfectedFile:
 
     @mock_aws
     def test_does_not_copy_to_raw(self, monkeypatch, lambda_context):
-        monkeypatch.setenv("RAW_BUCKET", "raw")
-        monkeypatch.setenv("STATE_MACHINE_ARN", STATE_MACHINE_ARN)
         monkeypatch.setattr(landing_to_raw_lambda.scanner, "scan", lambda data: False)
 
         s3 = boto3.client("s3", region_name=REGION)
@@ -232,8 +220,6 @@ class TestHandlerInfectedFile:
 
     @mock_aws
     def test_calls_fail_stage(self, monkeypatch, lambda_context):
-        monkeypatch.setenv("RAW_BUCKET", "raw")
-        monkeypatch.setenv("STATE_MACHINE_ARN", STATE_MACHINE_ARN)
         monkeypatch.setattr(landing_to_raw_lambda.scanner, "scan", lambda data: False)
         mock_tracker = MagicMock()
 
@@ -260,8 +246,6 @@ class TestHandlerInfectedFile:
 
     @mock_aws
     def test_start_execution_not_called(self, monkeypatch, lambda_context):
-        monkeypatch.setenv("RAW_BUCKET", "raw")
-        monkeypatch.setenv("STATE_MACHINE_ARN", STATE_MACHINE_ARN)
         monkeypatch.setattr(landing_to_raw_lambda.scanner, "scan", lambda data: False)
         mock_sfn = MagicMock()
 
@@ -286,8 +270,6 @@ class TestHandlerInfectedFile:
 
     @mock_aws
     def test_returns_207(self, monkeypatch, lambda_context):
-        monkeypatch.setenv("RAW_BUCKET", "raw")
-        monkeypatch.setenv("STATE_MACHINE_ARN", STATE_MACHINE_ARN)
         monkeypatch.setattr(landing_to_raw_lambda.scanner, "scan", lambda data: False)
 
         s3 = boto3.client("s3", region_name=REGION)
@@ -328,10 +310,7 @@ def _create_tracking_table(resource):
 
 class TestHandlerWithTracking:
     @mock_aws
-    def test_records_av_scan_success(self, monkeypatch, lambda_context):
-        monkeypatch.setenv("RAW_BUCKET", "raw")
-        monkeypatch.setenv("STATE_MACHINE_ARN", STATE_MACHINE_ARN)
-
+    def test_records_av_scan_success(self, lambda_context):
         s3 = boto3.client("s3", region_name=REGION)
         for bucket in (LANDING_BUCKET, RAW_BUCKET):
             s3.create_bucket(
@@ -369,8 +348,6 @@ class TestHandlerWithTracking:
 
     @mock_aws
     def test_records_av_scan_failure(self, monkeypatch, lambda_context):
-        monkeypatch.setenv("RAW_BUCKET", "raw")
-        monkeypatch.setenv("STATE_MACHINE_ARN", STATE_MACHINE_ARN)
         monkeypatch.setattr(landing_to_raw_lambda.scanner, "scan", lambda data: False)
 
         s3 = boto3.client("s3", region_name=REGION)

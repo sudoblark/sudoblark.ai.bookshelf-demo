@@ -31,33 +31,26 @@ metadata_lambda = importlib.util.module_from_spec(spec)
 sys.modules["metadata_lambda_function"] = metadata_lambda
 spec.loader.exec_module(metadata_lambda)
 
+DATA_LAKE_PREFIX = "aws-sudoblark-development-bookshelf-demo"
+RAW_BUCKET = f"{DATA_LAKE_PREFIX}-raw"
+PROCESSED_BUCKET = f"{DATA_LAKE_PREFIX}-processed"
+
 
 class TestConfig:
     """Tests for the Config class."""
 
     def test_from_env_success(self, monkeypatch):
         """Should return a Config when all required env vars are set."""
-        monkeypatch.setenv("PROCESSED_BUCKET", "test-processed-bucket")
         monkeypatch.setenv("BEDROCK_MODEL_ID", "anthropic.claude-3-haiku-20240307-v1:0")
         monkeypatch.setenv("LOG_LEVEL", "INFO")
 
         config = metadata_lambda.Config.from_env()
 
-        assert config.processed_bucket == "test-processed-bucket"
         assert config.bedrock_model_id == "anthropic.claude-3-haiku-20240307-v1:0"
         assert config.log_level == "INFO"
 
-    def test_from_env_missing_processed_bucket(self, monkeypatch):
-        """Should raise ValueError when PROCESSED_BUCKET is missing."""
-        monkeypatch.delenv("PROCESSED_BUCKET", raising=False)
-        monkeypatch.setenv("BEDROCK_MODEL_ID", "test-model")
-
-        with pytest.raises(ValueError, match="PROCESSED_BUCKET environment variable is required"):
-            metadata_lambda.Config.from_env()
-
     def test_from_env_default_bedrock_model(self, monkeypatch):
         """Should use default BEDROCK_MODEL_ID when not specified."""
-        monkeypatch.setenv("PROCESSED_BUCKET", "test-bucket")
         monkeypatch.delenv("BEDROCK_MODEL_ID", raising=False)
 
         config = metadata_lambda.Config.from_env()
@@ -66,7 +59,6 @@ class TestConfig:
 
     def test_from_env_invalid_log_level(self, monkeypatch):
         """Should raise ValueError for an invalid LOG_LEVEL."""
-        monkeypatch.setenv("PROCESSED_BUCKET", "test-bucket")
         monkeypatch.setenv("LOG_LEVEL", "INVALID")
 
         with pytest.raises(ValueError, match="LOG_LEVEL must be one of"):
@@ -243,10 +235,8 @@ class TestParquetWriter:
 class TestBookshelfProcessor:
     """Tests for BookshelfProcessor."""
 
-    def _make_config(self, monkeypatch, processed_bucket="processed", model="test-model"):
-        monkeypatch.setenv("PROCESSED_BUCKET", processed_bucket)
-        monkeypatch.setenv("BEDROCK_MODEL_ID", model)
-        return metadata_lambda.Config.from_env()
+    def _make_config(self, model="test-model"):
+        return metadata_lambda.Config(bedrock_model_id=model, log_level="INFO")
 
     def _make_image_bytes(self):
         buf = io.BytesIO()
@@ -267,20 +257,18 @@ class TestBookshelfProcessor:
             "processed_at": "2026-01-01T00:00:00Z",
         }
 
-    def test_process_success(self, s3_client, mocker, monkeypatch):
+    def test_process_success(self, s3_client, mocker):
         """Should download image, extract metadata, and write a Parquet file."""
-        config = self._make_config(monkeypatch)
+        config = self._make_config()
         image_bytes = self._make_image_bytes()
 
         s3_client.create_bucket(
-            Bucket="aws-sudoblark-development-demos-raw",
+            Bucket="test-raw",
             CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
         )
-        s3_client.put_object(
-            Bucket="aws-sudoblark-development-demos-raw", Key="book.jpg", Body=image_bytes
-        )
+        s3_client.put_object(Bucket="test-raw", Key="book.jpg", Body=image_bytes)
         s3_client.create_bucket(
-            Bucket="aws-sudoblark-development-demos-processed",
+            Bucket="test-processed",
             CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
         )
 
@@ -291,24 +279,22 @@ class TestBookshelfProcessor:
         )
         processor = metadata_lambda.BookshelfProcessor(config, s3_client, MagicMock())
 
-        parquet_key = processor.process("aws-sudoblark-development-demos-raw", "book.jpg")
+        parquet_key = processor.process("test-raw", "test-processed", "book.jpg")
 
         assert parquet_key.endswith(".parquet")
-        objects = s3_client.list_objects_v2(Bucket="aws-sudoblark-development-demos-processed")
+        objects = s3_client.list_objects_v2(Bucket="test-processed")
         assert objects["KeyCount"] >= 1
 
-    def test_process_extractor_failure(self, s3_client, monkeypatch, mocker):
+    def test_process_extractor_failure(self, s3_client, mocker):
         """Should propagate exceptions from the metadata extractor."""
-        config = self._make_config(monkeypatch)
+        config = self._make_config()
         image_bytes = self._make_image_bytes()
 
         s3_client.create_bucket(
-            Bucket="aws-sudoblark-development-demos-raw",
+            Bucket="test-raw",
             CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
         )
-        s3_client.put_object(
-            Bucket="aws-sudoblark-development-demos-raw", Key="book.jpg", Body=image_bytes
-        )
+        s3_client.put_object(Bucket="test-raw", Key="book.jpg", Body=image_bytes)
 
         mocker.patch.object(
             metadata_lambda.BedrockMetadataExtractor,
@@ -318,39 +304,25 @@ class TestBookshelfProcessor:
         processor = metadata_lambda.BookshelfProcessor(config, s3_client, MagicMock())
 
         with pytest.raises(Exception, match="Bedrock API error"):
-            processor.process("aws-sudoblark-development-demos-raw", "book.jpg")
+            processor.process("test-raw", "test-processed", "book.jpg")
 
-    def test_process_invalid_bucket_format(self, monkeypatch):
-        """Should raise ValueError for an invalid source bucket name format."""
-        config = self._make_config(monkeypatch)
-        processor = metadata_lambda.BookshelfProcessor(config, MagicMock(), MagicMock())
-
-        with pytest.raises(ValueError, match="Invalid source bucket name format"):
-            processor.process("short-bucket", "book.jpg")
-
-    def test_process_empty_inputs(self, monkeypatch):
+    def test_process_empty_inputs(self):
         """Should raise ValueError for empty source_bucket or image_key."""
-        config = self._make_config(monkeypatch)
+        config = self._make_config()
         processor = metadata_lambda.BookshelfProcessor(config, MagicMock(), MagicMock())
 
         with pytest.raises(ValueError, match="source_bucket and image_key must not be empty"):
-            processor.process("", "book.jpg")
+            processor.process("", "test-processed", "book.jpg")
 
         with pytest.raises(ValueError, match="source_bucket and image_key must not be empty"):
-            processor.process("test-bucket", "")
+            processor.process("test-raw", "test-processed", "")
 
-    def test_process_s3_client_error(self, s3_client, mocker, monkeypatch):
+    def test_process_s3_client_error(self, s3_client, mocker):
         """Should propagate S3 ClientError when put_object fails."""
         from botocore.exceptions import ClientError
 
-        config = self._make_config(monkeypatch, processed_bucket="processed")
+        config = self._make_config()
         image_bytes = self._make_image_bytes()
-
-        source_bucket = "test-account-project-app-source"
-        s3_client.create_bucket(
-            Bucket=source_bucket, CreateBucketConfiguration={"LocationConstraint": "eu-west-2"}
-        )
-        s3_client.put_object(Bucket=source_bucket, Key="test.jpg", Body=image_bytes)
 
         mock_s3 = MagicMock()
         mock_s3.get_object.return_value = {"Body": MagicMock(read=lambda: image_bytes)}
@@ -366,23 +338,18 @@ class TestBookshelfProcessor:
         processor = metadata_lambda.BookshelfProcessor(config, mock_s3, MagicMock())
 
         with pytest.raises(ClientError):
-            processor.process(source_bucket, "test.jpg")
+            processor.process("test-raw", "test-processed", "test.jpg")
 
 
 class TestHandler:
     """Tests for the Lambda handler function."""
 
-    def test_handler_success(self, lambda_context, monkeypatch):
+    def test_handler_success(self, lambda_context):
         """Should process an S3 event and return a success response."""
-        monkeypatch.setenv("PROCESSED_BUCKET", "processed-bucket")
-        monkeypatch.setenv("BEDROCK_MODEL_ID", "test-model")
-        monkeypatch.setenv("LOG_LEVEL", "INFO")
-
         mock_processor = MagicMock()
         mock_processor.process.return_value = "processed/year=2026/test.parquet"
-        mock_processor._config.processed_bucket = "processed"
-        monkeypatch.setattr(metadata_lambda.handler, "_processor", mock_processor)
-        monkeypatch.setattr(metadata_lambda.handler, "_tracker", MagicMock())
+        metadata_lambda.handler._processor = mock_processor
+        metadata_lambda.handler._tracker = MagicMock()
 
         event = {
             "Records": [
@@ -392,8 +359,8 @@ class TestHandler:
                     "eventName": "ObjectCreated:Put",
                     "s3": {
                         "bucket": {
-                            "name": "acc-proj-app-raw",
-                            "arn": "arn:aws:s3:::acc-proj-app-raw",
+                            "name": RAW_BUCKET,
+                            "arn": f"arn:aws:s3:::{RAW_BUCKET}",
                         },
                         "object": {"key": "uploads/user-1/upload-1/cover.jpg", "size": 1024},
                     },
@@ -407,31 +374,27 @@ class TestHandler:
         assert response["processed_count"] == 1
         assert response["failed_count"] == 0
         mock_processor.process.assert_called_once_with(
-            "acc-proj-app-raw", "uploads/user-1/upload-1/cover.jpg"
+            RAW_BUCKET, PROCESSED_BUCKET, "uploads/user-1/upload-1/cover.jpg"
         )
 
-    def test_handler_multiple_records(self, lambda_context, monkeypatch):
+    def test_handler_multiple_records(self, lambda_context):
         """Should process multiple S3 records."""
-        monkeypatch.setenv("PROCESSED_BUCKET", "processed-bucket")
-        monkeypatch.setenv("BEDROCK_MODEL_ID", "test-model")
-
         mock_processor = MagicMock()
         mock_processor.process.return_value = "processed/key.parquet"
-        mock_processor._config.processed_bucket = "processed"
-        monkeypatch.setattr(metadata_lambda.handler, "_processor", mock_processor)
-        monkeypatch.setattr(metadata_lambda.handler, "_tracker", MagicMock())
+        metadata_lambda.handler._processor = mock_processor
+        metadata_lambda.handler._tracker = MagicMock()
 
         event = {
             "Records": [
                 {
                     "s3": {
-                        "bucket": {"name": "acc-proj-app-raw"},
+                        "bucket": {"name": RAW_BUCKET},
                         "object": {"key": "uploads/u/up1/img1.jpg"},
                     }
                 },
                 {
                     "s3": {
-                        "bucket": {"name": "acc-proj-app-raw"},
+                        "bucket": {"name": RAW_BUCKET},
                         "object": {"key": "uploads/u/up2/img2.jpg"},
                     }
                 },
@@ -444,31 +407,27 @@ class TestHandler:
         assert response["failed_count"] == 0
         assert mock_processor.process.call_count == 2
 
-    def test_handler_partial_failure(self, lambda_context, monkeypatch):
+    def test_handler_partial_failure(self, lambda_context):
         """Should handle partial failures and return a multi-status response."""
-        monkeypatch.setenv("PROCESSED_BUCKET", "processed-bucket")
-        monkeypatch.setenv("BEDROCK_MODEL_ID", "test-model")
-
         mock_processor = MagicMock()
         mock_processor.process.side_effect = [
             "processed/key.parquet",
             Exception("Processing error"),
         ]
-        mock_processor._config.processed_bucket = "processed"
-        monkeypatch.setattr(metadata_lambda.handler, "_processor", mock_processor)
-        monkeypatch.setattr(metadata_lambda.handler, "_tracker", MagicMock())
+        metadata_lambda.handler._processor = mock_processor
+        metadata_lambda.handler._tracker = MagicMock()
 
         event = {
             "Records": [
                 {
                     "s3": {
-                        "bucket": {"name": "acc-proj-app-raw"},
+                        "bucket": {"name": RAW_BUCKET},
                         "object": {"key": "uploads/u/up1/img1.jpg"},
                     }
                 },
                 {
                     "s3": {
-                        "bucket": {"name": "acc-proj-app-raw"},
+                        "bucket": {"name": RAW_BUCKET},
                         "object": {"key": "uploads/u/up2/img2.jpg"},
                     }
                 },
@@ -481,17 +440,15 @@ class TestHandler:
         assert response["processed_count"] == 1
         assert response["failed_count"] == 1
 
-    def test_handler_path_traversal_attack(self, lambda_context, monkeypatch):
+    def test_handler_path_traversal_attack(self, lambda_context):
         """Should reject path traversal attempts and report the failure."""
-        monkeypatch.setenv("PROCESSED_BUCKET", "test-processed")
-
         event = {
             "Records": [
                 {
                     "eventVersion": "2.1",
                     "eventSource": "aws:s3",
                     "s3": {
-                        "bucket": {"name": "test-bucket"},
+                        "bucket": {"name": RAW_BUCKET},
                         "object": {"key": "../../../etc/passwd"},
                     },
                 }
@@ -503,10 +460,8 @@ class TestHandler:
         assert response["failed_count"] == 1
         assert "path traversal" in str(response["failed_files"][0]["error"]).lower()
 
-    def test_handler_general_exception(self, lambda_context, monkeypatch):
+    def test_handler_general_exception(self, lambda_context):
         """Should re-raise exceptions caused by a malformed event structure."""
-        monkeypatch.setenv("PROCESSED_BUCKET", "test-processed")
-
         event = {"Records": [{}]}
 
         with pytest.raises(Exception):
