@@ -162,6 +162,28 @@ locals {
     for wg in local.athena_workgroups_enriched : wg.name => wg
   }
 
+  # Enrich DynamoDB tables with computed full names
+  dynamodb_tables_enriched = [
+    for table in local.dynamodb_tables : merge(
+      {
+        account      = local.account
+        project      = local.project
+        application  = local.application
+        billing_mode = "PAY_PER_REQUEST"
+      },
+      table,
+      {
+        # Computed full table name following naming convention
+        full_name = lower("${local.account}-${local.project}-${local.application}-${table.name}")
+      }
+    )
+  ]
+
+  # Create a map of DynamoDB tables keyed by name
+  dynamodb_tables_map = {
+    for table in local.dynamodb_tables_enriched : table.name => table
+  }
+
   # Glue security configuration name
   glue_security_config_name = "${local.account}-glue-security-config"
 }
