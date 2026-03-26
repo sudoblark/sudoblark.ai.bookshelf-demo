@@ -1,3 +1,0 @@
-# Lambda runtime dependencies (deployment)
-# Exclude: boto3 (provided by Lambda runtime)
-aws-lambda-powertools
