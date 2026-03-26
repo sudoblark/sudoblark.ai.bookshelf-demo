@@ -28,6 +28,10 @@ skip-check:
   # CloudWatch Log Group Encryption
   - CKV_AWS_158  # KMS encryption for log groups not needed - demo doesn't warrant KMS key cost
 
+  # DynamoDB Configuration
+  - CKV_AWS_119  # CMK encryption not needed - AWS-managed encryption sufficient, CMK incurs unnecessary cost
+  - CKV2_AWS_16  # Auto-scaling not needed - PAY_PER_REQUEST billing mode handles scaling automatically
+
   # Glue Security Configuration
   - CKV_AWS_99   # Glue encryption configured but Checkov validation is overly strict for demo
 

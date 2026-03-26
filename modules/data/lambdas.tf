@@ -50,8 +50,9 @@ locals {
       timeout       = 60
       memory_size   = 512
       environment_variables = {
-        RAW_BUCKET = "raw"
-        LOG_LEVEL  = "INFO"
+        RAW_BUCKET     = "raw"
+        TRACKING_TABLE = "${var.account}-${local.project}-${local.application}-ingestion-tracking"
+        LOG_LEVEL      = "INFO"
       }
       iam_policy_statements = [
         {
@@ -71,6 +72,12 @@ locals {
           effect    = "Allow"
           actions   = ["s3:PutObject"]
           resources = ["arn:aws:s3:::${var.account}-${local.project}-${local.application}-raw/*"]
+        },
+        {
+          sid       = "IngestionTrackingWrite"
+          effect    = "Allow"
+          actions   = ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:GetItem"]
+          resources = ["arn:aws:dynamodb:*:*:table/${var.account}-${local.project}-${local.application}-ingestion-tracking"]
         }
       ]
     },
@@ -94,6 +101,7 @@ locals {
       ]
       environment_variables = {
         PROCESSED_BUCKET = "processed"
+        TRACKING_TABLE   = "${var.account}-${local.project}-${local.application}-ingestion-tracking"
         LOG_LEVEL        = "INFO"
         BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
       }
@@ -115,6 +123,12 @@ locals {
           effect    = "Allow"
           actions   = ["bedrock:InvokeModel"]
           resources = ["arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"]
+        },
+        {
+          sid       = "IngestionTrackingWrite"
+          effect    = "Allow"
+          actions   = ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:GetItem"]
+          resources = ["arn:aws:dynamodb:*:*:table/${var.account}-${local.project}-${local.application}-ingestion-tracking"]
         }
       ]
     }

@@ -372,7 +372,7 @@ class TestBookshelfProcessor:
 class TestHandler:
     """Tests for the Lambda handler function."""
 
-    def test_handler_success(self, sample_s3_event, lambda_context, monkeypatch):
+    def test_handler_success(self, lambda_context, monkeypatch):
         """Should process an S3 event and return a success response."""
         monkeypatch.setenv("PROCESSED_BUCKET", "processed-bucket")
         monkeypatch.setenv("BEDROCK_MODEL_ID", "test-model")
@@ -380,14 +380,35 @@ class TestHandler:
 
         mock_processor = MagicMock()
         mock_processor.process.return_value = "processed/year=2026/test.parquet"
+        mock_processor._config.processed_bucket = "processed"
         monkeypatch.setattr(metadata_lambda.handler, "_processor", mock_processor)
+        monkeypatch.setattr(metadata_lambda.handler, "_tracker", MagicMock())
 
-        response = metadata_lambda.handler(sample_s3_event, lambda_context)
+        event = {
+            "Records": [
+                {
+                    "eventVersion": "2.1",
+                    "eventSource": "aws:s3",
+                    "eventName": "ObjectCreated:Put",
+                    "s3": {
+                        "bucket": {
+                            "name": "acc-proj-app-raw",
+                            "arn": "arn:aws:s3:::acc-proj-app-raw",
+                        },
+                        "object": {"key": "uploads/user-1/upload-1/cover.jpg", "size": 1024},
+                    },
+                }
+            ]
+        }
+
+        response = metadata_lambda.handler(event, lambda_context)
 
         assert response["statusCode"] == 200
         assert response["processed_count"] == 1
         assert response["failed_count"] == 0
-        mock_processor.process.assert_called_once_with("test-bucket", "test-file.zip")
+        mock_processor.process.assert_called_once_with(
+            "acc-proj-app-raw", "uploads/user-1/upload-1/cover.jpg"
+        )
 
     def test_handler_multiple_records(self, lambda_context, monkeypatch):
         """Should process multiple S3 records."""
@@ -396,12 +417,24 @@ class TestHandler:
 
         mock_processor = MagicMock()
         mock_processor.process.return_value = "processed/key.parquet"
+        mock_processor._config.processed_bucket = "processed"
         monkeypatch.setattr(metadata_lambda.handler, "_processor", mock_processor)
+        monkeypatch.setattr(metadata_lambda.handler, "_tracker", MagicMock())
 
         event = {
             "Records": [
-                {"s3": {"bucket": {"name": "bucket1"}, "object": {"key": "image1.jpg"}}},
-                {"s3": {"bucket": {"name": "bucket2"}, "object": {"key": "image2.jpg"}}},
+                {
+                    "s3": {
+                        "bucket": {"name": "acc-proj-app-raw"},
+                        "object": {"key": "uploads/u/up1/img1.jpg"},
+                    }
+                },
+                {
+                    "s3": {
+                        "bucket": {"name": "acc-proj-app-raw"},
+                        "object": {"key": "uploads/u/up2/img2.jpg"},
+                    }
+                },
             ]
         }
 
@@ -421,12 +454,24 @@ class TestHandler:
             "processed/key.parquet",
             Exception("Processing error"),
         ]
+        mock_processor._config.processed_bucket = "processed"
         monkeypatch.setattr(metadata_lambda.handler, "_processor", mock_processor)
+        monkeypatch.setattr(metadata_lambda.handler, "_tracker", MagicMock())
 
         event = {
             "Records": [
-                {"s3": {"bucket": {"name": "bucket1"}, "object": {"key": "image1.jpg"}}},
-                {"s3": {"bucket": {"name": "bucket2"}, "object": {"key": "image2.jpg"}}},
+                {
+                    "s3": {
+                        "bucket": {"name": "acc-proj-app-raw"},
+                        "object": {"key": "uploads/u/up1/img1.jpg"},
+                    }
+                },
+                {
+                    "s3": {
+                        "bucket": {"name": "acc-proj-app-raw"},
+                        "object": {"key": "uploads/u/up2/img2.jpg"},
+                    }
+                },
             ]
         }
 

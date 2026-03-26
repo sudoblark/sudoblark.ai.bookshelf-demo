@@ -70,7 +70,7 @@ locals {
             lambda_notif,
             {
               # Resolve Lambda ARN from lambda name
-              lambda_function_arn = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${local.lambdas_map[lambda_notif.lambda_name].full_name}"
+              lambda_function_arn = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.lambdas_map[lambda_notif.lambda_name].full_name}"
             }
           )
         ]
@@ -160,6 +160,28 @@ locals {
   # Create a map of Athena workgroups keyed by name
   athena_workgroups_map = {
     for wg in local.athena_workgroups_enriched : wg.name => wg
+  }
+
+  # Enrich DynamoDB tables with computed full names
+  dynamodb_tables_enriched = [
+    for table in local.dynamodb_tables : merge(
+      {
+        account      = local.account
+        project      = local.project
+        application  = local.application
+        billing_mode = "PAY_PER_REQUEST"
+      },
+      table,
+      {
+        # Computed full table name following naming convention
+        full_name = lower("${local.account}-${local.project}-${local.application}-${table.name}")
+      }
+    )
+  ]
+
+  # Create a map of DynamoDB tables keyed by name
+  dynamodb_tables_map = {
+    for table in local.dynamodb_tables_enriched : table.name => table
   }
 
   # Glue security configuration name

@@ -99,3 +99,13 @@ output "athena_workgroups_map" {
   description = "Map of Athena workgroups keyed by workgroup name"
   value       = local.athena_workgroups_map
 }
+
+output "dynamodb_tables" {
+  description = "All DynamoDB tables with enriched metadata and computed values"
+  value       = local.dynamodb_tables_enriched
+}
+
+output "dynamodb_tables_map" {
+  description = "Map of DynamoDB tables keyed by table name"
+  value       = local.dynamodb_tables_map
+}

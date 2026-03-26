@@ -3,9 +3,11 @@
 import importlib.util
 import os
 import sys
+from unittest.mock import MagicMock
 
 import boto3
 import pytest
+from common.tracker import BookshelfTracker, StageStatus, UploadStage, UploadStatus
 from moto import mock_aws
 
 # Dynamically import lambda_function from file-router directory
@@ -19,6 +21,7 @@ spec.loader.exec_module(file_router_lambda)
 
 LANDING_BUCKET = "aws-sudoblark-development-bookshelf-demo-landing"
 RAW_BUCKET = "aws-sudoblark-development-bookshelf-demo-raw"
+TRACKING_TABLE = "test-tracking"
 REGION = "eu-west-2"
 
 
@@ -47,6 +50,11 @@ class TestFileRouterHandlerInit:
     def test_raises_when_raw_bucket_missing(self, monkeypatch):
         monkeypatch.delenv("RAW_BUCKET", raising=False)
         with pytest.raises(ValueError, match="RAW_BUCKET environment variable is required"):
+            file_router_lambda.FileRouterHandler()
+
+    def test_raises_when_tracking_table_missing(self, monkeypatch):
+        monkeypatch.delenv("TRACKING_TABLE", raising=False)
+        with pytest.raises(ValueError, match="TRACKING_TABLE environment variable is required"):
             file_router_lambda.FileRouterHandler()
 
 
@@ -96,6 +104,7 @@ class TestHandler:
     @mock_aws
     def test_copies_file_to_raw_bucket(self, monkeypatch, lambda_context):
         monkeypatch.setenv("RAW_BUCKET", "raw")
+        monkeypatch.setattr(file_router_lambda.handler, "_tracker", MagicMock())
 
         s3 = boto3.client("s3", region_name=REGION)
         for bucket in (LANDING_BUCKET, RAW_BUCKET):
@@ -119,6 +128,7 @@ class TestHandler:
     @mock_aws
     def test_deletes_source_after_copy(self, monkeypatch, lambda_context):
         monkeypatch.setenv("RAW_BUCKET", "raw")
+        monkeypatch.setattr(file_router_lambda.handler, "_tracker", MagicMock())
 
         s3 = boto3.client("s3", region_name=REGION)
         for bucket in (LANDING_BUCKET, RAW_BUCKET):
@@ -138,6 +148,7 @@ class TestHandler:
     @mock_aws
     def test_rejects_unsupported_extension(self, monkeypatch, lambda_context):
         monkeypatch.setenv("RAW_BUCKET", "raw")
+        monkeypatch.setattr(file_router_lambda.handler, "_tracker", MagicMock())
 
         s3 = boto3.client("s3", region_name=REGION)
         for bucket in (LANDING_BUCKET, RAW_BUCKET):
@@ -158,6 +169,7 @@ class TestHandler:
     @mock_aws
     def test_rejects_path_traversal_key(self, monkeypatch, lambda_context):
         monkeypatch.setenv("RAW_BUCKET", "raw")
+        monkeypatch.setattr(file_router_lambda.handler, "_tracker", MagicMock())
 
         s3 = boto3.client("s3", region_name=REGION)
         for bucket in (LANDING_BUCKET, RAW_BUCKET):
@@ -176,6 +188,7 @@ class TestHandler:
     @mock_aws
     def test_rejects_invalid_key_format(self, monkeypatch, lambda_context):
         monkeypatch.setenv("RAW_BUCKET", "raw")
+        monkeypatch.setattr(file_router_lambda.handler, "_tracker", MagicMock())
 
         s3 = boto3.client("s3", region_name=REGION)
         for bucket in (LANDING_BUCKET, RAW_BUCKET):
@@ -190,3 +203,81 @@ class TestHandler:
         assert result["statusCode"] == 207
         assert result["failed_count"] == 1
         assert "expected format" in result["failed_files"][0]["error"]
+
+
+def _create_tracking_table(resource):
+    resource.create_table(
+        TableName=TRACKING_TABLE,
+        KeySchema=[
+            {"AttributeName": "user_id", "KeyType": "HASH"},
+            {"AttributeName": "file_id", "KeyType": "RANGE"},
+        ],
+        AttributeDefinitions=[
+            {"AttributeName": "user_id", "AttributeType": "S"},
+            {"AttributeName": "file_id", "AttributeType": "S"},
+        ],
+        BillingMode="PAY_PER_REQUEST",
+    )
+
+
+class TestHandlerWithTracking:
+    @mock_aws
+    def test_records_success_stage_on_routing(self, monkeypatch, lambda_context):
+        monkeypatch.setenv("RAW_BUCKET", "raw")
+
+        s3 = boto3.client("s3", region_name=REGION)
+        for bucket in (LANDING_BUCKET, RAW_BUCKET):
+            s3.create_bucket(
+                Bucket=bucket,
+                CreateBucketConfiguration={"LocationConstraint": REGION},
+            )
+        key = "uploads/user-1/upload-1/cover.jpg"
+        s3.put_object(Bucket=LANDING_BUCKET, Key=key, Body=b"imgdata")
+
+        dynamodb = boto3.resource("dynamodb", region_name=REGION)
+        _create_tracking_table(dynamodb)
+
+        tracker = BookshelfTracker(dynamodb_resource=dynamodb, table_name=TRACKING_TABLE)
+        h = file_router_lambda.FileRouterHandler(s3_client=s3, tracker=tracker)
+
+        result = h(_make_s3_event(LANDING_BUCKET, key), lambda_context)
+        assert result["statusCode"] == 200
+
+        item = (
+            dynamodb.Table(TRACKING_TABLE)
+            .get_item(Key={"user_id": "user-1", "file_id": "upload-1#cover.jpg"})
+            .get("Item")
+        )
+        assert item["current_status"] == UploadStatus.SUCCESS.value
+        assert len(item["stage_progress"]) == 1
+        entry = item["stage_progress"][0]
+        assert entry["stage_name"] == UploadStage.ROUTING.value
+        assert entry["status"] == StageStatus.SUCCESS.value
+        assert entry["source"] == {"bucket": LANDING_BUCKET, "key": key}
+        assert entry["destination"] == {"bucket": RAW_BUCKET, "key": key}
+
+    @mock_aws
+    def test_records_failed_stage_on_copy_error(self, monkeypatch, lambda_context):
+        monkeypatch.setenv("RAW_BUCKET", "raw")
+
+        s3 = MagicMock()
+        s3.copy_object.side_effect = Exception("S3 unavailable")
+
+        dynamodb = boto3.resource("dynamodb", region_name=REGION)
+        _create_tracking_table(dynamodb)
+
+        tracker = BookshelfTracker(dynamodb_resource=dynamodb, table_name=TRACKING_TABLE)
+        h = file_router_lambda.FileRouterHandler(s3_client=s3, tracker=tracker)
+
+        key = "uploads/user-1/upload-1/cover.jpg"
+        result = h(_make_s3_event(LANDING_BUCKET, key), lambda_context)
+        assert result["statusCode"] == 207
+
+        item = (
+            dynamodb.Table(TRACKING_TABLE)
+            .get_item(Key={"user_id": "user-1", "file_id": "upload-1#cover.jpg"})
+            .get("Item")
+        )
+        assert item["current_status"] == UploadStatus.FAILED.value
+        assert item["stage_progress"][0]["status"] == StageStatus.FAILED.value
+        assert item["stage_progress"][0]["error_message"] == "S3 unavailable"

@@ -26,6 +26,7 @@ os.environ["LOG_LEVEL"] = "INFO"
 # Required by FileRouterHandler and MetadataExtractorHandler at module-load time
 os.environ["RAW_BUCKET"] = "raw"
 os.environ["PROCESSED_BUCKET"] = "processed"
+os.environ["TRACKING_TABLE"] = "test-tracking"
 
 
 @pytest.fixture
