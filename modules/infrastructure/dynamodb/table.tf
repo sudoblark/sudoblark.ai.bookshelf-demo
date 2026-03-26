@@ -2,8 +2,6 @@ locals {
   tables_map = { for table in var.dynamodb_tables : table.name => table }
 }
 
-#checkov:skip=CKV_AWS_119:AWS-managed encryption is sufficient for this demo; CMK would incur unnecessary cost
-#checkov:skip=CKV2_AWS_16:PAY_PER_REQUEST billing mode provides automatic scaling without explicit auto-scaling configuration
 resource "aws_dynamodb_table" "table" {
   for_each = local.tables_map
 
