@@ -3,7 +3,6 @@ from typing import TYPE_CHECKING, Any, Dict
 
 from bedrock_extractor import BedrockMetadataExtractor
 from botocore.exceptions import ClientError
-from common.s3 import resolve_bucket
 from config import Config
 from parquet_writer import ParquetWriter
 
@@ -22,24 +21,24 @@ class BookshelfProcessor:
         self._extractor = BedrockMetadataExtractor(config.bedrock_model_id, bedrock_client)
         self._writer = ParquetWriter(s3_client)
 
-    def process(self, source_bucket: str, image_key: str) -> str:
+    def process(self, source_bucket: str, processed_bucket: str, image_key: str) -> str:
         """Download an image from S3, extract its metadata, and write to Parquet.
 
         Args:
-            source_bucket: Source S3 bucket containing the image.
+            source_bucket: S3 bucket containing the image (raw tier).
+            processed_bucket: S3 bucket for Parquet output (processed tier).
             image_key: S3 key of the image file.
 
         Returns:
             S3 key of the uploaded Parquet file.
 
         Raises:
-            ValueError: If inputs are empty or the bucket name format is invalid.
+            ValueError: If any input is empty.
             ClientError: If S3 operations fail.
         """
         if not source_bucket or not image_key:
             raise ValueError("source_bucket and image_key must not be empty")
 
-        processed_bucket: str = resolve_bucket(source_bucket, self._config.processed_bucket)
         logger.info(f"Extracting metadata from s3://{source_bucket}/{image_key}")
 
         try:

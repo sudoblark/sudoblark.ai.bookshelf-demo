@@ -10,8 +10,7 @@ class Config:
 
     _ALLOWED_LOG_LEVELS: List[str] = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
-    def __init__(self, processed_bucket: str, bedrock_model_id: str, log_level: str) -> None:
-        self.processed_bucket = processed_bucket
+    def __init__(self, bedrock_model_id: str, log_level: str) -> None:
         self.bedrock_model_id = bedrock_model_id
         self.log_level = log_level
 
@@ -22,10 +21,6 @@ class Config:
         Raises:
             ValueError: If required environment variables are missing or invalid.
         """
-        processed_bucket: str = os.environ.get("PROCESSED_BUCKET", "")
-        if not processed_bucket:
-            raise ValueError("PROCESSED_BUCKET environment variable is required")
-
         bedrock_model_id: str = os.environ.get(
             "BEDROCK_MODEL_ID", "anthropic.claude-3-haiku-20240307-v1:0"
         )
@@ -35,7 +30,6 @@ class Config:
             raise ValueError(f"LOG_LEVEL must be one of {cls._ALLOWED_LOG_LEVELS}")
 
         return cls(
-            processed_bucket=processed_bucket,
             bedrock_model_id=bedrock_model_id,
             log_level=log_level,
         )
