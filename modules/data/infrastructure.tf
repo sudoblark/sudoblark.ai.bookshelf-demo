@@ -70,7 +70,7 @@ locals {
             lambda_notif,
             {
               # Resolve Lambda ARN from lambda name
-              lambda_function_arn = "arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:${local.lambdas_map[lambda_notif.lambda_name].full_name}"
+              lambda_function_arn = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.lambdas_map[lambda_notif.lambda_name].full_name}"
             }
           )
         ]
