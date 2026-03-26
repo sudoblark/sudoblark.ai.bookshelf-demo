@@ -23,10 +23,13 @@ os.environ["AWS_SECURITY_TOKEN"] = "testing"
 os.environ["AWS_SESSION_TOKEN"] = "testing"
 os.environ["AWS_DEFAULT_REGION"] = "eu-west-2"
 os.environ["LOG_LEVEL"] = "INFO"
-# Required by FileRouterHandler and MetadataExtractorHandler at module-load time
+# Required by Lambda handlers at module-load time
 os.environ["RAW_BUCKET"] = "raw"
 os.environ["PROCESSED_BUCKET"] = "processed"
 os.environ["TRACKING_TABLE"] = "test-tracking"
+os.environ[
+    "STATE_MACHINE_ARN"
+] = "arn:aws:states:eu-west-2:123456789012:stateMachine:test-raw-to-enriched"
 
 
 @pytest.fixture
