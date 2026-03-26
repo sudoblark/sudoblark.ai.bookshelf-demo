@@ -13,12 +13,12 @@ from typing import Any
 
 import boto3
 import scanner
-from common.handler import BaseS3BatchHandler
-from common.s3 import parse_upload_key, resolve_bucket
+from common.handler import BaseDataProcessor
+from common.s3 import parse_upload_key
 from common.tracker import BookshelfTracker, UploadStage
 
 
-class LandingToRawHandler(BaseS3BatchHandler):
+class LandingToRawHandler(BaseDataProcessor):
     """AV scans landing-bucket uploads and promotes clean files to raw."""
 
     def __init__(
@@ -28,11 +28,6 @@ class LandingToRawHandler(BaseS3BatchHandler):
         stepfunctions_client: Any = None,
     ) -> None:
         super().__init__(s3_client)
-
-        raw_bucket = os.environ.get("RAW_BUCKET", "")
-        if not raw_bucket:
-            raise ValueError("RAW_BUCKET environment variable is required")
-        self._raw_bucket_tier = raw_bucket
 
         state_machine_arn = os.environ.get("STATE_MACHINE_ARN", "")
         if not state_machine_arn:
@@ -49,18 +44,19 @@ class LandingToRawHandler(BaseS3BatchHandler):
 
         self._stepfunctions_client = stepfunctions_client or boto3.client("stepfunctions")
 
-    def process_record(self, bucket: str, key: str) -> str:
+    def process_record(self, key: str) -> str:
         user_id, upload_id, filename = parse_upload_key(key)
-        raw_bucket = resolve_bucket(bucket, self._raw_bucket_tier)
 
-        self._tracker.create_record(user_id, upload_id, filename, bucket, key)
-        self._tracker.start_stage(user_id, upload_id, filename, UploadStage.AV_SCAN, bucket, key)
+        self._tracker.create_record(user_id, upload_id, filename, self.data_lake.landing, key)
+        self._tracker.start_stage(
+            user_id, upload_id, filename, UploadStage.AV_SCAN, self.data_lake.landing, key
+        )
 
-        data = self.s3_client.get_object(Bucket=bucket, Key=key)["Body"].read()
+        data = self.s3_client.get_object(Bucket=self.data_lake.landing, Key=key)["Body"].read()
         clean = scanner.scan(data)
 
         if not clean:
-            self.s3_client.delete_object(Bucket=bucket, Key=key)
+            self.s3_client.delete_object(Bucket=self.data_lake.landing, Key=key)
             self._tracker.fail_stage(
                 user_id,
                 upload_id,
@@ -71,19 +67,21 @@ class LandingToRawHandler(BaseS3BatchHandler):
             raise ValueError("AV scan failed: file quarantined")
 
         self.s3_client.copy_object(
-            CopySource={"Bucket": bucket, "Key": key},
-            Bucket=raw_bucket,
+            CopySource={"Bucket": self.data_lake.landing, "Key": key},
+            Bucket=self.data_lake.raw,
             Key=key,
         )
         self._tracker.complete_stage(
-            user_id, upload_id, filename, UploadStage.AV_SCAN, raw_bucket, key
+            user_id, upload_id, filename, UploadStage.AV_SCAN, self.data_lake.raw, key
         )
         self._stepfunctions_client.start_execution(
             stateMachineArn=self._state_machine_arn,
-            input=json.dumps({"bucket": raw_bucket, "key": key}),
+            input=json.dumps({"bucket": self.data_lake.raw, "key": key}),
         )
 
-        self.logger.info(f"Promoted s3://{bucket}/{key} to s3://{raw_bucket}/{key}")
+        self.logger.info(
+            f"Promoted s3://{self.data_lake.landing}/{key} to s3://{self.data_lake.raw}/{key}"
+        )
         return key
 
 
