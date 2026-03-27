@@ -1,13 +1,11 @@
 import logging
-from typing import TYPE_CHECKING, Any, Dict
+import uuid
+from datetime import datetime
+from typing import Any, Dict
 
-from bedrock_extractor import BedrockMetadataExtractor
+from agent import BookshelfAgent
 from botocore.exceptions import ClientError
-from config import Config
 from parquet_writer import ParquetWriter
-
-if TYPE_CHECKING:
-    from mypy_boto3_s3.type_defs import GetObjectOutputTypeDef
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +13,9 @@ logger = logging.getLogger(__name__)
 class BookshelfProcessor:
     """Orchestrates image download, metadata extraction, and Parquet persistence."""
 
-    def __init__(self, config: Config, s3_client: Any, bedrock_client: Any) -> None:
-        self._config = config
+    def __init__(self, agent: BookshelfAgent, s3_client: Any) -> None:
+        self._agent = agent
         self._s3_client = s3_client
-        self._extractor = BedrockMetadataExtractor(config.bedrock_model_id, bedrock_client)
         self._writer = ParquetWriter(s3_client)
 
     def process(self, source_bucket: str, processed_bucket: str, image_key: str) -> str:
@@ -42,13 +39,12 @@ class BookshelfProcessor:
         logger.info(f"Extracting metadata from s3://{source_bucket}/{image_key}")
 
         try:
-            image_obj: "GetObjectOutputTypeDef" = self._s3_client.get_object(
-                Bucket=source_bucket, Key=image_key
-            )
+            image_obj = self._s3_client.get_object(Bucket=source_bucket, Key=image_key)
             image_bytes: bytes = image_obj["Body"].read()
             logger.info(f"Downloaded image: {len(image_bytes)} bytes")
 
-            metadata: Dict[str, Any] = self._extractor.extract(image_bytes, image_key)
+            book_metadata = self._agent.run(image_bytes)
+            metadata = self._apply_defaults(book_metadata.model_dump(), image_key)
             logger.info(f"Extracted metadata: {metadata.get('title', 'Unknown')}")
 
             parquet_key: str = self._writer.write(metadata, processed_bucket)
@@ -59,3 +55,14 @@ class BookshelfProcessor:
             error_code: str = e.response.get("Error", {}).get("Code", "Unknown")
             logger.error(f"S3 operation failed: {error_code}", exc_info=True)
             raise
+
+    @staticmethod
+    def _apply_defaults(metadata: Dict[str, Any], filename: str) -> Dict[str, Any]:
+        """Stamp operational metadata fields if the model did not populate them."""
+        if not metadata.get("id"):
+            metadata["id"] = str(uuid.uuid4())
+        if not metadata.get("filename"):
+            metadata["filename"] = filename
+        if not metadata.get("processed_at"):
+            metadata["processed_at"] = datetime.utcnow().isoformat() + "Z"
+        return metadata

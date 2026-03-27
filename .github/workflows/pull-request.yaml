@@ -78,6 +78,7 @@ jobs:
     strategy:
       matrix:
         lambda:
+          - bookshelf-agent
           - common
           - landing-to-raw
           - metadata-extractor
@@ -129,6 +130,7 @@ jobs:
     strategy:
       matrix:
         lambda:
+          - bookshelf-agent
           - common
           - landing-to-raw
           - metadata-extractor

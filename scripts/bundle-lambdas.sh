@@ -1,10 +1,11 @@
 #!/bin/bash
 
 #
-# Bundle Lambda Functions with Dependencies
+# Bundle Lambda Functions and Layers with Dependencies
 #
-# This script packages all Lambda functions with their Python dependencies
-# into ZIP files in the lambda-packages/ directory for Terraform deployment.
+# This script packages all Lambda functions and layers with their Python
+# dependencies into ZIP files in the lambda-packages/ directory for
+# Terraform deployment.
 #
 # Usage: ./scripts/bundle-lambdas.sh
 #
@@ -26,6 +27,11 @@ LAMBDA_SOURCE_DIR="${PROJECT_ROOT}/lambda-packages"
 OUTPUT_DIR="${PROJECT_ROOT}/lambda-packages"
 TEMP_DIR="${OUTPUT_DIR}/tmp"
 
+# Lambda layers to bundle
+LAYERS=(
+  "bookshelf-agent"
+)
+
 # Lambda functions to bundle
 LAMBDAS=(
   "landing-to-raw"
@@ -37,15 +43,86 @@ LAMBDAS=(
 # layer and count against the 262 MB unzipped deployment limit.
 # Uses a case statement for bash 3 compatibility (macOS ships bash 3.2).
 layer_exclude_packages() {
-  local lambda_name=$1
-  case "$lambda_name" in
-    metadata-extractor)
+  local name=$1
+  case "$name" in
+    bookshelf-agent)
+      # Exclude packages provided by the Lambda runtime so they don't bloat the layer.
+      # pydantic-ai-slim[bedrock] declares boto3 as a dep; botocore alone is ~75 MB unzipped.
       echo "boto3 boto3-*.dist-info botocore botocore-*.dist-info s3transfer s3transfer-*.dist-info jmespath jmespath-*.dist-info"
+      ;;
+    metadata-extractor)
+      echo "boto3 boto3-*.dist-info botocore botocore-*.dist-info s3transfer s3transfer-*.dist-info jmespath jmespath-*.dist-info Pillow Pillow-*.dist-info pydantic pydantic-*.dist-info pydantic_ai pydantic_ai-*.dist-info pydantic_ai_slim pydantic_ai_slim-*.dist-info"
       ;;
     *)
       echo ""
       ;;
   esac
+}
+
+# Function to bundle a Lambda layer
+# Lambda layers require a python/ directory at the ZIP root so that Lambda
+# adds the contents to sys.path at /opt/python.
+bundle_layer() {
+  local layer_name=$1
+  local source_dir="${LAMBDA_SOURCE_DIR}/${layer_name}"
+  local requirements_file="${source_dir}/requirements.txt"
+  local output_file="${OUTPUT_DIR}/${layer_name}.zip"
+  local temp_build_dir="${TEMP_DIR}/${layer_name}/python"
+
+  if [ ! -d "$source_dir" ]; then
+    echo -e "${RED}✗${NC} Source directory not found: ${source_dir}"
+    return 1
+  fi
+
+  echo -e "${YELLOW}→${NC} Bundling layer ${layer_name}..."
+
+  # Create clean temp build directory with python/ subdirectory
+  rm -rf "${TEMP_DIR}/${layer_name}"
+  mkdir -p "$temp_build_dir"
+
+  # Copy layer source code (exclude requirements files and README)
+  cp -r "${source_dir}"/* "${temp_build_dir}/"
+  rm -f "${temp_build_dir}/requirements.txt" \
+        "${temp_build_dir}/requirements-ci.txt" \
+        "${temp_build_dir}/README.md"
+
+  # Install dependencies if requirements.txt exists
+  if [ -f "$requirements_file" ]; then
+    echo -e "${YELLOW}  →${NC} Installing dependencies from requirements.txt..."
+    pip install -q \
+      --target "$temp_build_dir" \
+      --platform manylinux2014_x86_64 \
+      --python-version 3.11 \
+      --only-binary=:all: \
+      --upgrade \
+      -r "$requirements_file"
+    echo -e "${GREEN}  ✓${NC} Dependencies installed (linux/x86_64)"
+  else
+    echo -e "${YELLOW}  →${NC} No requirements.txt found, skipping dependency installation"
+  fi
+
+  # Remove packages already provided by the Lambda runtime
+  local exclude_pkgs
+  exclude_pkgs=$(layer_exclude_packages "$layer_name")
+  if [ -n "$exclude_pkgs" ]; then
+    echo -e "${YELLOW}  →${NC} Removing runtime-provided packages..."
+    # shellcheck disable=SC2086
+    (cd "$temp_build_dir" && rm -rf $exclude_pkgs)
+    echo -e "${GREEN}  ✓${NC} Runtime-provided packages removed"
+  fi
+
+  # Create ZIP file — zip from the layer root so python/ is at the ZIP root
+  echo -e "${YELLOW}  →${NC} Creating ZIP archive..."
+  pushd "${TEMP_DIR}/${layer_name}" > /dev/null || return 1
+  zip -r -q "$output_file" . || { popd > /dev/null; return 1; }
+  popd > /dev/null || return 1
+
+  local size
+  size=$(du -h "$output_file" | cut -f1)
+
+  echo -e "${GREEN}✓${NC} Created ${layer_name}.zip (${size})"
+
+  return 0
 }
 
 # Function to bundle a Lambda with dependencies
@@ -113,7 +190,6 @@ bundle_lambda() {
   zip -r -q "$output_file" . || { popd > /dev/null; return 1; }
   popd > /dev/null || return 1
 
-  # Get file size
   local size
   size=$(du -h "$output_file" | cut -f1)
 
@@ -124,7 +200,7 @@ bundle_lambda() {
 
 # Main execution
 echo "================================================="
-echo "Lambda Function Bundler"
+echo "Lambda Bundler"
 echo "================================================="
 echo ""
 
@@ -149,10 +225,19 @@ rm -rf "$TEMP_DIR"
 echo -e "${GREEN}✓${NC} Output directory: ${OUTPUT_DIR}"
 echo ""
 
-# Bundle each Lambda
+# Bundle each layer first
 success_count=0
 fail_count=0
 
+for layer in "${LAYERS[@]}"; do
+  if bundle_layer "$layer"; then
+    success_count=$((success_count + 1))
+  else
+    fail_count=$((fail_count + 1))
+  fi
+done
+
+# Bundle each Lambda
 for lambda in "${LAMBDAS[@]}"; do
   if bundle_lambda "$lambda"; then
     success_count=$((success_count + 1))
@@ -174,9 +259,9 @@ echo -e "Failed:  ${RED}${fail_count}${NC}"
 echo ""
 
 if [ $fail_count -eq 0 ]; then
-  echo -e "${GREEN}✓${NC} All Lambda functions bundled successfully!"
+  echo -e "${GREEN}✓${NC} All bundles created successfully!"
   exit 0
 else
-  echo -e "${RED}✗${NC} Some Lambda functions failed to bundle"
+  echo -e "${RED}✗${NC} Some bundles failed"
   exit 1
 fi

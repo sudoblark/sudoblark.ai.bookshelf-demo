@@ -23,7 +23,14 @@ locals {
     timeout               = 30
     memory_size           = 256
     layers                = []
+    layer_names           = []
     environment_variables = {}
+  }
+
+  # Default Lambda Layer configurations
+  layer_defaults = {
+    description         = ""
+    compatible_runtimes = ["python3.11"]
   }
 
   # Default S3 bucket configurations

@@ -3,7 +3,8 @@ import logging
 from datetime import datetime
 from typing import Any, Dict
 
-import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class ParquetWriter:
             raise ValueError("metadata and processed_bucket must not be empty")
 
         try:
-            df = pd.DataFrame([metadata])
+            table = pa.Table.from_pydict({k: [v] for k, v in metadata.items()})
 
             now = datetime.utcnow()
             parquet_key: str = (
@@ -42,7 +43,7 @@ class ParquetWriter:
             )
 
             buffer = io.BytesIO()
-            df.to_parquet(buffer, index=False, engine="pyarrow")
+            pq.write_table(table, buffer)
             parquet_bytes: bytes = buffer.getvalue()
 
             logger.info(f"Generated Parquet file: {len(parquet_bytes)} bytes")

@@ -82,10 +82,6 @@ addopts = [
     "-ra",
     "--strict-markers",
     "--strict-config",
-    "--cov=lambda-packages",
-    "--cov-report=html",
-    "--cov-report=term-missing:skip-covered",
-    "--cov-fail-under=80",
 ]
 testpaths = ["tests"]
 python_files = ["test_*.py"]

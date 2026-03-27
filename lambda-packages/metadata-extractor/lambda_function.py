@@ -10,7 +10,7 @@ import os
 from typing import Any
 
 import boto3
-from bedrock_extractor import BedrockMetadataExtractor  # noqa: F401
+from agent import BookshelfAgent
 from common.handler import BaseDataProcessor
 from common.s3 import parse_upload_key
 from common.tracker import BookshelfTracker, UploadStage
@@ -29,11 +29,8 @@ class MetadataExtractorHandler(BaseDataProcessor):
         super().__init__(s3_client)
         _bedrock_client = bedrock_client or boto3.client("bedrock-runtime")
         config = Config.from_env()
-        self._processor = BookshelfProcessor(
-            config=config,
-            s3_client=self.s3_client,
-            bedrock_client=_bedrock_client,
-        )
+        agent = BookshelfAgent(config.bedrock_model_id, _bedrock_client)
+        self._processor = BookshelfProcessor(agent=agent, s3_client=self.s3_client)
         if tracker is not None:
             self._tracker = tracker
         else:
