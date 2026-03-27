@@ -11,8 +11,8 @@ from typing import Any
 
 import boto3
 from bedrock_extractor import BedrockMetadataExtractor  # noqa: F401
-from common.handler import BaseS3BatchHandler
-from common.s3 import parse_upload_key, resolve_bucket
+from common.handler import BaseDataProcessor
+from common.s3 import parse_upload_key
 from common.tracker import BookshelfTracker, UploadStage
 from config import Config
 from image_processor import ImageProcessor  # noqa: F401
@@ -20,7 +20,7 @@ from parquet_writer import ParquetWriter  # noqa: F401
 from processor import BookshelfProcessor
 
 
-class MetadataExtractorHandler(BaseS3BatchHandler):
+class MetadataExtractorHandler(BaseDataProcessor):
     """Extracts book metadata from S3 image objects using Bedrock."""
 
     def __init__(
@@ -42,19 +42,25 @@ class MetadataExtractorHandler(BaseS3BatchHandler):
                 raise ValueError("TRACKING_TABLE environment variable is required")
             self._tracker = BookshelfTracker(table_name=tracking_table)
 
-    def process_record(self, bucket: str, key: str) -> str:
+    def process_record(self, key: str) -> str:
         user_id, upload_id, filename = parse_upload_key(key)
-        processed_bucket = resolve_bucket(bucket, self._processor._config.processed_bucket)
 
-        self._tracker.start_stage(user_id, upload_id, filename, UploadStage.ENRICHMENT, bucket, key)
+        self._tracker.start_stage(
+            user_id, upload_id, filename, UploadStage.ENRICHMENT, self.data_lake.raw, key
+        )
         try:
-            parquet_key = self._processor.process(bucket, key)
+            parquet_key = self._processor.process(self.data_lake.raw, self.data_lake.processed, key)
         except Exception as exc:
             self._tracker.fail_stage(user_id, upload_id, filename, UploadStage.ENRICHMENT, str(exc))
             raise
 
         self._tracker.complete_stage(
-            user_id, upload_id, filename, UploadStage.ENRICHMENT, processed_bucket, parquet_key
+            user_id,
+            upload_id,
+            filename,
+            UploadStage.ENRICHMENT,
+            self.data_lake.processed,
+            parquet_key,
         )
         return parquet_key
 

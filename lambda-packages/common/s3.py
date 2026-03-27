@@ -1,7 +1,7 @@
 """Shared S3 utilities for bookshelf-demo Lambda functions."""
 
 import logging
-from typing import List, Tuple
+from typing import Tuple
 
 logger = logging.getLogger(__name__)
 
@@ -27,29 +27,6 @@ def parse_upload_key(key: str) -> Tuple[str, str, str]:
         )
     _, user_id, upload_id, filename = parts
     return user_id, upload_id, filename
-
-
-def resolve_bucket(source_bucket: str, tier: str) -> str:
-    """Derive a full bucket name from the source bucket's naming convention.
-
-    The convention is ``account-project-application-{tier}``. Strips the last
-    dash-delimited segment of *source_bucket* and appends *tier*.
-
-    Args:
-        source_bucket: Full name of the source bucket.
-        tier: Target tier name (e.g. ``"raw"``, ``"processed"``).
-
-    Returns:
-        Full name of the target bucket.
-
-    Raises:
-        ValueError: If *source_bucket* has fewer than four dash-delimited segments.
-    """
-    parts: List[str] = source_bucket.split("-")
-    if len(parts) < 4:
-        raise ValueError(f"Invalid source bucket name format: {source_bucket}")
-    prefix = "-".join(parts[:-1])
-    return f"{prefix}-{tier}"
 
 
 def validate_key(key: str) -> None:

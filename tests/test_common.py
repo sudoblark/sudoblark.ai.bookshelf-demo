@@ -1,35 +1,36 @@
 """Tests for lambda-packages/common shared utilities."""
 
-from typing import Any
+from typing import Any, Optional
 from unittest.mock import MagicMock
 
 import pytest
-from common.handler import BaseS3BatchHandler
+from common.data_lake import BookshelfDataLake
+from common.handler import BaseDataProcessor
 from common.response import build_response
-from common.s3 import resolve_bucket, validate_key
+from common.s3 import validate_key
 from common.tracker import BookshelfTracker, StageStatus, UploadStage, UploadStatus
 
 # ---------------------------------------------------------------------------
-# Minimal concrete implementation used to test BaseS3BatchHandler directly
+# Minimal concrete implementations used to test BaseDataProcessor directly
 # ---------------------------------------------------------------------------
 
 
-class _IdentityHandler(BaseS3BatchHandler):
+class _IdentityProcessor(BaseDataProcessor):
     """Returns the key unchanged; records each processed key for assertions."""
 
     def __init__(self, s3_client: Any = None) -> None:
         super().__init__(s3_client)
         self.processed: list = []
 
-    def process_record(self, bucket: str, key: str) -> str:
+    def process_record(self, key: str) -> str:
         self.processed.append(key)
         return key
 
 
-class _RaisingHandler(BaseS3BatchHandler):
+class _RaisingProcessor(BaseDataProcessor):
     """Always raises from process_record to exercise failure paths."""
 
-    def process_record(self, bucket: str, key: str) -> str:
+    def process_record(self, key: str) -> str:
         raise RuntimeError("processing failed")
 
 
@@ -49,48 +50,56 @@ def _make_s3_event(bucket: str, key: str) -> dict:
     }
 
 
-class TestBaseS3BatchHandler:
+class TestBookshelfDataLake:
+    def test_from_prefix_constructs_all_tiers(self):
+        lake = BookshelfDataLake.from_prefix("aws-sudoblark-dev-bookshelf-demo")
+        assert lake.landing == "aws-sudoblark-dev-bookshelf-demo-landing"
+        assert lake.raw == "aws-sudoblark-dev-bookshelf-demo-raw"
+        assert lake.processed == "aws-sudoblark-dev-bookshelf-demo-processed"
+
+    def test_dataclass_attributes_accessible(self):
+        lake = BookshelfDataLake(landing="a-landing", raw="a-raw", processed="a-processed")
+        assert lake.landing == "a-landing"
+        assert lake.raw == "a-raw"
+        assert lake.processed == "a-processed"
+
+
+class TestBaseDataProcessor:
     def test_logger_named_after_concrete_class(self):
-        h = _IdentityHandler(s3_client=MagicMock())
-        assert h.logger.name == "_IdentityHandler"
+        h = _IdentityProcessor(s3_client=MagicMock())
+        assert h.logger.name == "_IdentityProcessor"
+
+    def test_data_lake_constructed_from_prefix(self, monkeypatch):
+        monkeypatch.setenv("DATA_LAKE_PREFIX", "aws-sudoblark-dev-bookshelf-demo")
+        h = _IdentityProcessor(s3_client=MagicMock())
+        assert h.data_lake.landing == "aws-sudoblark-dev-bookshelf-demo-landing"
+        assert h.data_lake.raw == "aws-sudoblark-dev-bookshelf-demo-raw"
+        assert h.data_lake.processed == "aws-sudoblark-dev-bookshelf-demo-processed"
+
+    def test_raises_when_data_lake_prefix_missing(self, monkeypatch):
+        monkeypatch.delenv("DATA_LAKE_PREFIX", raising=False)
+        with pytest.raises(ValueError, match="DATA_LAKE_PREFIX environment variable is required"):
+            _IdentityProcessor(s3_client=MagicMock())
 
     def test_processes_record_and_returns_200(self):
-        h = _IdentityHandler(s3_client=MagicMock())
+        h = _IdentityProcessor(s3_client=MagicMock())
         result = h(_make_s3_event("my-bucket", "uploads/u/up/cover.jpg"), None)
         assert result["statusCode"] == 200
         assert result["processed_count"] == 1
         assert "uploads/u/up/cover.jpg" in result["processed_files"]
 
     def test_records_failure_and_returns_207(self):
-        h = _RaisingHandler(s3_client=MagicMock())
+        h = _RaisingProcessor(s3_client=MagicMock())
         result = h(_make_s3_event("my-bucket", "uploads/u/up/cover.jpg"), None)
         assert result["statusCode"] == 207
         assert result["failed_count"] == 1
         assert "processing failed" in result["failed_files"][0]["error"]
 
     def test_rejects_path_traversal_before_process_record(self):
-        h = _IdentityHandler(s3_client=MagicMock())
+        h = _IdentityProcessor(s3_client=MagicMock())
         result = h(_make_s3_event("my-bucket", "uploads/../secret/file.jpg"), None)
         assert result["statusCode"] == 207
         assert len(h.processed) == 0  # process_record was never called
-
-
-class TestResolveBucket:
-    def test_resolves_landing_to_raw(self):
-        result = resolve_bucket("aws-sudoblark-development-bookshelf-demo-landing", "raw")
-        assert result == "aws-sudoblark-development-bookshelf-demo-raw"
-
-    def test_resolves_raw_to_processed(self):
-        result = resolve_bucket("aws-sudoblark-development-bookshelf-demo-raw", "processed")
-        assert result == "aws-sudoblark-development-bookshelf-demo-processed"
-
-    def test_raises_for_short_bucket_name(self):
-        with pytest.raises(ValueError, match="Invalid source bucket name format"):
-            resolve_bucket("bad-name", "raw")
-
-    def test_raises_for_three_segment_name(self):
-        with pytest.raises(ValueError, match="Invalid source bucket name format"):
-            resolve_bucket("account-project-landing", "raw")
 
 
 class TestValidateKey:
@@ -154,7 +163,7 @@ _IN_PROGRESS_ROUTING = {
 }
 
 
-def _make_tracker(item: dict | None = None):
+def _make_tracker(item: Optional[dict] = None):
     """Return a (BookshelfTracker, mock_table) pair."""
     mock_resource = MagicMock()
     mock_table = MagicMock()

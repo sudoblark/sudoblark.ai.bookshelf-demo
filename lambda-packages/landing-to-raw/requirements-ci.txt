@@ -1,0 +1,5 @@
+# Additional dependencies for local testing and CI
+# boto3 and aws-lambda-powertools are provided by the Lambda runtime/layers
+# but needed locally (common/handler.py imports aws_lambda_powertools)
+boto3
+aws-lambda-powertools

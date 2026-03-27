@@ -42,17 +42,18 @@ locals {
   # Define Lambda functions for the ETL pipeline
   lambdas = [
     {
-      name          = "file-router"
-      description   = "Routes single image uploads from landing to the raw bucket"
-      zip_file_path = "../../lambda-packages/file-router.zip"
+      name          = "landing-to-raw"
+      description   = "AV scans files in landing and promotes clean files to raw, triggering the enrichment state machine"
+      zip_file_path = "../../lambda-packages/landing-to-raw.zip"
       handler       = "lambda_function.handler"
       runtime       = "python3.11"
       timeout       = 60
       memory_size   = 512
       environment_variables = {
-        RAW_BUCKET     = "raw"
-        TRACKING_TABLE = "${var.account}-${local.project}-${local.application}-ingestion-tracking"
-        LOG_LEVEL      = "INFO"
+        DATA_LAKE_PREFIX  = "${var.account}-${local.project}-${local.application}"
+        TRACKING_TABLE    = "${var.account}-${local.project}-${local.application}-ingestion-tracking"
+        STATE_MACHINE_ARN = "arn:aws:states:eu-west-2:PLACEHOLDER:stateMachine:PLACEHOLDER-bookshelf-demo-raw-to-enriched"
+        LOG_LEVEL         = "INFO"
       }
       iam_policy_statements = [
         {
@@ -78,6 +79,12 @@ locals {
           effect    = "Allow"
           actions   = ["dynamodb:PutItem", "dynamodb:UpdateItem", "dynamodb:GetItem"]
           resources = ["arn:aws:dynamodb:*:*:table/${var.account}-${local.project}-${local.application}-ingestion-tracking"]
+        },
+        {
+          sid       = "StartExecution"
+          effect    = "Allow"
+          actions   = ["states:StartExecution"]
+          resources = ["arn:aws:states:*:*:stateMachine:*-bookshelf-demo-raw-to-enriched"]
         }
       ]
     },
@@ -100,7 +107,7 @@ locals {
         # Pillow bundled directly in deployment ZIP due to layer permission restrictions
       ]
       environment_variables = {
-        PROCESSED_BUCKET = "processed"
+        DATA_LAKE_PREFIX = "${var.account}-${local.project}-${local.application}"
         TRACKING_TABLE   = "${var.account}-${local.project}-${local.application}-ingestion-tracking"
         LOG_LEVEL        = "INFO"
         BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"

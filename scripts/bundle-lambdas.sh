@@ -28,7 +28,7 @@ TEMP_DIR="${OUTPUT_DIR}/tmp"
 
 # Lambda functions to bundle
 LAMBDAS=(
-  "file-router"
+  "landing-to-raw"
   "metadata-extractor"
 )
 

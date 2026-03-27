@@ -41,6 +41,7 @@ class UploadStage(str, Enum):
 
     USER_UPLOAD = "user_upload"
     ROUTING = "routing"
+    AV_SCAN = "av_scan"
     ENRICHMENT = "enrichment"
 
 

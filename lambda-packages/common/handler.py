@@ -1,9 +1,11 @@
-"""Abstract base handler for S3-batch-processing Lambda functions.
+"""Abstract base processor for S3-triggered Lambda functions.
 
-``BaseS3BatchHandler``
+``BaseDataProcessor``
     Provides shared plumbing for S3-triggered Lambdas that process a batch of
     ObjectCreated records:
 
+    - A :class:`~common.data_lake.BookshelfDataLake` instance exposing all bucket
+      tier names, constructed from the ``DATA_LAKE_PREFIX`` environment variable.
     - A logger keyed to the concrete class name, level controlled by ``LOG_LEVEL``.
     - A ``boto3`` S3 client (injectable for tests).
     - A ``__call__`` implementation that parses the S3 event, validates each key,
@@ -13,14 +15,15 @@
 
 Usage::
 
-    from common.handler import BaseS3BatchHandler
+    from common.handler import BaseDataProcessor
 
-    class MyHandler(BaseS3BatchHandler):
-        def process_record(self, bucket: str, key: str) -> str:
-            ...  # do work
+    class MyProcessor(BaseDataProcessor):
+        def process_record(self, key: str) -> str:
+            data = self.s3_client.get_object(Bucket=self.data_lake.raw, Key=key)
+            ...
             return output_key
 
-    handler = MyHandler()   # Lambda entry point
+    handler = MyProcessor()   # Lambda entry point
 """
 
 import logging
@@ -30,12 +33,13 @@ from typing import Any, Dict, List
 
 import boto3
 from aws_lambda_powertools.utilities.data_classes import S3Event
+from common.data_lake import BookshelfDataLake
 from common.response import build_response
 from common.s3 import validate_key
 
 
-class BaseS3BatchHandler(ABC):
-    """Base handler for Lambda functions that process batches of S3 ObjectCreated records.
+class BaseDataProcessor(ABC):
+    """Base processor for Lambda functions that handle batches of S3 ObjectCreated records.
 
     Args:
         s3_client: boto3 S3 client. Defaults to ``boto3.client("s3")``.
@@ -47,13 +51,18 @@ class BaseS3BatchHandler(ABC):
         self.logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
         self.s3_client: Any = s3_client or boto3.client("s3")
 
+        prefix = os.environ.get("DATA_LAKE_PREFIX", "")
+        if not prefix:
+            raise ValueError("DATA_LAKE_PREFIX environment variable is required")
+        self.data_lake: BookshelfDataLake = BookshelfDataLake.from_prefix(prefix)
+
     @abstractmethod
-    def process_record(self, bucket: str, key: str) -> str:
+    def process_record(self, key: str) -> str:
         """Process a single S3 record.
 
         Args:
-            bucket: Name of the S3 bucket containing the object.
             key: S3 object key (already validated — no path traversal).
+                 Use ``self.data_lake`` to resolve the source and destination buckets.
 
         Returns:
             An output identifier (e.g. destination key) recorded in the response.
@@ -75,7 +84,7 @@ class BaseS3BatchHandler(ABC):
             key: str = record.s3.get_object.key
             try:
                 validate_key(key)
-                output = self.process_record(record.s3.bucket.name, key)
+                output = self.process_record(key)
                 processed_files.append(output)
             except Exception as e:
                 self.logger.error(f"Failed to process {key}: {str(e)}", exc_info=True)

@@ -40,33 +40,22 @@ locals {
       bucket_name = "landing"
       lambda_notifications = [
         {
-          lambda_name   = "file-router"
+          lambda_name   = "landing-to-raw"
           events        = ["s3:ObjectCreated:*"]
           filter_prefix = "uploads/"
           filter_suffix = ".jpg"
         },
         {
-          lambda_name   = "file-router"
+          lambda_name   = "landing-to-raw"
           events        = ["s3:ObjectCreated:*"]
           filter_prefix = "uploads/"
           filter_suffix = ".jpeg"
         },
         {
-          lambda_name   = "file-router"
+          lambda_name   = "landing-to-raw"
           events        = ["s3:ObjectCreated:*"]
           filter_prefix = "uploads/"
           filter_suffix = ".png"
-        }
-      ]
-    },
-    {
-      bucket_name = "raw"
-      lambda_notifications = [
-        {
-          lambda_name   = "metadata-extractor"
-          events        = ["s3:ObjectCreated:*"]
-          filter_prefix = ""
-          filter_suffix = "" # Process all image files (jpg, jpeg, png, etc.)
         }
       ]
     }
