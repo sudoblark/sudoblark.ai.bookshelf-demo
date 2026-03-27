@@ -43,8 +43,13 @@ LAMBDAS=(
 # layer and count against the 262 MB unzipped deployment limit.
 # Uses a case statement for bash 3 compatibility (macOS ships bash 3.2).
 layer_exclude_packages() {
-  local lambda_name=$1
-  case "$lambda_name" in
+  local name=$1
+  case "$name" in
+    bookshelf-agent)
+      # Exclude packages provided by the Lambda runtime so they don't bloat the layer.
+      # pydantic-ai-slim[bedrock] declares boto3 as a dep; botocore alone is ~75 MB unzipped.
+      echo "boto3 boto3-*.dist-info botocore botocore-*.dist-info s3transfer s3transfer-*.dist-info jmespath jmespath-*.dist-info"
+      ;;
     metadata-extractor)
       echo "boto3 boto3-*.dist-info botocore botocore-*.dist-info s3transfer s3transfer-*.dist-info jmespath jmespath-*.dist-info Pillow Pillow-*.dist-info pydantic pydantic-*.dist-info pydantic_ai pydantic_ai-*.dist-info pydantic_ai_slim pydantic_ai_slim-*.dist-info"
       ;;
@@ -94,6 +99,16 @@ bundle_layer() {
     echo -e "${GREEN}  ✓${NC} Dependencies installed (linux/x86_64)"
   else
     echo -e "${YELLOW}  →${NC} No requirements.txt found, skipping dependency installation"
+  fi
+
+  # Remove packages already provided by the Lambda runtime
+  local exclude_pkgs
+  exclude_pkgs=$(layer_exclude_packages "$layer_name")
+  if [ -n "$exclude_pkgs" ]; then
+    echo -e "${YELLOW}  →${NC} Removing runtime-provided packages..."
+    # shellcheck disable=SC2086
+    (cd "$temp_build_dir" && rm -rf $exclude_pkgs)
+    echo -e "${GREEN}  ✓${NC} Runtime-provided packages removed"
   fi
 
   # Create ZIP file — zip from the layer root so python/ is at the ZIP root
