@@ -49,6 +49,11 @@ locals {
       runtime       = "python3.11"
       timeout       = 60
       memory_size   = 512
+      layers = [
+        # AWS Lambda Powertools for Python (eu-west-2, Python 3.11)
+        # See: https://docs.powertools.aws.dev/lambda/python/latest/#lambda-layer
+        "arn:aws:lambda:eu-west-2:017000801446:layer:AWSLambdaPowertoolsPythonV3-python311-x86_64:7"
+      ]
       environment_variables = {
         DATA_LAKE_PREFIX  = "${var.account}-${local.project}-${local.application}"
         TRACKING_TABLE    = "${var.account}-${local.project}-${local.application}-ingestion-tracking"
