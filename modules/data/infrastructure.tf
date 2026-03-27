@@ -24,6 +24,29 @@ locals {
     for bucket in local.buckets_enriched : bucket.name => bucket
   }
 
+  # Enrich Lambda Layers with computed values and merged defaults
+  layers_enriched = [
+    for layer in local.layers : merge(
+      {
+        account             = local.account
+        project             = local.project
+        application         = local.application
+        description         = local.layer_defaults.description
+        compatible_runtimes = local.layer_defaults.compatible_runtimes
+      },
+      layer,
+      {
+        # Computed full layer name following naming convention
+        full_name = lower("${local.account}-${local.project}-${local.application}-${layer.name}")
+      }
+    )
+  ]
+
+  # Create a map of Layers keyed by name for easy lookup
+  layers_map = {
+    for layer in local.layers_enriched : layer.name => layer
+  }
+
   # Enrich Lambda functions with computed values and merged defaults
   lambdas_enriched = [
     for lambda in local.lambdas : merge(
@@ -35,6 +58,7 @@ locals {
         timeout               = local.lambda_defaults.timeout
         memory_size           = local.lambda_defaults.memory_size
         layers                = local.lambda_defaults.layers
+        layer_names           = local.lambda_defaults.layer_names
         environment_variables = local.lambda_defaults.environment_variables
       },
       lambda,

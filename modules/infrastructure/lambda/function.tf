@@ -1,5 +1,14 @@
 locals {
   lambdas_map = { for lambda in var.lambdas : lambda.name => lambda }
+
+  # Merge public layer ARNs (layers) with locally-managed layer ARNs (resolved from layer_names)
+  resolved_layers = {
+    for name, lambda in local.lambdas_map :
+    name => concat(
+      lambda.layers,
+      [for layer_name in lambda.layer_names : var.layer_arns[layer_name]]
+    )
+  }
 }
 
 data "aws_iam_policy_document" "assume_role" {
@@ -73,7 +82,7 @@ resource "aws_lambda_function" "function" {
   runtime       = each.value.runtime
   timeout       = each.value.timeout
   memory_size   = each.value.memory_size
-  layers        = each.value.layers
+  layers        = local.resolved_layers[each.key]
 
   filename         = each.value.zip_file_path
   source_code_hash = filebase64sha256(each.value.zip_file_path)

@@ -96,6 +96,7 @@ locals {
       runtime       = "python3.11"
       timeout       = 300 # 5 minutes for LLM processing
       memory_size   = 1024
+      layer_names   = ["bookshelf-agent"]
       layers = [
         # AWS SDK for pandas (includes pandas, pyarrow, numpy, etc.)
         # Version 11 for Python 3.11 in eu-west-2

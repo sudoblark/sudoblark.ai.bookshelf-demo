@@ -45,6 +45,16 @@ output "buckets_map" {
   value       = local.buckets_map
 }
 
+output "layers" {
+  description = "All Lambda layers with enriched metadata and computed values"
+  value       = local.layers_enriched
+}
+
+output "layers_map" {
+  description = "Map of Lambda layers keyed by layer name"
+  value       = local.layers_map
+}
+
 output "lambdas" {
   description = "All Lambda functions with enriched metadata and computed values"
   value       = local.lambdas_enriched
