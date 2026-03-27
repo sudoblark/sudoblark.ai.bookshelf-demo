@@ -11,6 +11,12 @@ sys.path.insert(
     0,
     os.path.join(os.path.dirname(__file__), "../lambda-packages"),
 )
+# Add bookshelf-agent layer to sys.path — mirrors Lambda runtime where the
+# layer's python/ directory is added to sys.path at /opt/python.
+sys.path.insert(
+    0,
+    os.path.join(os.path.dirname(__file__), "../lambda-packages/bookshelf-agent"),
+)
 
 import boto3  # noqa: E402
 import pytest  # noqa: E402

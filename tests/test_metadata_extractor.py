@@ -104,60 +104,29 @@ class TestImageProcessor:
             metadata_lambda.ImageProcessor.resize_to_jpeg(b"not an image")
 
 
-class TestBedrockMetadataExtractor:
-    """Tests for BedrockMetadataExtractor."""
+class TestBookshelfAgent:
+    """Tests for BookshelfAgent."""
 
-    def _make_extractor(self, mock_client=None):
+    def _make_agent(self, mock_client=None):
         if mock_client is None:
             mock_client = MagicMock()
-        return metadata_lambda.BedrockMetadataExtractor("test-model", mock_client)
+        return metadata_lambda.BookshelfAgent("test-model", mock_client)
 
-    # --- _apply_defaults ---
-
-    def test_apply_defaults_adds_missing_fields(self):
-        """Should add id, filename, and processed_at when absent."""
-        extractor = self._make_extractor()
-        metadata = {"title": "Test Book"}
-
-        result = extractor._apply_defaults(metadata, "book.jpg")
-
-        assert "id" in result
-        assert result["filename"] == "book.jpg"
-        assert "processed_at" in result
-        assert result["title"] == "Test Book"
-
-    def test_apply_defaults_preserves_existing_fields(self):
-        """Should not overwrite fields that already exist."""
-        extractor = self._make_extractor()
-        metadata = {
-            "id": "existing-id",
-            "filename": "original.jpg",
-            "processed_at": "2026-01-01T00:00:00Z",
-        }
-
-        result = extractor._apply_defaults(metadata, "new.jpg")
-
-        assert result["id"] == "existing-id"
-        assert result["filename"] == "original.jpg"
-        assert result["processed_at"] == "2026-01-01T00:00:00Z"
-
-    # --- extract ---
-
-    def test_extract_empty_image_bytes(self):
+    def test_run_empty_image_bytes(self):
         """Should raise ValueError for empty image bytes."""
-        extractor = self._make_extractor()
+        agent = self._make_agent()
 
         with pytest.raises(ValueError, match="image_bytes must not be empty"):
-            extractor.extract(b"", "test.jpg")
+            agent.run(b"")
 
-    def test_extract_returns_metadata_with_defaults(self):
-        """Should return validated metadata with id, filename, and processed_at populated."""
-        extractor = self._make_extractor()
+    def test_run_returns_book_metadata(self):
+        """Should return a BookMetadata instance with extracted fields."""
+        agent = self._make_agent()
 
         img_buffer = io.BytesIO()
         Image.new("RGB", (100, 100), color="red").save(img_buffer, format="JPEG")
 
-        with extractor._agent.override(
+        with agent._agent.override(
             model=TestModel(
                 custom_output_args={
                     "title": "The Great Gatsby",
@@ -170,17 +139,15 @@ class TestBedrockMetadataExtractor:
                 }
             )
         ):
-            result = extractor.extract(img_buffer.getvalue(), "test.jpg")
+            result = agent.run(img_buffer.getvalue())
 
-        assert result["title"] == "The Great Gatsby"
-        assert result["author"] == "F. Scott Fitzgerald"
-        assert result["filename"] == "test.jpg"
-        assert "id" in result
-        assert "processed_at" in result
+        assert result.title == "The Great Gatsby"
+        assert result.author == "F. Scott Fitzgerald"
+        assert result.isbn == "9780743273565"
 
-    def test_extract_model_failure_propagates(self):
+    def test_run_model_failure_propagates(self):
         """Should propagate exceptions raised by the underlying model."""
-        extractor = self._make_extractor()
+        agent = self._make_agent()
 
         img_buffer = io.BytesIO()
         Image.new("RGB", (100, 100), color="red").save(img_buffer, format="JPEG")
@@ -188,9 +155,9 @@ class TestBedrockMetadataExtractor:
         def failing_model(messages: list[ModelMessage], info: AgentInfo) -> None:
             raise UnexpectedModelBehavior("Model unavailable")
 
-        with extractor._agent.override(model=FunctionModel(failing_model)):
+        with agent._agent.override(model=FunctionModel(failing_model)):
             with pytest.raises(Exception):
-                extractor.extract(img_buffer.getvalue(), "test.jpg")
+                agent.run(img_buffer.getvalue())
 
 
 class TestParquetWriter:
@@ -232,34 +199,62 @@ class TestParquetWriter:
             writer.write({"id": "test", "title": "Test"}, "")
 
 
+def _make_book_metadata(title: str = "Test Book"):
+    """Return a BookMetadata instance for use as BookshelfAgent.run() mock return value."""
+    from models import BookMetadata
+
+    return BookMetadata(
+        title=title,
+        author="Test Author",
+        isbn="1234567890",
+        publisher="Test Publisher",
+        published_year=2024,
+        description="Test description",
+        confidence=0.9,
+    )
+
+
 class TestBookshelfProcessor:
     """Tests for BookshelfProcessor."""
-
-    def _make_config(self, model="test-model"):
-        return metadata_lambda.Config(bedrock_model_id=model, log_level="INFO")
 
     def _make_image_bytes(self):
         buf = io.BytesIO()
         Image.new("RGB", (100, 100), color="red").save(buf, format="JPEG")
         return buf.getvalue()
 
-    def _make_extract_return_value(self, title: str = "Test Book") -> dict:
-        return {
-            "id": "test-id-123",
-            "title": title,
-            "author": "Test Author",
-            "isbn": "1234567890",
-            "publisher": "Test Publisher",
-            "published_year": 2024,
-            "description": "Test description",
-            "confidence": 0.9,
-            "filename": "book.jpg",
+    # --- _apply_defaults ---
+
+    def test_apply_defaults_adds_missing_fields(self):
+        """Should add id, filename, and processed_at when absent."""
+        processor = metadata_lambda.BookshelfProcessor(MagicMock(), MagicMock())
+        metadata = {"title": "Test Book"}
+
+        result = processor._apply_defaults(metadata, "book.jpg")
+
+        assert "id" in result
+        assert result["filename"] == "book.jpg"
+        assert "processed_at" in result
+        assert result["title"] == "Test Book"
+
+    def test_apply_defaults_preserves_existing_fields(self):
+        """Should not overwrite fields that already exist."""
+        processor = metadata_lambda.BookshelfProcessor(MagicMock(), MagicMock())
+        metadata = {
+            "id": "existing-id",
+            "filename": "original.jpg",
             "processed_at": "2026-01-01T00:00:00Z",
         }
 
+        result = processor._apply_defaults(metadata, "new.jpg")
+
+        assert result["id"] == "existing-id"
+        assert result["filename"] == "original.jpg"
+        assert result["processed_at"] == "2026-01-01T00:00:00Z"
+
+    # --- process ---
+
     def test_process_success(self, s3_client, mocker):
         """Should download image, extract metadata, and write a Parquet file."""
-        config = self._make_config()
         image_bytes = self._make_image_bytes()
 
         s3_client.create_bucket(
@@ -272,12 +267,9 @@ class TestBookshelfProcessor:
             CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
         )
 
-        mocker.patch.object(
-            metadata_lambda.BedrockMetadataExtractor,
-            "extract",
-            return_value=self._make_extract_return_value(),
-        )
-        processor = metadata_lambda.BookshelfProcessor(config, s3_client, MagicMock())
+        mock_agent = MagicMock()
+        mock_agent.run.return_value = _make_book_metadata()
+        processor = metadata_lambda.BookshelfProcessor(mock_agent, s3_client)
 
         parquet_key = processor.process("test-raw", "test-processed", "book.jpg")
 
@@ -286,8 +278,7 @@ class TestBookshelfProcessor:
         assert objects["KeyCount"] >= 1
 
     def test_process_extractor_failure(self, s3_client, mocker):
-        """Should propagate exceptions from the metadata extractor."""
-        config = self._make_config()
+        """Should propagate exceptions from the agent."""
         image_bytes = self._make_image_bytes()
 
         s3_client.create_bucket(
@@ -296,20 +287,16 @@ class TestBookshelfProcessor:
         )
         s3_client.put_object(Bucket="test-raw", Key="book.jpg", Body=image_bytes)
 
-        mocker.patch.object(
-            metadata_lambda.BedrockMetadataExtractor,
-            "extract",
-            side_effect=Exception("Bedrock API error"),
-        )
-        processor = metadata_lambda.BookshelfProcessor(config, s3_client, MagicMock())
+        mock_agent = MagicMock()
+        mock_agent.run.side_effect = Exception("Bedrock API error")
+        processor = metadata_lambda.BookshelfProcessor(mock_agent, s3_client)
 
         with pytest.raises(Exception, match="Bedrock API error"):
             processor.process("test-raw", "test-processed", "book.jpg")
 
     def test_process_empty_inputs(self):
         """Should raise ValueError for empty source_bucket or image_key."""
-        config = self._make_config()
-        processor = metadata_lambda.BookshelfProcessor(config, MagicMock(), MagicMock())
+        processor = metadata_lambda.BookshelfProcessor(MagicMock(), MagicMock())
 
         with pytest.raises(ValueError, match="source_bucket and image_key must not be empty"):
             processor.process("", "test-processed", "book.jpg")
@@ -321,7 +308,6 @@ class TestBookshelfProcessor:
         """Should propagate S3 ClientError when put_object fails."""
         from botocore.exceptions import ClientError
 
-        config = self._make_config()
         image_bytes = self._make_image_bytes()
 
         mock_s3 = MagicMock()
@@ -330,12 +316,9 @@ class TestBookshelfProcessor:
             {"Error": {"Code": "AccessDenied", "Message": "Access Denied"}}, "PutObject"
         )
 
-        mocker.patch.object(
-            metadata_lambda.BedrockMetadataExtractor,
-            "extract",
-            return_value=self._make_extract_return_value(),
-        )
-        processor = metadata_lambda.BookshelfProcessor(config, mock_s3, MagicMock())
+        mock_agent = MagicMock()
+        mock_agent.run.return_value = _make_book_metadata()
+        processor = metadata_lambda.BookshelfProcessor(mock_agent, mock_s3)
 
         with pytest.raises(ClientError):
             processor.process("test-raw", "test-processed", "test.jpg")
