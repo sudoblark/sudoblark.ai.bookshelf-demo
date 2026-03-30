@@ -119,3 +119,13 @@ output "dynamodb_tables_map" {
   description = "Map of DynamoDB tables keyed by table name"
   value       = local.dynamodb_tables_map
 }
+
+output "step_functions" {
+  description = "All Step Functions state machines with enriched metadata and computed values"
+  value       = local.step_functions_enriched
+}
+
+output "step_functions_map" {
+  description = "Map of Step Functions state machines keyed by name"
+  value       = local.step_functions_map
+}

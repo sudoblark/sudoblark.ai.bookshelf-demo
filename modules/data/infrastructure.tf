@@ -210,4 +210,30 @@ locals {
 
   # Glue security configuration name
   glue_security_config_name = "${local.account}-glue-security-config"
+
+  # Enrich Step Functions state machines with computed values and resolved references
+  step_functions_enriched = [
+    for sm in local.step_functions : merge(
+      {
+        account     = local.account
+        project     = local.project
+        application = local.application
+        description = ""
+      },
+      sm,
+      {
+        # Computed full state machine name following naming convention
+        full_name = lower("${local.account}-${local.project}-${local.application}-${sm.name}")
+        # Computed IAM role name — created by the step_functions infrastructure module
+        role_name = lower("${local.account}-${local.project}-${local.application}-${sm.name}")
+        # Resolved metadata-extractor Lambda ARN from lambda name reference
+        metadata_extractor_arn = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.lambdas_map[sm.metadata_extractor_name].full_name}"
+      }
+    )
+  ]
+
+  # Create a map of Step Functions state machines keyed by name
+  step_functions_map = {
+    for sm in local.step_functions_enriched : sm.name => sm
+  }
 }
