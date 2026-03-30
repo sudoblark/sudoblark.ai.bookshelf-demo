@@ -47,10 +47,8 @@ class LandingToRawHandler(BaseDataProcessor):
     def process_record(self, key: str) -> str:
         user_id, upload_id, filename = parse_upload_key(key)
 
-        self._tracker.create_record(user_id, upload_id, filename, self.data_lake.landing, key)
-        self._tracker.start_stage(
-            user_id, upload_id, filename, UploadStage.AV_SCAN, self.data_lake.landing, key
-        )
+        self._tracker.create_record(user_id, upload_id)
+        self._tracker.start_stage(upload_id, UploadStage.AV_SCAN, self.data_lake.landing, key)
 
         data = self.s3_client.get_object(Bucket=self.data_lake.landing, Key=key)["Body"].read()
         clean = scanner.scan(data)
@@ -60,7 +58,6 @@ class LandingToRawHandler(BaseDataProcessor):
             self._tracker.fail_stage(
                 user_id,
                 upload_id,
-                filename,
                 UploadStage.AV_SCAN,
                 "AV scan failed: file quarantined",
             )
@@ -72,11 +69,11 @@ class LandingToRawHandler(BaseDataProcessor):
             Key=key,
         )
         self._tracker.complete_stage(
-            user_id, upload_id, filename, UploadStage.AV_SCAN, self.data_lake.raw, key
+            user_id, upload_id, UploadStage.AV_SCAN, self.data_lake.raw, key
         )
         self._stepfunctions_client.start_execution(
             stateMachineArn=self._state_machine_arn,
-            input=json.dumps({"bucket": self.data_lake.raw, "key": key}),
+            input=json.dumps({"upload_id": upload_id, "bucket": self.data_lake.raw, "key": key}),
         )
 
         self.logger.info(

@@ -39,22 +39,25 @@ class MetadataExtractorHandler(BaseDataProcessor):
                 raise ValueError("TRACKING_TABLE environment variable is required")
             self._tracker = BookshelfTracker(table_name=tracking_table)
 
+    def __call__(self, event: dict, context: Any) -> dict:
+        if "upload_id" in event and "key" in event:
+            result = self.process_record(event["key"])
+            return {"status": "success", "output_key": result}
+        return super().__call__(event, context)
+
     def process_record(self, key: str) -> str:
         user_id, upload_id, filename = parse_upload_key(key)
 
-        self._tracker.start_stage(
-            user_id, upload_id, filename, UploadStage.ENRICHMENT, self.data_lake.raw, key
-        )
+        self._tracker.start_stage(upload_id, UploadStage.ENRICHMENT, self.data_lake.raw, key)
         try:
             parquet_key = self._processor.process(self.data_lake.raw, self.data_lake.processed, key)
         except Exception as exc:
-            self._tracker.fail_stage(user_id, upload_id, filename, UploadStage.ENRICHMENT, str(exc))
+            self._tracker.fail_stage(user_id, upload_id, UploadStage.ENRICHMENT, str(exc))
             raise
 
         self._tracker.complete_stage(
             user_id,
             upload_id,
-            filename,
             UploadStage.ENRICHMENT,
             self.data_lake.processed,
             parquet_key,
