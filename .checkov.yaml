@@ -35,6 +35,9 @@ skip-check:
   # Glue Security Configuration
   - CKV_AWS_99   # Glue encryption configured but Checkov validation is overly strict for demo
 
+  # Step Functions
+  - CKV_AWS_284  # X-Ray tracing not needed - demo doesn't require distributed tracing overhead/cost
+
 
 # Framework to scan
 framework:

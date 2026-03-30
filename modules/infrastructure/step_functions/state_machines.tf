@@ -49,6 +49,41 @@ resource "aws_iam_role_policy" "step_functions_policy" {
   policy = data.aws_iam_policy_document.step_functions_policy[each.key].json
 }
 
+resource "aws_cloudwatch_log_group" "step_functions" {
+  for_each = local.state_machines_map
+
+  name              = "/aws/states/${each.value.full_name}"
+  retention_in_days = 7
+}
+
+resource "aws_iam_role_policy" "step_functions_logging_policy" {
+  for_each = local.state_machines_map
+
+  name = "${each.value.role_name}-logging"
+  role = aws_iam_role.step_functions[each.key].id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "CloudWatchLogsDelivery"
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogDelivery",
+          "logs:GetLogDelivery",
+          "logs:UpdateLogDelivery",
+          "logs:DeleteLogDelivery",
+          "logs:ListLogDeliveries",
+          "logs:PutResourcePolicy",
+          "logs:DescribeResourcePolicies",
+          "logs:DescribeLogGroups",
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 resource "aws_sfn_state_machine" "state_machine" {
   for_each = local.state_machines_map
 
@@ -57,6 +92,12 @@ resource "aws_sfn_state_machine" "state_machine" {
 
   definition = each.value.definition
 
+  logging_configuration {
+    log_destination        = "${aws_cloudwatch_log_group.step_functions[each.key].arn}:*"
+    include_execution_data = false
+    level                  = "ERROR"
+  }
+
   tags = {
     Name = each.value.full_name
   }
@@ -64,5 +105,7 @@ resource "aws_sfn_state_machine" "state_machine" {
   depends_on = [
     aws_iam_role.step_functions,
     aws_iam_role_policy.step_functions_policy,
+    aws_iam_role_policy.step_functions_logging_policy,
+    aws_cloudwatch_log_group.step_functions,
   ]
 }
