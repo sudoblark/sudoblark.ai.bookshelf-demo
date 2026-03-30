@@ -140,7 +140,7 @@ class TestHandlerCleanFile:
 
         mock_sfn.start_execution.assert_called_once_with(
             stateMachineArn=STATE_MACHINE_ARN,
-            input=json.dumps({"bucket": RAW_BUCKET, "key": key}),
+            input=json.dumps({"upload_id": "test-upload", "bucket": RAW_BUCKET, "key": key}),
         )
 
     @mock_aws
@@ -166,7 +166,7 @@ class TestHandlerCleanFile:
 
         mock_tracker.complete_stage.assert_called_once()
         call_args = mock_tracker.complete_stage.call_args
-        assert call_args.args[3] == UploadStage.AV_SCAN
+        assert call_args.args[2] == UploadStage.AV_SCAN
 
 
 class TestHandlerInfectedFile:
@@ -242,7 +242,7 @@ class TestHandlerInfectedFile:
 
         mock_tracker.fail_stage.assert_called_once()
         call_args = mock_tracker.fail_stage.call_args
-        assert call_args.args[3] == UploadStage.AV_SCAN
+        assert call_args.args[2] == UploadStage.AV_SCAN
 
     @mock_aws
     def test_start_execution_not_called(self, monkeypatch, lambda_context):
@@ -297,12 +297,21 @@ def _create_tracking_table(resource):
     resource.create_table(
         TableName=TRACKING_TABLE,
         KeySchema=[
-            {"AttributeName": "user_id", "KeyType": "HASH"},
-            {"AttributeName": "file_id", "KeyType": "RANGE"},
+            {"AttributeName": "upload_id", "KeyType": "HASH"},
         ],
         AttributeDefinitions=[
+            {"AttributeName": "upload_id", "AttributeType": "S"},
             {"AttributeName": "user_id", "AttributeType": "S"},
-            {"AttributeName": "file_id", "AttributeType": "S"},
+        ],
+        GlobalSecondaryIndexes=[
+            {
+                "IndexName": "user_id-index",
+                "KeySchema": [
+                    {"AttributeName": "user_id", "KeyType": "HASH"},
+                    {"AttributeName": "upload_id", "KeyType": "RANGE"},
+                ],
+                "Projection": {"ProjectionType": "ALL"},
+            }
         ],
         BillingMode="PAY_PER_REQUEST",
     )
@@ -333,11 +342,7 @@ class TestHandlerWithTracking:
         result = h(_make_s3_event(LANDING_BUCKET, key), lambda_context)
         assert result["statusCode"] == 200
 
-        item = (
-            dynamodb.Table(TRACKING_TABLE)
-            .get_item(Key={"user_id": "user-1", "file_id": "upload-1#cover.jpg"})
-            .get("Item")
-        )
+        item = dynamodb.Table(TRACKING_TABLE).get_item(Key={"upload_id": "upload-1"}).get("Item")
         assert item["current_status"] == UploadStatus.SUCCESS.value
         assert len(item["stage_progress"]) == 1
         entry = item["stage_progress"][0]
@@ -372,11 +377,7 @@ class TestHandlerWithTracking:
         result = h(_make_s3_event(LANDING_BUCKET, key), lambda_context)
         assert result["statusCode"] == 207
 
-        item = (
-            dynamodb.Table(TRACKING_TABLE)
-            .get_item(Key={"user_id": "user-1", "file_id": "upload-1#cover.jpg"})
-            .get("Item")
-        )
+        item = dynamodb.Table(TRACKING_TABLE).get_item(Key={"upload_id": "upload-1"}).get("Item")
         assert item["current_status"] == UploadStatus.FAILED.value
         assert item["stage_progress"][0]["stage_name"] == UploadStage.AV_SCAN.value
         assert item["stage_progress"][0]["status"] == StageStatus.FAILED.value

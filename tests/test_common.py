@@ -176,21 +176,17 @@ def _make_tracker(item: Optional[dict] = None):
 class TestBookshelfTracker:
     def test_create_record_puts_item_with_queued_status(self):
         tracker, table = _make_tracker()
-        tracker.create_record("u1", "up1", "book.zip", "landing", "uploads/u1/up1/book.zip")
+        tracker.create_record("u1", "up1")
         table.put_item.assert_called_once()
         item = table.put_item.call_args[1]["Item"]
         assert item["user_id"] == "u1"
-        assert item["file_id"] == "up1#book.zip"
         assert item["upload_id"] == "up1"
-        assert item["filename"] == "book.zip"
         assert item["current_status"] == UploadStatus.QUEUED.value
         assert item["stage_progress"] == []
 
     def test_start_stage_appends_entry_and_sets_in_progress(self):
         tracker, table = _make_tracker()
-        tracker.start_stage(
-            "u1", "up1", "book.zip", UploadStage.ROUTING, "landing", "uploads/u1/up1/book.zip"
-        )
+        tracker.start_stage("up1", UploadStage.ROUTING, "landing", "uploads/u1/up1/book.zip")
         table.update_item.assert_called_once()
         vals = table.update_item.call_args[1]["ExpressionAttributeValues"]
         assert vals[":status"] == UploadStatus.IN_PROGRESS.value
@@ -201,7 +197,7 @@ class TestBookshelfTracker:
     def test_complete_stage_marks_success(self):
         tracker, table = _make_tracker({"stage_progress": [dict(_IN_PROGRESS_ROUTING)]})
         tracker.complete_stage(
-            "u1", "up1", "book.zip", UploadStage.ROUTING, "raw-bucket", "raw/u1/up1/book.zip"
+            "u1", "up1", UploadStage.ROUTING, "raw-bucket", "raw/u1/up1/book.zip"
         )
         table.update_item.assert_called_once()
         vals = table.update_item.call_args[1]["ExpressionAttributeValues"]
@@ -214,7 +210,7 @@ class TestBookshelfTracker:
 
     def test_fail_stage_marks_failed_with_error_message(self):
         tracker, table = _make_tracker({"stage_progress": [dict(_IN_PROGRESS_ROUTING)]})
-        tracker.fail_stage("u1", "up1", "book.zip", UploadStage.ROUTING, "something went wrong")
+        tracker.fail_stage("u1", "up1", UploadStage.ROUTING, "something went wrong")
         table.update_item.assert_called_once()
         vals = table.update_item.call_args[1]["ExpressionAttributeValues"]
         assert vals[":status"] == UploadStatus.FAILED.value
@@ -227,7 +223,7 @@ class TestBookshelfTracker:
         tracker, table = _make_tracker(
             {"stage_progress": [completed_entry, dict(_IN_PROGRESS_ROUTING)]}
         )
-        tracker.complete_stage("u1", "up1", "book.zip", UploadStage.ROUTING, "raw", "raw/k")
+        tracker.complete_stage("u1", "up1", UploadStage.ROUTING, "raw", "raw/k")
         vals = table.update_item.call_args[1]["ExpressionAttributeValues"]
         assert vals[":entry"]["status"] == StageStatus.SUCCESS.value
 
@@ -247,6 +243,6 @@ class TestBookshelfTracker:
         bad_entry = {**_IN_PROGRESS_ROUTING}
         del bad_entry["start_time"]
         tracker, table = _make_tracker({"stage_progress": [bad_entry]})
-        tracker.complete_stage("u1", "up1", "book.zip", UploadStage.ROUTING, "raw", "raw/k")
+        tracker.complete_stage("u1", "up1", UploadStage.ROUTING, "raw", "raw/k")
         vals = table.update_item.call_args[1]["ExpressionAttributeValues"]
         assert vals[":entry"]["processing_time"] is None
