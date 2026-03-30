@@ -226,8 +226,6 @@ locals {
         full_name = lower("${local.account}-${local.project}-${local.application}-${sm.name}")
         # Computed IAM role name — created by the step_functions infrastructure module
         role_name = lower("${local.account}-${local.project}-${local.application}-${sm.name}")
-        # Resolved metadata-extractor Lambda ARN from lambda name reference
-        metadata_extractor_arn = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.lambdas_map[sm.metadata_extractor_name].full_name}"
       }
     )
   ]

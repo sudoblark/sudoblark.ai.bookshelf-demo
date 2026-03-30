@@ -55,21 +55,7 @@ resource "aws_sfn_state_machine" "state_machine" {
   name     = each.value.full_name
   role_arn = aws_iam_role.step_functions[each.key].arn
 
-  definition = jsonencode({
-    Comment = each.value.description
-    StartAt = "ExtractMetadata"
-    States = {
-      ExtractMetadata = {
-        Type     = "Task"
-        Resource = "arn:aws:states:::lambda:invoke"
-        Parameters = {
-          FunctionName = each.value.metadata_extractor_arn
-          "Payload.$"  = "$"
-        }
-        End = true
-      }
-    }
-  })
+  definition = each.value.definition
 
   tags = {
     Name = each.value.full_name

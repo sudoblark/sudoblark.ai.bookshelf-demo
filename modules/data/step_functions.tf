@@ -3,24 +3,28 @@
 
   Each state machine object requires:
   - name (string): The state machine identifier (will be prefixed with account-project-application)
-  - metadata_extractor_name (string): Name of the Lambda to invoke for metadata extraction
+  - definition (string): Rendered ASL JSON via templatefile(); ASL source lives under application/step_functions/
+  - iam_policy_statements (list(object)): IAM policy statements for the state machine execution role
 
   Optional fields:
   - description (string): Description of the state machine (default: "")
-  - iam_policy_statements (list(object)): IAM policy statements for the state machine execution role
 
   Constraints:
   - State machine names must be unique within the configuration
   - Final name will be: account-project-application-name (all lowercase)
-  - metadata_extractor_name must reference an existing Lambda in the lambdas local
+  - ASL template file must exist at application/step_functions/<name>.asl.json
 */
 
 locals {
   step_functions = [
     {
-      name                    = "raw-to-enriched"
-      description             = "Processes raw book images to enrich with AI-extracted metadata"
-      metadata_extractor_name = "metadata-extractor"
+      name        = "raw-to-enriched"
+      description = "Processes raw book images to enrich with AI-extracted metadata"
+      # templatefile variables grow as processor Lambdas are added in future PRs
+      definition = templatefile("${path.module}/../../application/step_functions/raw-to-enriched.asl.json", {
+        description            = "Processes raw book images to enrich with AI-extracted metadata"
+        metadata_extractor_arn = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.lambdas_map["metadata-extractor"].full_name}"
+      })
       iam_policy_statements = [
         {
           sid       = "InvokeMetadataExtractor"
