@@ -27,6 +27,7 @@ skip-check:
 
   # CloudWatch Log Group Encryption
   - CKV_AWS_158  # KMS encryption for log groups not needed - demo doesn't warrant KMS key cost
+  - CKV_AWS_338  # KMS encryption for log groups not needed - demo doesn't warrant KMS key cost
 
   # DynamoDB Configuration
   - CKV_AWS_119  # CMK encryption not needed - AWS-managed encryption sufficient, CMK incurs unnecessary cost

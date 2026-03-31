@@ -95,7 +95,7 @@ resource "aws_sfn_state_machine" "state_machine" {
   logging_configuration {
     log_destination        = "${aws_cloudwatch_log_group.step_functions[each.key].arn}:*"
     include_execution_data = false
-    level                  = "ERROR"
+    level                  = "ALL"
   }
 
   tags = {
