@@ -77,11 +77,17 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        lambda:
-          - bookshelf-agent
-          - common
-          - landing-to-raw
-          - metadata-extractor
+        include:
+          - lambda: bookshelf-agent
+            path: application/backend/data-pipeline/bookshelf-agent
+          - lambda: common
+            path: application/backend/common
+          - lambda: landing-to-raw
+            path: application/backend/data-pipeline/landing-to-raw
+          - lambda: metadata-extractor
+            path: application/backend/data-pipeline/metadata-extractor
+          - lambda: ops
+            path: application/backend/restapi/ops
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -96,25 +102,28 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements-dev.txt
-          pip install -r lambda-packages/${{ matrix.lambda }}/requirements.txt
-          pip install -r \
-            lambda-packages/${{ matrix.lambda }}/requirements-ci.txt
+          if [ -f "${{ matrix.path }}/requirements.txt" ]; then
+            pip install -r ${{ matrix.path }}/requirements.txt
+          fi
+          if [ -f "${{ matrix.path }}/requirements-ci.txt" ]; then
+            pip install -r ${{ matrix.path }}/requirements-ci.txt
+          fi
 
       - name: Run Black
-        run: black --config pyproject.toml --check lambda-packages/${{ matrix.lambda }}/
+        run: black --config pyproject.toml --check ${{ matrix.path }}/
 
       - name: Run isort
-        run: isort --settings-path pyproject.toml --check-only lambda-packages/${{ matrix.lambda }}/
+        run: isort --settings-path pyproject.toml --check-only ${{ matrix.path }}/
 
       - name: Run Flake8
-        run: flake8 lambda-packages/${{ matrix.lambda }}/
+        run: flake8 ${{ matrix.path }}/
 
       - name: Run mypy
-        run: mypy lambda-packages/${{ matrix.lambda }}/
+        run: mypy ${{ matrix.path }}/
 
       - name: Run Bandit
         run: |
-          bandit -r lambda-packages/${{ matrix.lambda }}/ -f json \
+          bandit -r ${{ matrix.path }}/ -f json \
             -o bandit-report-${{ matrix.lambda }}.json || true
 
       - name: Upload Bandit Report
@@ -129,11 +138,17 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        lambda:
-          - bookshelf-agent
-          - common
-          - landing-to-raw
-          - metadata-extractor
+        include:
+          - lambda: bookshelf-agent
+            path: application/backend/data-pipeline/bookshelf-agent
+          - lambda: common
+            path: application/backend/common
+          - lambda: landing-to-raw
+            path: application/backend/data-pipeline/landing-to-raw
+          - lambda: metadata-extractor
+            path: application/backend/data-pipeline/metadata-extractor
+          - lambda: ops
+            path: application/backend/restapi/ops
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -148,16 +163,19 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements-dev.txt
-          pip install -r lambda-packages/${{ matrix.lambda }}/requirements.txt
-          pip install -r \
-            lambda-packages/${{ matrix.lambda }}/requirements-ci.txt
+          if [ -f "${{ matrix.path }}/requirements.txt" ]; then
+            pip install -r ${{ matrix.path }}/requirements.txt
+          fi
+          if [ -f "${{ matrix.path }}/requirements-ci.txt" ]; then
+            pip install -r ${{ matrix.path }}/requirements-ci.txt
+          fi
 
       - name: Run pytest with coverage
         run: |
           TEST_FILE="test_${{ matrix.lambda }}.py"
           TEST_FILE="${TEST_FILE//-/_}"
           pytest tests/${TEST_FILE} \
-            --cov=lambda-packages/${{ matrix.lambda }} \
+            --cov=${{ matrix.path }} \
             --cov-report=term-missing --cov-report=html \
             --cov-fail-under=80
 

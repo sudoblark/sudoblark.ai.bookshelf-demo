@@ -21,7 +21,7 @@ locals {
       name        = "raw-to-enriched"
       description = "Processes raw book images to enrich with AI-extracted metadata"
       # templatefile variables grow as processor Lambdas are added in future PRs
-      definition = templatefile("${path.module}/../../application/step_functions/raw-to-enriched.asl.json", {
+      definition = templatefile("${path.module}/../../application/backend/data-pipeline/step_functions/raw-to-enriched.asl.json", {
         description            = "Processes raw book images to enrich with AI-extracted metadata"
         metadata_extractor_arn = "arn:aws:lambda:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:function:${local.lambdas_map["metadata-extractor"].full_name}"
       })

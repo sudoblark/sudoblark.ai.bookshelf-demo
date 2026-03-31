@@ -5,17 +5,17 @@ import sys
 from typing import Any, Dict
 from unittest.mock import MagicMock
 
-# Add lambda-packages/ to sys.path so `import common` resolves when Lambda
+# Add application/backend/ to sys.path so `import common` resolves when Lambda
 # modules are loaded dynamically via importlib.
 sys.path.insert(
     0,
-    os.path.join(os.path.dirname(__file__), "../lambda-packages"),
+    os.path.join(os.path.dirname(__file__), "../application/backend"),
 )
 # Add bookshelf-agent layer to sys.path — mirrors Lambda runtime where the
 # layer's python/ directory is added to sys.path at /opt/python.
 sys.path.insert(
     0,
-    os.path.join(os.path.dirname(__file__), "../lambda-packages/bookshelf-agent"),
+    os.path.join(os.path.dirname(__file__), "../application/backend/data-pipeline/bookshelf-agent"),
 )
 
 import boto3  # noqa: E402

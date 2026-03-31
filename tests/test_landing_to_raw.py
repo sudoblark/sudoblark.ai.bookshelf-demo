@@ -12,7 +12,9 @@ from common.tracker import BookshelfTracker, StageStatus, UploadStage, UploadSta
 from moto import mock_aws
 
 # Add landing-to-raw directory to sys.path so `import scanner` resolves
-LAMBDA_DIR = os.path.join(os.path.dirname(__file__), "../lambda-packages/landing-to-raw")
+LAMBDA_DIR = os.path.join(
+    os.path.dirname(__file__), "../application/backend/data-pipeline/landing-to-raw"
+)
 if LAMBDA_DIR not in sys.path:
     sys.path.insert(0, LAMBDA_DIR)
 

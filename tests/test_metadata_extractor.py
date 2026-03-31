@@ -4,7 +4,7 @@ import importlib.util
 import io
 import os
 
-# Add lambda-packages/metadata-extractor to sys.path so local imports resolve
+# Add metadata-extractor to sys.path so local imports resolve
 import sys
 from unittest.mock import MagicMock
 
@@ -18,7 +18,9 @@ from pydantic_ai.models.test import TestModel
 
 pydantic_ai_models.ALLOW_MODEL_REQUESTS = False
 
-_LAMBDA_DIR = os.path.join(os.path.dirname(__file__), "../lambda-packages/metadata-extractor")
+_LAMBDA_DIR = os.path.join(
+    os.path.dirname(__file__), "../application/backend/data-pipeline/metadata-extractor"
+)
 if _LAMBDA_DIR not in sys.path:
     sys.path.insert(0, _LAMBDA_DIR)
 

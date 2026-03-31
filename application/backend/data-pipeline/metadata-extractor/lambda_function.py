@@ -7,7 +7,7 @@ images, then writes the results to Parquet format in the processed bucket.
 """
 
 import os
-from typing import Any
+from typing import Any, Dict
 
 import boto3
 from agent import BookshelfAgent
@@ -39,11 +39,12 @@ class MetadataExtractorHandler(BaseDataProcessor):
                 raise ValueError("TRACKING_TABLE environment variable is required")
             self._tracker = BookshelfTracker(table_name=tracking_table)
 
-    def __call__(self, event: dict, context: Any) -> dict:
+    def __call__(self, event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         if "upload_id" in event and "key" in event:
             result = self.process_record(event["key"])
             return {"status": "success", "output_key": result}
-        return super().__call__(event, context)
+        batch_response: Dict[str, Any] = super().__call__(event, context)
+        return batch_response
 
     def process_record(self, key: str) -> str:
         user_id, upload_id, filename = parse_upload_key(key)

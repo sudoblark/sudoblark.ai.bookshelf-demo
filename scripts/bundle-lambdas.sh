@@ -7,6 +7,12 @@
 # dependencies into ZIP files in the lambda-packages/ directory for
 # Terraform deployment.
 #
+# Source code lives under application/backend/ following the logical boundaries
+# that would be separate repos in a production micro-repo setup:
+#   application/backend/common/            — shared utilities (PyPI package equivalent)
+#   application/backend/data-pipeline/    — Step Functions pipeline Lambdas + agent layer
+#   application/backend/restapi/          — REST API Lambdas
+#
 # Usage: ./scripts/bundle-lambdas.sh
 #
 
@@ -22,21 +28,14 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-# Directories - source and output both live under lambda-packages/
-LAMBDA_SOURCE_DIR="${PROJECT_ROOT}/lambda-packages"
+# Source roots
+COMMON_DIR="${PROJECT_ROOT}/application/backend/common"
+DATA_PIPELINE_DIR="${PROJECT_ROOT}/application/backend/data-pipeline"
+RESTAPI_DIR="${PROJECT_ROOT}/application/backend/restapi"
+
+# ZIP output stays in lambda-packages/ — referenced by Terraform
 OUTPUT_DIR="${PROJECT_ROOT}/lambda-packages"
 TEMP_DIR="${OUTPUT_DIR}/tmp"
-
-# Lambda layers to bundle
-LAYERS=(
-  "bookshelf-agent"
-)
-
-# Lambda functions to bundle
-LAMBDAS=(
-  "landing-to-raw"
-  "metadata-extractor"
-)
 
 # Returns space-separated glob patterns for packages to remove after pip install
 # for a given Lambda. These packages are already provided by an attached Lambda
@@ -62,9 +61,10 @@ layer_exclude_packages() {
 # Function to bundle a Lambda layer
 # Lambda layers require a python/ directory at the ZIP root so that Lambda
 # adds the contents to sys.path at /opt/python.
+# Args: layer_name source_dir
 bundle_layer() {
   local layer_name=$1
-  local source_dir="${LAMBDA_SOURCE_DIR}/${layer_name}"
+  local source_dir=$2
   local requirements_file="${source_dir}/requirements.txt"
   local output_file="${OUTPUT_DIR}/${layer_name}.zip"
   local temp_build_dir="${TEMP_DIR}/${layer_name}/python"
@@ -126,9 +126,10 @@ bundle_layer() {
 }
 
 # Function to bundle a Lambda with dependencies
+# Args: lambda_name source_dir
 bundle_lambda() {
   local lambda_name=$1
-  local source_dir="${LAMBDA_SOURCE_DIR}/${lambda_name}"
+  local source_dir=$2
   local requirements_file="${source_dir}/requirements.txt"
   local output_file="${OUTPUT_DIR}/${lambda_name}.zip"
   local temp_build_dir="${TEMP_DIR}/${lambda_name}"
@@ -151,9 +152,9 @@ bundle_lambda() {
         "${temp_build_dir}/README.md"
 
   # Copy shared common modules so they are importable within the Lambda package
-  if [ -d "${LAMBDA_SOURCE_DIR}/common" ]; then
+  if [ -d "${COMMON_DIR}" ]; then
     echo -e "${YELLOW}  →${NC} Including common shared modules..."
-    cp -r "${LAMBDA_SOURCE_DIR}/common" "${temp_build_dir}/"
+    cp -r "${COMMON_DIR}" "${temp_build_dir}/common"
     echo -e "${GREEN}  ✓${NC} Common modules included"
   fi
 
@@ -219,32 +220,41 @@ echo -e "${GREEN}✓${NC} Python $(python3 --version | cut -d' ' -f2) found"
 echo -e "${GREEN}✓${NC} pip $(pip --version | cut -d' ' -f2) found"
 echo ""
 
-# Create temp directory and clean up any previous run
+# Create output directory and clean up any previous temp run
 mkdir -p "$OUTPUT_DIR"
 rm -rf "$TEMP_DIR"
 echo -e "${GREEN}✓${NC} Output directory: ${OUTPUT_DIR}"
 echo ""
 
-# Bundle each layer first
 success_count=0
 fail_count=0
 
-for layer in "${LAYERS[@]}"; do
-  if bundle_layer "$layer"; then
-    success_count=$((success_count + 1))
-  else
-    fail_count=$((fail_count + 1))
-  fi
-done
+# --- Layers (data-pipeline) ---
+if bundle_layer "bookshelf-agent" "${DATA_PIPELINE_DIR}/bookshelf-agent"; then
+  success_count=$((success_count + 1))
+else
+  fail_count=$((fail_count + 1))
+fi
 
-# Bundle each Lambda
-for lambda in "${LAMBDAS[@]}"; do
-  if bundle_lambda "$lambda"; then
-    success_count=$((success_count + 1))
-  else
-    fail_count=$((fail_count + 1))
-  fi
-done
+# --- Data-pipeline Lambdas ---
+if bundle_lambda "landing-to-raw" "${DATA_PIPELINE_DIR}/landing-to-raw"; then
+  success_count=$((success_count + 1))
+else
+  fail_count=$((fail_count + 1))
+fi
+
+if bundle_lambda "metadata-extractor" "${DATA_PIPELINE_DIR}/metadata-extractor"; then
+  success_count=$((success_count + 1))
+else
+  fail_count=$((fail_count + 1))
+fi
+
+# --- REST API Lambdas ---
+if bundle_lambda "ops" "${RESTAPI_DIR}/ops"; then
+  success_count=$((success_count + 1))
+else
+  fail_count=$((fail_count + 1))
+fi
 
 # Clean up temp directory
 rm -rf "$TEMP_DIR"
