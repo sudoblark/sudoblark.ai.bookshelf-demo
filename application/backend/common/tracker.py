@@ -28,7 +28,7 @@ Usage::
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 import boto3
 
@@ -209,7 +209,8 @@ class BookshelfTracker:
             List of tracking record dicts.
         """
         response = self._table.scan(Limit=limit)
-        return response.get("Items", [])
+        items: List[Dict[Any, Any]] = response.get("Items", [])
+        return items
 
     def get_by_id(self, upload_id: str) -> Optional[dict]:
         """Return a single tracking record by upload_id, or None if not found.
@@ -221,7 +222,8 @@ class BookshelfTracker:
             Tracking record dict, or None if no record exists.
         """
         response = self._table.get_item(Key={"upload_id": upload_id})
-        return response.get("Item")
+        item: Optional[Dict[Any, Any]] = response.get("Item")
+        return item
 
     # ------------------------------------------------------------------
     # Internal helpers
