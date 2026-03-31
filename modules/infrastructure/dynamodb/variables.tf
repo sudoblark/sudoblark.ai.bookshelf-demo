@@ -4,7 +4,7 @@ variable "dynamodb_tables" {
     name         = string
     full_name    = string
     hash_key     = string
-    range_key    = string
+    range_key    = optional(string)
     billing_mode = string
     attributes = list(object({
       name = string

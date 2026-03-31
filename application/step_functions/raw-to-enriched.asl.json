@@ -1,0 +1,15 @@
+{
+  "Comment": "${description}",
+  "StartAt": "ExtractMetadata",
+  "States": {
+    "ExtractMetadata": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${metadata_extractor_arn}",
+        "Payload.$": "$"
+      },
+      "End": true
+    }
+  }
+}

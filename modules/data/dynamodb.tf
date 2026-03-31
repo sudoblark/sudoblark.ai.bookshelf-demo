@@ -21,19 +21,17 @@ locals {
   dynamodb_tables = [
     {
       name         = "ingestion-tracking"
-      hash_key     = "user_id"
-      range_key    = "file_id"
+      hash_key     = "upload_id"
       billing_mode = "PAY_PER_REQUEST"
       attributes = [
-        { name = "user_id", type = "S" },
-        { name = "file_id", type = "S" },
         { name = "upload_id", type = "S" },
+        { name = "user_id", type = "S" },
       ]
       global_secondary_indexes = [
         {
-          name            = "upload_id-index"
-          hash_key        = "upload_id"
-          range_key       = null
+          name            = "user_id-index"
+          hash_key        = "user_id"
+          range_key       = "upload_id"
           projection_type = "ALL"
         }
       ]

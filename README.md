@@ -692,6 +692,29 @@ aws s3api get-bucket-notification-configuration \
   --bucket BUCKET-NAME
 ```
 
+**Inspect individual Parquet records locally:**
+
+Download a file from the processed bucket and use `scripts/read_parquet.py` to examine its contents without needing Athena:
+
+```sh
+# Install script dependencies (one-off)
+pip install -r scripts/requirements.txt
+
+# Check for available commands to list files from s3, and read local/remove parquet
+python scripts/read_parquet.py --help
+
+# For example
+PROCESSED_BUCKET=$(aws s3 ls | grep processed | awk '{print $3}')
+python scripts/read_parquet.py --list-files s3://$PROCESSED_BUCKET
+
+
+# Read directly from S3 (no local download needed)
+PROCESSED_BUCKET=$(aws s3 ls | grep processed | awk '{print $3}')
+python scripts/read_parquet.py s3://${PROCESSED_BUCKET}/processed/some-file.parquet
+```
+
+This is useful when iterating on the Lambda output format or verifying that a specific record was written with the expected field values.
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- LICENSE -->

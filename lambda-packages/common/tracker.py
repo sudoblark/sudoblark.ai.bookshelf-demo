@@ -20,9 +20,9 @@ Usage::
         table_name=os.environ["TRACKING_TABLE"],
     )
 
-    tracker.create_record(user_id, upload_id, filename, bucket, key)
-    tracker.start_stage(user_id, upload_id, filename, UploadStage.ROUTING, bucket, key)
-    tracker.complete_stage(user_id, upload_id, filename, UploadStage.ROUTING, dest_bucket, dest_key)
+    tracker.create_record(user_id, upload_id)
+    tracker.start_stage(upload_id, UploadStage.ROUTING, bucket, key)
+    tracker.complete_stage(user_id, upload_id, UploadStage.ROUTING, dest_bucket, dest_key)
 """
 
 from datetime import datetime, timezone
@@ -86,26 +86,18 @@ class BookshelfTracker:
         self,
         user_id: str,
         upload_id: str,
-        filename: str,
-        source_bucket: str,
-        source_key: str,
     ) -> None:
         """Create a new tracking record when a file first lands in S3.
 
         Args:
-            user_id: Cognito user sub (partition key).
-            upload_id: UUID identifying this upload batch.
-            filename: Original filename.
-            source_bucket: Landing bucket name.
-            source_key: Full S3 key in the landing bucket.
+            user_id: Cognito user sub.
+            upload_id: UUID identifying this upload batch (partition key).
         """
         now = _now_iso()
         self._table.put_item(
             Item={
-                "user_id": user_id,
-                "file_id": f"{upload_id}#{filename}",
                 "upload_id": upload_id,
-                "filename": filename,
+                "user_id": user_id,
                 "current_status": UploadStatus.QUEUED.value,
                 "stage_progress": [],
                 "created_at": now,
@@ -115,9 +107,7 @@ class BookshelfTracker:
 
     def start_stage(
         self,
-        user_id: str,
         upload_id: str,
-        filename: str,
         stage: UploadStage,
         source_bucket: str,
         source_key: str,
@@ -127,9 +117,7 @@ class BookshelfTracker:
         Uses DynamoDB ``list_append`` so no prior read is required.
 
         Args:
-            user_id: Cognito user sub (partition key).
-            upload_id: UUID identifying this upload batch.
-            filename: Original filename.
+            upload_id: UUID identifying this upload batch (partition key).
             stage: The pipeline stage beginning.
             source_bucket: Bucket the file is being read from.
             source_key: Key the file is being read from.
@@ -145,7 +133,7 @@ class BookshelfTracker:
             "error_message": None,
         }
         self._table.update_item(
-            Key={"user_id": user_id, "file_id": f"{upload_id}#{filename}"},
+            Key={"upload_id": upload_id},
             UpdateExpression=(
                 "SET stage_progress = list_append("
                 "if_not_exists(stage_progress, :empty), :entry"
@@ -163,7 +151,6 @@ class BookshelfTracker:
         self,
         user_id: str,
         upload_id: str,
-        filename: str,
         stage: UploadStage,
         dest_bucket: str,
         dest_key: str,
@@ -171,17 +158,14 @@ class BookshelfTracker:
         """Mark the most recent in-progress entry for this stage as succeeded.
 
         Args:
-            user_id: Cognito user sub (partition key).
-            upload_id: UUID identifying this upload batch.
-            filename: Original filename.
+            user_id: Cognito user sub.
+            upload_id: UUID identifying this upload batch (partition key).
             stage: The pipeline stage completing successfully.
             dest_bucket: Bucket the file was written to.
             dest_key: Key the file was written to.
         """
         self._update_stage(
-            user_id=user_id,
             upload_id=upload_id,
-            filename=filename,
             stage=stage,
             status=StageStatus.SUCCESS,
             dest_bucket=dest_bucket,
@@ -194,23 +178,19 @@ class BookshelfTracker:
         self,
         user_id: str,
         upload_id: str,
-        filename: str,
         stage: UploadStage,
         error_message: str,
     ) -> None:
         """Mark the most recent in-progress entry for this stage as failed.
 
         Args:
-            user_id: Cognito user sub (partition key).
-            upload_id: UUID identifying this upload batch.
-            filename: Original filename.
+            user_id: Cognito user sub.
+            upload_id: UUID identifying this upload batch (partition key).
             stage: The pipeline stage that failed.
             error_message: Human-readable failure reason.
         """
         self._update_stage(
-            user_id=user_id,
             upload_id=upload_id,
-            filename=filename,
             stage=stage,
             status=StageStatus.FAILED,
             dest_bucket=None,
@@ -240,9 +220,7 @@ class BookshelfTracker:
 
     def _update_stage(
         self,
-        user_id: str,
         upload_id: str,
-        filename: str,
         stage: UploadStage,
         status: StageStatus,
         dest_bucket: Optional[str],
@@ -250,7 +228,7 @@ class BookshelfTracker:
         error_message: Optional[str],
         upload_status: UploadStatus,
     ) -> None:
-        key = {"user_id": user_id, "file_id": f"{upload_id}#{filename}"}
+        key = {"upload_id": upload_id}
         item = self._table.get_item(Key=key).get("Item", {})
         stage_progress = list(item.get("stage_progress", []))
         idx = self._find_stage_index(stage_progress, stage)

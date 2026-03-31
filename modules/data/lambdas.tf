@@ -57,7 +57,7 @@ locals {
       environment_variables = {
         DATA_LAKE_PREFIX  = "${var.account}-${local.project}-${local.application}"
         TRACKING_TABLE    = "${var.account}-${local.project}-${local.application}-ingestion-tracking"
-        STATE_MACHINE_ARN = "arn:aws:states:eu-west-2:PLACEHOLDER:stateMachine:PLACEHOLDER-bookshelf-demo-raw-to-enriched"
+        STATE_MACHINE_ARN = "arn:aws:states:${data.aws_region.current.id}:${data.aws_caller_identity.current.account_id}:stateMachine:${var.account}-${local.project}-${local.application}-raw-to-enriched"
         LOG_LEVEL         = "INFO"
       }
       iam_policy_statements = [
