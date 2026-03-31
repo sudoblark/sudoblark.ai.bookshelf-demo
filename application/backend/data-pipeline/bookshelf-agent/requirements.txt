@@ -3,6 +3,5 @@
 # pydantic-ai-slim[bedrock] includes only the core framework and the boto3-backed
 # BedrockConverseModel provider. Avoids bundling unused provider SDKs (Anthropic,
 # OpenAI, Google, etc.) that would push the layer over the 262 MB unzipped limit.
-Pillow
-pydantic
 pydantic-ai-slim[bedrock]
+pyarrow

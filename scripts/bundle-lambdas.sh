@@ -50,7 +50,7 @@ layer_exclude_packages() {
       echo "boto3 boto3-*.dist-info botocore botocore-*.dist-info s3transfer s3transfer-*.dist-info jmespath jmespath-*.dist-info"
       ;;
     metadata-extractor)
-      echo "boto3 boto3-*.dist-info botocore botocore-*.dist-info s3transfer s3transfer-*.dist-info jmespath jmespath-*.dist-info Pillow Pillow-*.dist-info pydantic pydantic-*.dist-info pydantic_ai pydantic_ai-*.dist-info pydantic_ai_slim pydantic_ai_slim-*.dist-info"
+      echo "boto3 boto3-*.dist-info botocore botocore-*.dist-info s3transfer s3transfer-*.dist-info jmespath jmespath-*.dist-info Pillow Pillow-*.dist-info pydantic pydantic-*.dist-info pydantic_ai pydantic_ai-*.dist-info pydantic_ai_slim pydantic_ai_slim-*.dist-info pyarrow pyarrow-*.dist-info"
       ;;
     *)
       echo ""
@@ -113,6 +113,7 @@ bundle_layer() {
 
   # Create ZIP file — zip from the layer root so python/ is at the ZIP root
   echo -e "${YELLOW}  →${NC} Creating ZIP archive..."
+  rm -f "$output_file"
   pushd "${TEMP_DIR}/${layer_name}" > /dev/null || return 1
   zip -r -q "$output_file" . || { popd > /dev/null; return 1; }
   popd > /dev/null || return 1
@@ -187,6 +188,7 @@ bundle_lambda() {
 
   # Create ZIP file
   echo -e "${YELLOW}  →${NC} Creating ZIP archive..."
+  rm -f "$output_file"
   pushd "$temp_build_dir" > /dev/null || return 1
   zip -r -q "$output_file" . || { popd > /dev/null; return 1; }
   popd > /dev/null || return 1

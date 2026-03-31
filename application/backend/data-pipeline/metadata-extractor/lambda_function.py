@@ -15,7 +15,6 @@ from common.handler import BaseDataProcessor
 from common.s3 import parse_upload_key
 from common.tracker import BookshelfTracker, UploadStage
 from config import Config
-from image_processor import ImageProcessor  # noqa: F401
 from parquet_writer import ParquetWriter  # noqa: F401
 from processor import BookshelfProcessor
 
