@@ -35,6 +35,7 @@
     <li>
       <a href="#about-the-project">About The Project</a>
       <ul>
+        <li><a href="#repository-structure-mono-repo-vs-micro-repos">Repository Structure: Mono-repo vs Micro-repos</a></li>
         <li><a href="#built-with">Built With</a></li>
       </ul>
     </li>
@@ -100,6 +101,26 @@ The Bookshelf Demo showcases a serverless ETL pipeline built entirely on AWS. Up
 | IaC | Terraform | Terraform | Terraform |
 
 **Perfect for:** Software engineers and cloud architects who want to understand event-driven pipeline design as a reusable pattern, demonstrated end-to-end on AWS.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+### Repository Structure: Mono-repo vs Micro-repos
+
+This repository is a **mono-repo for demo convenience**. In production, each application component would live in its own repository with its own CI pipeline and release cadence — so a hotfix to the API never requires redeploying the ETL pipeline, and a frontend release never blocks on backend changes.
+
+The `application/` folders map directly to three production repos:
+
+| Production repo | Maps to | Release trigger |
+|---|---|---|
+| `bookshelf.backend.etl` | `application/backend/data-pipeline/` | Data pipeline changes: new enrichment stages, AV rule updates, Parquet schema changes |
+| `bookshelf.backend.api` | `application/backend/restapi/` | API changes: new endpoints, response shape changes, auth updates |
+| `bookshelf.frontend.portal` | *(not yet in this repo)* | UI/UX changes: new dashboard views, styling, client-side logic |
+
+**Note on Terraform:** The infrastructure in `modules/` and `infrastructure/` is intentionally left as a single coupled state in this demo. In production each repo would own its infrastructure, but splitting Terraform state introduces cross-state references that would add complexity without adding teaching value here.
+
+The shared utilities in `application/backend/common/` would become a versioned **PyPI package** (`bookshelf-common`) consumed as a pinned dependency by both backend repos. In this demo it is instead bundled directly into each Lambda ZIP by `scripts/bundle-lambdas.sh` to avoid the overhead of publishing a package.
+
+> **💡 Why a mono-repo here?** A single clone, a single `terraform apply`, and a single test run is enough to get the full system running. That removes friction for a demo or workshop while keeping the component boundaries clear enough to reason about the production shape.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -209,7 +230,7 @@ This project demonstrates Sudoblark's **three-layer Terraform architecture**:
 
 ### Metadata Schema
 
-Extracted metadata is defined as the [`BookMetadata`](lambda-packages/metadata-extractor/models.py) Pydantic model in `lambda-packages/metadata-extractor/models.py`. That file is the single source of truth for field names, types, validation rules, and defaults — refer to it directly rather than any secondary table.
+Extracted metadata is defined as the [`BookMetadata`](application/backend/data-pipeline/metadata-extractor/models.py) Pydantic model. That file is the single source of truth for field names, types, validation rules, and defaults — refer to it directly rather than any secondary table.
 
 Each processed record also includes `id` (UUID), `filename`, and `processed_at` (ISO 8601 timestamp) added by the processor at write time.
 ## Getting Started
@@ -273,13 +294,13 @@ pip install -r requirements-dev.txt
 pre-commit install
 
 # Install Lambda dependencies for local testing
-cd lambda-packages/common
+cd application/backend/common
 pip install -r requirements.txt -r requirements-ci.txt
-cd ../file-router
+cd ../data-pipeline/landing-to-raw
 pip install -r requirements.txt -r requirements-ci.txt
 cd ../metadata-extractor
 pip install -r requirements.txt -r requirements-ci.txt
-cd ../..
+cd ../../../..
 ```
 
 > **💡 Pre-commit hooks:** Automatically run code formatters and linters before each commit. This catches issues early before CI/CD.
@@ -292,7 +313,7 @@ cd ../..
 bash scripts/bundle-lambdas.sh
 ```
 
-> **💡 Lambda Packaging:** The bundle script packages each Lambda and automatically copies `lambda-packages/common/` into every ZIP so shared utilities are importable at runtime. `requirements.txt` contains minimal runtime dependencies for deployment; `requirements-ci.txt` contains additional dependencies (boto3, pandas, pyarrow) needed for local testing/CI that are provided by Lambda runtime or AWS layers in production.
+> **💡 Lambda Packaging:** The bundle script packages each Lambda and automatically copies `application/backend/common/` into every ZIP so shared utilities are importable at runtime. `requirements.txt` contains minimal runtime dependencies for deployment; `requirements-ci.txt` contains additional dependencies (boto3, pandas, pyarrow) needed for local testing/CI that are provided by Lambda runtime or AWS layers in production.
 ```sh
 cd infrastructure/aws-sudoblark-development
 terraform init
@@ -498,7 +519,7 @@ This project follows Sudoblark's Python quality standards with comprehensive tes
 
 ```sh
 # Run all tests with coverage
-pytest --cov=lambda-packages --cov-report=html --cov-report=term-missing
+pytest --cov=application/backend --cov-report=html --cov-report=term-missing
 
 # Run specific test file
 pytest tests/test_metadata_extractor.py -v
@@ -519,28 +540,29 @@ pytest tests/test_file_router.py -v
 tests/
 ├── conftest.py                   # Pytest fixtures and configuration
 ├── test_common.py                # Tests for shared common utilities
-├── test_file_router.py           # Tests for image routing Lambda
-└── test_metadata_extractor.py    # Tests for Bedrock metadata extraction
+├── test_landing_to_raw.py        # Tests for AV scan + routing Lambda
+├── test_metadata_extractor.py    # Tests for Bedrock metadata extraction
+└── test_ops.py                   # Tests for ops dashboard API endpoints
 ```
 
 ### Linting and Security
 
 ```sh
 # Format code with Black
-black lambda-packages/ tests/
+black application/backend/ tests/
 
 # Sort imports
-isort lambda-packages/ tests/
+isort application/backend/ tests/
 
 # Lint with Flake8
-flake8 lambda-packages/ tests/
+flake8 application/backend/ tests/
 
 # Type checking with mypy (requires boto3-stubs)
 pip install 'boto3-stubs[s3,bedrock-runtime]'
-mypy lambda-packages/
+mypy application/backend/
 
 # Security scan with Bandit
-bandit -r lambda-packages/
+bandit -r application/backend/
 ```
 
 **CI/CD:** All checks run automatically on pull requests. See `.github/workflows/pull-request.yaml`.
@@ -644,11 +666,7 @@ ModuleNotFoundError: No module named 'PIL'
 ```
 **Solution:** Re-package Lambda with dependencies:
 ```sh
-cd lambda-packages/metadata-extractor
-rm -rf *  # Clean directory
-cp path/to/your/handler.py .
-pip install -r requirements.txt -t .
-zip -r ../../metadata-extractor.zip .
+bash scripts/bundle-lambdas.sh
 ```
 
 **Issue: "Terraform state locked"**

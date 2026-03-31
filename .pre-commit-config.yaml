@@ -7,7 +7,7 @@ repos:
       - id: black
         name: Format Python code with Black
         language_version: python3.11
-        files: ^(lambda-packages|tests)/.*\.py$
+        files: ^(application/backend|tests)/.*\.py$
         args: ["--line-length=100"]
 
   # Python import sorting
@@ -17,7 +17,7 @@ repos:
       - id: isort
         name: Sort Python imports with isort
         language_version: python3.11
-        files: ^(lambda-packages|tests)/.*\.py$
+        files: ^(application/backend|tests)/.*\.py$
         args: ["--profile", "black", "--line-length", "100"]
 
   # Python linting
@@ -27,7 +27,7 @@ repos:
       - id: flake8
         name: Lint Python with Flake8
         language_version: python3.11
-        files: ^(lambda-packages|tests)/.*\.py$
+        files: ^(application/backend|tests)/.*\.py$
         args: ["--max-line-length=120", "--extend-ignore=E203,W503"]
 
   # Python type checking (per Lambda to avoid module conflicts)
@@ -35,15 +35,9 @@ repos:
     rev: v1.7.1
     hooks:
       - id: mypy
-        name: mypy type check (unzip-processor)
-        language_version: python3.11
-        files: ^lambda-packages/unzip-processor/.*\.py$
-        additional_dependencies: ['boto3-stubs[s3]']
-
-      - id: mypy
         name: mypy type check (metadata-extractor)
         language_version: python3.11
-        files: ^lambda-packages/metadata-extractor/.*\.py$
+        files: ^application/backend/data-pipeline/metadata-extractor/.*\.py$
         additional_dependencies: ['boto3-stubs[s3,bedrock-runtime]', 'types-Pillow', 'pydantic']
 
   # Python security scanning
@@ -53,7 +47,7 @@ repos:
       - id: bandit
         name: Security scan with Bandit
         language_version: python3.11
-        files: ^lambda-packages/.*\.py$
+        files: ^application/backend/.*\.py$
         args: ["-r", "--skip", "B101"]
         additional_dependencies: ["pbr"]
 

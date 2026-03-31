@@ -28,7 +28,7 @@ Usage::
 from datetime import datetime, timezone
 from decimal import Decimal
 from enum import Enum
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 import boto3
 
@@ -198,6 +198,30 @@ class BookshelfTracker:
             error_message=error_message,
             upload_status=UploadStatus.FAILED,
         )
+
+    def list_all(self, limit: int = 100) -> List[dict]:
+        """Scan all tracking records (ops dashboard use only).
+
+        Args:
+            limit: Maximum number of records to return.
+
+        Returns:
+            List of tracking record dicts.
+        """
+        response = self._table.scan(Limit=limit)
+        return response.get("Items", [])
+
+    def get_by_id(self, upload_id: str) -> Optional[dict]:
+        """Return a single tracking record by upload_id, or None if not found.
+
+        Args:
+            upload_id: UUID identifying the upload batch (partition key).
+
+        Returns:
+            Tracking record dict, or None if no record exists.
+        """
+        response = self._table.get_item(Key={"upload_id": upload_id})
+        return response.get("Item")
 
     # ------------------------------------------------------------------
     # Internal helpers
