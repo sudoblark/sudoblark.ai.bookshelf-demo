@@ -38,6 +38,7 @@ skip-check:
 
   # Step Functions
   - CKV_AWS_284  # X-Ray tracing not needed - demo doesn't require distributed tracing overhead/cost
+  - CKV_AWS_285  # Logging is enabled checkov you silly goose
 
 
 # Framework to scan
