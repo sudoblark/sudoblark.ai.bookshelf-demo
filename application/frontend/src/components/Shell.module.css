@@ -1,0 +1,85 @@
+.shell {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ---- Sidebar ---- */
+.sidebar {
+  width: 200px;
+  flex-shrink: 0;
+  background: #111;
+  border-right: 1px solid #1e1e1e;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem 0.75rem;
+  gap: 1.5rem;
+}
+
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.5rem;
+}
+
+.logoIcon {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.logoText {
+  font-weight: 600;
+  font-size: var(--font-md);
+  color: #e8e8e8;
+  letter-spacing: 0.01em;
+}
+
+/* ---- Nav ---- */
+.nav {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.navItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: none;
+  background: none;
+  color: #888;
+  font-size: var(--font-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.navItem:hover {
+  background: #1a1a1a;
+  color: #ccc;
+}
+
+.navItem.active {
+  background: #1e1b3a;
+  color: #a89fff;
+}
+
+.navIcon {
+  font-size: 1rem;
+  line-height: 1;
+}
+
+/* ---- Content area ---- */
+.content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}

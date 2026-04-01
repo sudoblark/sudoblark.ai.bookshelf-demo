@@ -108,10 +108,12 @@ locals {
         "arn:aws:lambda:eu-west-2:017000801446:layer:AWSLambdaPowertoolsPythonV3-python311-x86_64:7"
       ]
       environment_variables = {
-        DATA_LAKE_PREFIX = "${var.account}-${local.project}-${local.application}"
-        TRACKING_TABLE   = "${var.account}-${local.project}-${local.application}-ingestion-tracking"
-        LOG_LEVEL        = "INFO"
-        BEDROCK_MODEL_ID = "anthropic.claude-3-haiku-20240307-v1:0"
+        DATA_LAKE_PREFIX    = "${var.account}-${local.project}-${local.application}"
+        TRACKING_TABLE      = "${var.account}-${local.project}-${local.application}-ingestion-tracking"
+        LOG_LEVEL           = "INFO"
+        BEDROCK_MODEL_ID    = "anthropic.claude-3-5-sonnet-20241022-v2:0"
+        ISBN_LOOKUP_ENABLED = "true"
+        ISBN_API_TIMEOUT    = "5.0"
       }
       iam_policy_statements = [
         {
@@ -127,10 +129,13 @@ locals {
           resources = ["arn:aws:s3:::${var.account}-${local.project}-${local.application}-processed/*"]
         },
         {
-          sid       = "BedrockInvokeModel"
-          effect    = "Allow"
-          actions   = ["bedrock:InvokeModel"]
-          resources = ["arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-3-haiku-20240307-v1:0"]
+          sid     = "BedrockInvokeModel"
+          effect  = "Allow"
+          actions = ["bedrock:InvokeModel"]
+          resources = [
+            "arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-3-haiku-20240307-v1:0",
+            "arn:aws:bedrock:eu-west-2::foundation-model/anthropic.claude-3-5-sonnet-20241022-v2:0"
+          ]
         },
         {
           sid       = "IngestionTrackingWrite"
