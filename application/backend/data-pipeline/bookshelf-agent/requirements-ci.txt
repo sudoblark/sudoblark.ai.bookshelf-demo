@@ -1,2 +1,0 @@
-# No additional CI dependencies — all runtime dependencies are in requirements.txt
-# (Pillow, pydantic, pydantic-ai-slim[bedrock])

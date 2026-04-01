@@ -1,12 +1,14 @@
-"""Tests for the ops Lambda handler (GET /ops/files and GET /ops/files/{file_id})."""
+"""Tests for the ops handler (GET /ops/files and GET /ops/files/{file_id})."""
 
 import importlib
 import json
 import sys
 from decimal import Decimal
+from unittest.mock import MagicMock
 
 import boto3
 import pytest
+from fastapi import Request
 from moto import mock_aws
 
 TABLE_NAME = "test-ingestion-tracking"
@@ -49,14 +51,14 @@ def dynamodb_resource(aws_credentials):
 def ops_handler(dynamodb_resource, monkeypatch):
     monkeypatch.setenv("TRACKING_TABLE", TABLE_NAME)
     # Force reimport so the module-level singleton picks up the test table name.
-    sys.modules.pop("lambda_function", None)
+    sys.modules.pop("ops_handler", None)
     sys.path.insert(
         0,
         __import__("os").path.join(
-            __import__("os").path.dirname(__file__), "../application/backend/restapi/ops"
+            __import__("os").path.dirname(__file__), "../application/backend/streaming-agent"
         ),
     )
-    mod = importlib.import_module("lambda_function")
+    mod = importlib.import_module("ops_handler")
     return mod.OpsHandler(dynamodb_resource=dynamodb_resource)
 
 
@@ -86,12 +88,9 @@ def _seed(
     )
 
 
-def _list_event():
-    return {"pathParameters": None}
-
-
-def _detail_event(file_id):
-    return {"pathParameters": {"file_id": file_id}}
+def _mock_request() -> Request:
+    """Create a mock FastAPI Request for testing."""
+    return MagicMock(spec=Request)
 
 
 # ---------------------------------------------------------------------------
@@ -100,34 +99,38 @@ def _detail_event(file_id):
 
 
 class TestListFiles:
-    def test_returns_200_empty_list_when_table_is_empty(self, ops_handler):
-        resp = ops_handler(_list_event())
-        assert resp["statusCode"] == 200
-        body = json.loads(resp["body"])
+    @pytest.mark.asyncio
+    async def test_returns_200_empty_list_when_table_is_empty(self, ops_handler):
+        resp = await ops_handler.handle_list(_mock_request())
+        assert resp.status_code == 200
+        body = json.loads(resp.body.decode())
         assert body["files"] == []
         assert body["count"] == 0
 
-    def test_returns_all_records(self, ops_handler, dynamodb_resource):
+    @pytest.mark.asyncio
+    async def test_returns_all_records(self, ops_handler, dynamodb_resource):
         _seed(dynamodb_resource, UPLOAD_ID_A)
         _seed(dynamodb_resource, UPLOAD_ID_B)
-        resp = ops_handler(_list_event())
-        assert resp["statusCode"] == 200
-        body = json.loads(resp["body"])
+        resp = await ops_handler.handle_list(_mock_request())
+        assert resp.status_code == 200
+        body = json.loads(resp.body.decode())
         assert body["count"] == 2
         upload_ids = {r["upload_id"] for r in body["files"]}
         assert upload_ids == {UPLOAD_ID_A, UPLOAD_ID_B}
 
-    def test_each_record_has_required_fields(self, ops_handler, dynamodb_resource):
+    @pytest.mark.asyncio
+    async def test_each_record_has_required_fields(self, ops_handler, dynamodb_resource):
         _seed(dynamodb_resource, UPLOAD_ID_A)
-        resp = ops_handler(_list_event())
-        record = json.loads(resp["body"])["files"][0]
+        resp = await ops_handler.handle_list(_mock_request())
+        record = json.loads(resp.body.decode())["files"][0]
         assert "upload_id" in record
         assert "current_status" in record
         assert "created_at" in record
 
-    def test_cors_header_present(self, ops_handler):
-        resp = ops_handler(_list_event())
-        assert resp["headers"]["Access-Control-Allow-Origin"] == "*"
+    @pytest.mark.asyncio
+    async def test_cors_header_present(self, ops_handler):
+        resp = await ops_handler.handle_list(_mock_request())
+        assert resp.headers["Access-Control-Allow-Origin"] == "*"
 
 
 # ---------------------------------------------------------------------------
@@ -136,31 +139,35 @@ class TestListFiles:
 
 
 class TestGetFileById:
-    def test_returns_200_with_full_record(self, ops_handler, dynamodb_resource):
+    @pytest.mark.asyncio
+    async def test_returns_200_with_full_record(self, ops_handler, dynamodb_resource):
         _seed(dynamodb_resource, UPLOAD_ID_A)
-        resp = ops_handler(_detail_event(UPLOAD_ID_A))
-        assert resp["statusCode"] == 200
-        body = json.loads(resp["body"])
+        resp = await ops_handler.handle_get(_mock_request(), UPLOAD_ID_A)
+        assert resp.status_code == 200
+        body = json.loads(resp.body.decode())
         assert body["file"]["upload_id"] == UPLOAD_ID_A
         assert body["file"]["current_status"] == "SUCCESS"
 
-    def test_returns_404_when_not_found(self, ops_handler):
-        resp = ops_handler(_detail_event("nonexistent-id"))
-        assert resp["statusCode"] == 404
-        body = json.loads(resp["body"])
+    @pytest.mark.asyncio
+    async def test_returns_404_when_not_found(self, ops_handler):
+        resp = await ops_handler.handle_get(_mock_request(), "nonexistent-id")
+        assert resp.status_code == 404
+        body = json.loads(resp.body.decode())
         assert "error" in body
 
-    def test_stage_progress_included(self, ops_handler, dynamodb_resource):
+    @pytest.mark.asyncio
+    async def test_stage_progress_included(self, ops_handler, dynamodb_resource):
         _seed(dynamodb_resource, UPLOAD_ID_A)
-        resp = ops_handler(_detail_event(UPLOAD_ID_A))
-        stages = json.loads(resp["body"])["file"]["stage_progress"]
+        resp = await ops_handler.handle_get(_mock_request(), UPLOAD_ID_A)
+        stages = json.loads(resp.body.decode())["file"]["stage_progress"]
         assert len(stages) == 1
         assert stages[0]["stage_name"] == "av_scan"
 
-    def test_cors_header_present(self, ops_handler, dynamodb_resource):
+    @pytest.mark.asyncio
+    async def test_cors_header_present(self, ops_handler, dynamodb_resource):
         _seed(dynamodb_resource, UPLOAD_ID_A)
-        resp = ops_handler(_detail_event(UPLOAD_ID_A))
-        assert resp["headers"]["Access-Control-Allow-Origin"] == "*"
+        resp = await ops_handler.handle_get(_mock_request(), UPLOAD_ID_A)
+        assert resp.headers["Access-Control-Allow-Origin"] == "*"
 
 
 # ---------------------------------------------------------------------------
@@ -169,17 +176,21 @@ class TestGetFileById:
 
 
 class TestDecimalSerialisation:
-    def test_processing_time_decimal_serialises_in_list(self, ops_handler, dynamodb_resource):
+    @pytest.mark.asyncio
+    async def test_processing_time_decimal_serialises_in_list(self, ops_handler, dynamodb_resource):
         _seed(dynamodb_resource, UPLOAD_ID_A, stage_processing_time=Decimal("2.345"))
-        resp = ops_handler(_list_event())
+        resp = await ops_handler.handle_list(_mock_request())
         # Must not raise — body should be valid JSON with processing_time as a string
-        body = json.loads(resp["body"])
+        body = json.loads(resp.body.decode())
         stage = body["files"][0]["stage_progress"][0]
         assert stage["processing_time"] == "2.345"
 
-    def test_processing_time_decimal_serialises_in_detail(self, ops_handler, dynamodb_resource):
+    @pytest.mark.asyncio
+    async def test_processing_time_decimal_serialises_in_detail(
+        self, ops_handler, dynamodb_resource
+    ):
         _seed(dynamodb_resource, UPLOAD_ID_A, stage_processing_time=Decimal("1.001"))
-        resp = ops_handler(_detail_event(UPLOAD_ID_A))
-        body = json.loads(resp["body"])
+        resp = await ops_handler.handle_get(_mock_request(), UPLOAD_ID_A)
+        body = json.loads(resp.body.decode())
         stage = body["file"]["stage_progress"][0]
         assert stage["processing_time"] == "1.001"

@@ -1,2 +1,0 @@
-# Lambda runtime dependencies (deployment)
-# boto3 is provided by the Lambda runtime — no third-party dependencies required

@@ -11,12 +11,6 @@ sys.path.insert(
     0,
     os.path.join(os.path.dirname(__file__), "../application/backend"),
 )
-# Add bookshelf-agent layer to sys.path — mirrors Lambda runtime where the
-# layer's python/ directory is added to sys.path at /opt/python.
-sys.path.insert(
-    0,
-    os.path.join(os.path.dirname(__file__), "../application/backend/data-pipeline/bookshelf-agent"),
-)
 
 import boto3  # noqa: E402
 import pytest  # noqa: E402
@@ -32,9 +26,6 @@ os.environ["LOG_LEVEL"] = "INFO"
 # Required by Lambda handlers at module-load time
 os.environ["DATA_LAKE_PREFIX"] = "aws-sudoblark-development-bookshelf-demo"
 os.environ["TRACKING_TABLE"] = "test-tracking"
-os.environ[
-    "STATE_MACHINE_ARN"
-] = "arn:aws:states:eu-west-2:123456789012:stateMachine:test-raw-to-enriched"
 
 
 @pytest.fixture
