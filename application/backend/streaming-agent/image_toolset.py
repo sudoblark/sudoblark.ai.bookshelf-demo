@@ -14,9 +14,30 @@ import json
 import logging
 from typing import Any
 
+from pydantic import BaseModel, Field
 from pydantic_ai import FunctionToolset
 
 logger = logging.getLogger(__name__)
+
+
+class ImageMetadata(BaseModel):
+    """Metadata about an image stored in S3."""
+
+    size_bytes: int = Field(..., description="Size of the image in bytes")
+    content_type: str = Field(default="image/jpeg", description="MIME type of the image")
+    key: str = Field(..., description="S3 object key")
+
+
+class TextractResult(BaseModel):
+    """Result of OCR extraction via AWS Textract."""
+
+    extracted_text: str = Field(..., description="All extracted text from the image")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Average OCR confidence (0-1)")
+    line_count: int = Field(default=0, description="Number of high-confidence text lines")
+    raw_blocks: str = Field(
+        default="[]",
+        description="JSON string of raw Textract blocks (LINE and WORD types)",
+    )
 
 
 def build_image_toolset(
@@ -43,25 +64,25 @@ def build_image_toolset(
     textract_call_count = [0]  # Mutable counter in closure
 
     @toolset.tool_plain
-    def get_image_metadata() -> dict:
+    def get_image_metadata() -> ImageMetadata:
         """Get metadata about the image: size (bytes), content-type.
 
         Returns:
-            dict with keys: size_bytes, content_type, key.
+            ImageMetadata with size_bytes, content_type, and key.
         """
         try:
             response = s3_client.head_object(Bucket=bucket, Key=key)
-            return {
-                "size_bytes": response["ContentLength"],
-                "content_type": response.get("ContentType", "image/jpeg"),
-                "key": key,
-            }
+            return ImageMetadata(
+                size_bytes=response["ContentLength"],
+                content_type=response.get("ContentType", "image/jpeg"),
+                key=key,
+            )
         except Exception as e:
             logger.exception("Failed to get image metadata")
-            return {"error": str(e)}
+            raise ValueError(f"Failed to get image metadata: {str(e)}")
 
     @toolset.tool_plain
-    def extract_text_via_textract() -> dict:
+    def extract_text_via_textract() -> TextractResult:
         """Extract all visible text from the book cover using AWS Textract OCR.
 
         Fast, accurate OCR without needing to send base64 to the LLM.
@@ -70,11 +91,11 @@ def build_image_toolset(
         NOTE: This tool can only be called ONCE per request. Subsequent calls will be rejected.
 
         Returns:
-            dict with keys: extracted_text, confidence, blocks (detailed response).
+            TextractResult with extracted_text, confidence, and line_count.
         """
         textract_call_count[0] += 1
         if textract_call_count[0] > 1:
-            return {"error": "extract_text_via_textract() can only be called once per request"}
+            raise ValueError("extract_text_via_textract() can only be called once per request")
 
         try:
             # Call Textract to extract text from the S3 image
@@ -101,11 +122,11 @@ def build_image_toolset(
                 f"(avg confidence: {avg_confidence:.1f}%)"
             )
 
-            return {
-                "extracted_text": extracted_text,
-                "confidence": avg_confidence / 100,  # Normalize to 0-1
-                "line_count": len(lines),
-                "raw_blocks": json.dumps(
+            return TextractResult(
+                extracted_text=extracted_text,
+                confidence=avg_confidence / 100,  # Normalize to 0-1
+                line_count=len(lines),
+                raw_blocks=json.dumps(
                     [
                         {
                             "text": b.get("Text"),
@@ -116,9 +137,9 @@ def build_image_toolset(
                         if b["BlockType"] in ("LINE", "WORD")
                     ]
                 ),
-            }
+            )
         except Exception as e:
             logger.exception("Failed to extract text via Textract")
-            return {"error": str(e)}
+            raise ValueError(f"Failed to extract text via Textract: {str(e)}")
 
     return toolset

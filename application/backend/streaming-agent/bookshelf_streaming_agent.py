@@ -38,6 +38,16 @@ Use determine_isbn_source() to generate the correct assistantMessage and identif
 whether ISBN is direct, inferred, or missing.
 
 Use calculate_confidence_score() with the ISBN source and extracted fields to determine confidence.
+
+CRITICAL ISBN RULES:
+- NEVER populate the isbn field unless you have directly extracted it from the barcode on the cover.
+- NEVER infer, guess, or look up ISBNs based on title/author.
+- NEVER call lookup_isbn_metadata() during initial extraction.
+- If the ISBN is not visible, LEAVE THE ISBN FIELD EMPTY.
+- Only the backend will clear any inferred ISBNs you set.
+
+Only populate isbn in these cases:
+1. You have directly read it from the barcode on the book cover.
 """
 
 REFINEMENT_SYSTEM_PROMPT: str = """\
@@ -49,11 +59,19 @@ Help them refine and confirm the details through conversation.
 When the user suggests changes, update the relevant metadata fields and acknowledge
 the change briefly in assistantMessage.
 
-Set readyToSave to true ONLY when the user explicitly confirms they are happy
-(e.g. "looks good", "save it", "that's correct", "yes").
-
 Keep assistantMessage to 1-2 sentences. Always return ALL metadata fields in
 your structured output, carrying forward any previously confirmed values.
+
+The user will manually click "Save book" when they are ready. Do not prompt them to save.
+
+When updating metadata (especially when user provides an ISBN):
+- Use lookup_isbn_metadata() if the user provides an ISBN to verify and complete fields
+- Use determine_isbn_source() to classify whether ISBN is now "direct" (user-provided) or "missing"
+- Use calculate_confidence_score() to recalculate confidence based on the updated ISBN source and fields
+
+CRITICAL: DO NOT use lookup_isbn_metadata() if the ISBN was not visible on the cover.
+Only accept ISBN values that the user explicitly provides. Never hallucinate or guess ISBN numbers.
+If the user provides an ISBN, you may use lookup_isbn_metadata() to verify and complete metadata.
 """
 
 

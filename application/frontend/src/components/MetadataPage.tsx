@@ -97,8 +97,6 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
           });
         } else if (event.type === "metadata_update") {
           setMetadata((prev) => ({ ...prev, [event.field]: event.value }));
-        } else if (event.type === "ready_to_save" && event.readyToSave) {
-          await handleSave();
         } else if (event.type === "error") {
           setError(event.message);
         }
@@ -147,10 +145,71 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
 
   return (
     <div className={styles.page}>
-      {/* ── Chat (dominant) ─────────────────────────────── */}
+      {/* ── Book card (top center) ───────────────────────── */}
+      <div className={styles.bookCardContainer}>
+        <div className={styles.bookCard}>
+          <div className={styles.bookSpine} />
+          <div className={styles.bookCover}>
+            <div className={styles.coverContent}>
+              <div className={styles.coverTitle}>{metadata.title || "Untitled"}</div>
+              <div className={styles.coverAuthor}>{metadata.author || "Unknown Author"}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Metadata fields (top center) ─────────────────── */}
+      <div className={styles.fieldsSection}>
+        <div className={styles.cardFields}>
+          <CardField
+            label="Title"
+            value={metadata.title}
+            onChange={(v) => setMetadata((p) => ({ ...p, title: v }))}
+          />
+          <CardField
+            label="Author"
+            value={metadata.author}
+            onChange={(v) => setMetadata((p) => ({ ...p, author: v }))}
+          />
+          <CardField
+            label="Year"
+            value={metadata.published_year?.toString() ?? ""}
+            onChange={(v) => setMetadata((p) => ({ ...p, published_year: v ? parseInt(v, 10) : null }))}
+            type="number"
+          />
+          <ISBNField
+            value={metadata.isbn}
+            onChange={(v) => setMetadata((p) => ({ ...p, isbn: v }))}
+          />
+          <CardField
+            label="Publisher"
+            value={metadata.publisher}
+            onChange={(v) => setMetadata((p) => ({ ...p, publisher: v }))}
+          />
+        </div>
+
+        {metadata.confidence !== null && (
+          <div className={styles.confidence}>
+            <span className={styles.confidenceLabel}>Confidence</span>
+            <span className={styles.confidenceValue}>
+              {Math.round((metadata.confidence ?? 0) * 100)}%
+            </span>
+          </div>
+        )}
+
+        <button
+          className={styles.saveBtn}
+          onClick={handleSave}
+          disabled={busy}
+        >
+          Save book
+        </button>
+      </div>
+
+      {/* ── Chat section (bottom) ──────────────────────── */}
       <section className={styles.chatSection}>
         <header className={styles.chatHeader}>
-          <span className={styles.chatTitle}>Chat</span>
+          <span className={styles.chatTitle}>Refine</span>
           {extracting && <span className={styles.analysing}>Analysing cover…</span>}
         </header>
 
@@ -187,57 +246,6 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
           </button>
         </div>
       </section>
-
-      {/* ── Metadata card (aside) ────────────────────────── */}
-      <aside className={styles.card}>
-        <p className={styles.cardLabel}>Book details</p>
-
-        <div className={styles.cardFields}>
-          <CardField
-            label="Title"
-            value={metadata.title}
-            onChange={(v) => setMetadata((p) => ({ ...p, title: v }))}
-          />
-          <CardField
-            label="Author"
-            value={metadata.author}
-            onChange={(v) => setMetadata((p) => ({ ...p, author: v }))}
-          />
-          <CardField
-            label="Year"
-            value={metadata.published_year?.toString() ?? ""}
-            onChange={(v) => setMetadata((p) => ({ ...p, published_year: v ? parseInt(v, 10) : null }))}
-            type="number"
-          />
-          <CardField
-            label="ISBN"
-            value={metadata.isbn}
-            onChange={(v) => setMetadata((p) => ({ ...p, isbn: v }))}
-          />
-          <CardField
-            label="Publisher"
-            value={metadata.publisher}
-            onChange={(v) => setMetadata((p) => ({ ...p, publisher: v }))}
-          />
-        </div>
-
-        {metadata.confidence !== null && (
-          <div className={styles.confidence}>
-            <span className={styles.confidenceLabel}>Confidence</span>
-            <span className={styles.confidenceValue}>
-              {Math.round((metadata.confidence ?? 0) * 100)}%
-            </span>
-          </div>
-        )}
-
-        <button
-          className={styles.saveBtn}
-          onClick={handleSave}
-          disabled={busy}
-        >
-          Save book
-        </button>
-      </aside>
     </div>
   );
 }
@@ -260,6 +268,37 @@ function CardField({ label, value, onChange, type = "text" }: CardFieldProps) {
         onChange={(e) => onChange(e.target.value)}
         placeholder="—"
       />
+    </div>
+  );
+}
+
+interface ISBNFieldProps {
+  value: string;
+  onChange: (v: string) => void;
+}
+
+function ISBNField({ value, onChange }: ISBNFieldProps) {
+  const displayValue = typeof value === "string" ? value.trim() : "";
+  const isbnValid = displayValue && displayValue.length > 0 && !displayValue.includes("[");
+  const isbnMissing = !displayValue || !isbnValid;
+
+  return (
+    <div className={styles.cardField}>
+      <label className={styles.fieldLabel}>ISBN</label>
+      {isbnMissing ? (
+        <div className={styles.isbnMissing}>
+          <span className={styles.isbnIcon}>🔍</span>
+          <span className={styles.isbnText}>Not visible</span>
+        </div>
+      ) : (
+        <input
+          className={styles.fieldInput}
+          type="text"
+          value={displayValue}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="—"
+        />
+      )}
     </div>
   );
 }

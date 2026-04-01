@@ -16,9 +16,51 @@ import re
 from typing import Optional
 
 import httpx
+from pydantic import BaseModel, Field
 from pydantic_ai import FunctionToolset
 
 logger = logging.getLogger(__name__)
+
+
+class ISBNSourceResult(BaseModel):
+    """Result of determining ISBN source."""
+
+    source: str = Field(..., description="'direct', 'inferred', or 'missing'")
+    message: str = Field(..., description="Human-readable message about the ISBN status")
+
+
+class ConfidenceScoreResult(BaseModel):
+    """Result of calculating confidence score."""
+
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score 0.0-1.0")
+    reasoning: str = Field(..., description="Explanation of confidence calculation")
+
+
+class ISBNValidationResult(BaseModel):
+    """Result of validating ISBN format."""
+
+    is_valid: bool = Field(..., description="Whether ISBN format is valid")
+    isbn_type: Optional[str] = Field(default=None, description="'ISBN-10' or 'ISBN-13'")
+    normalized_isbn: Optional[str] = Field(
+        default=None, description="ISBN normalized (digits only)"
+    )
+    error: Optional[str] = Field(default=None, description="Error message if validation failed")
+
+
+class ISBNLookupResult(BaseModel):
+    """Result of looking up ISBN metadata."""
+
+    success: bool = Field(..., description="Whether lookup succeeded")
+    title: Optional[str] = Field(default=None, description="Book title")
+    authors: Optional[str] = Field(default=None, description="Author name(s)")
+    publisher: Optional[str] = Field(default=None, description="Publisher name")
+    published_date: Optional[str] = Field(default=None, description="Publication date")
+    description: Optional[str] = Field(default=None, description="Book description")
+    isbn: Optional[str] = Field(default=None, description="ISBN")
+    source: Optional[str] = Field(
+        default=None, description="API source (Google Books, Open Library)"
+    )
+    error: Optional[str] = Field(default=None, description="Error message if lookup failed")
 
 
 def calculate_confidence(
@@ -179,11 +221,14 @@ def build_isbn_toolset(enable_lookup: bool = True) -> FunctionToolset:
         title: str = "",
         author: str = "",
         isbn: str = "",
-    ) -> dict:
+    ) -> ISBNSourceResult:
         """Determine ISBN source and generate appropriate message.
 
         Classifies whether the ISBN came from direct observation (barcode),
         inference from title+author lookup, or is missing entirely.
+
+        IMPORTANT: Only call lookup_isbn_metadata() if source is "direct".
+        Never infer or hallucinate ISBN numbers.
 
         Args:
             isbn_visible: True if ISBN barcode was directly visible on image
@@ -192,32 +237,27 @@ def build_isbn_toolset(enable_lookup: bool = True) -> FunctionToolset:
             isbn: The ISBN found (if any)
 
         Returns:
-            dict with keys: source ("direct"/"inferred"/"missing"), message
+            ISBNSourceResult with source and message
         """
         if isbn_visible and isbn:
-            return {
-                "source": "direct",
-                "message": f"Found and validated the ISBN: {isbn}. This is {title} by {author}.",
-            }
-        elif not isbn_visible and isbn and title and author:
-            return {
-                "source": "inferred",
-                "message": f"Based on the title and author, I found the ISBN: {isbn}. "
-                "Verify with the actual barcode if available.",
-            }
+            return ISBNSourceResult(
+                source="direct",
+                message=f"Found and validated the ISBN: {isbn}. This is {title} by {author}.",
+            )
         else:
-            return {
-                "source": "missing",
-                "message": "ISBN not visible on this front cover. "
+            # ISBN is missing or was inferred — DO NOT attempt to look it up
+            return ISBNSourceResult(
+                source="missing",
+                message="ISBN not visible on this front cover. "
                 "Provide the ISBN or a photo of the back cover for verification.",
-            }
+            )
 
     @toolset.tool_plain
     def calculate_confidence_score(
         isbn_source: str,
         fields_present: list[str],
         text_clarity: float = 0.8,
-    ) -> dict:
+    ) -> ConfidenceScoreResult:
         """Calculate confidence score for metadata extraction.
 
         Determines confidence based on ISBN source (direct/inferred/missing),
@@ -229,49 +269,49 @@ def build_isbn_toolset(enable_lookup: bool = True) -> FunctionToolset:
             text_clarity: 0.0-1.0 how clearly text is readable on image (default 0.8)
 
         Returns:
-            dict with keys: confidence (0.0-1.0), reasoning
+            ConfidenceScoreResult with confidence and reasoning
         """
         score = calculate_confidence(isbn_source, fields_present, text_clarity)
-        return {
-            "confidence": round(score, 2),
-            "reasoning": f"ISBN source: {isbn_source}, fields: {len(fields_present)}, clarity: {text_clarity}",
-        }
+        return ConfidenceScoreResult(
+            confidence=round(score, 2),
+            reasoning=f"ISBN source: {isbn_source}, fields: {len(fields_present)}, clarity: {text_clarity}",
+        )
 
     @toolset.tool_plain
-    def validate_isbn(isbn: str) -> dict:
+    def validate_isbn(isbn: str) -> ISBNValidationResult:
         """Validate ISBN format and structure.
 
         Args:
             isbn: The ISBN string to validate (can include hyphens/spaces).
 
         Returns:
-            dict with keys: is_valid, isbn_type, normalized_isbn, error.
+            ISBNValidationResult with validation status and details
         """
         if not isbn or not isbn.strip():
-            return {
-                "is_valid": False,
-                "error": "ISBN is empty or whitespace",
-            }
+            return ISBNValidationResult(
+                is_valid=False,
+                error="ISBN is empty or whitespace",
+            )
 
         normalized = _normalize_isbn(isbn)
         is_valid, isbn_type = _is_valid_isbn(normalized)
 
         if is_valid:
-            return {
-                "is_valid": True,
-                "isbn_type": isbn_type,
-                "normalized_isbn": normalized,
-            }
+            return ISBNValidationResult(
+                is_valid=True,
+                isbn_type=isbn_type,
+                normalized_isbn=normalized,
+            )
         else:
-            return {
-                "is_valid": False,
-                "error": f"Invalid ISBN format: {isbn} (expected 10 or 13 digits)",
-            }
+            return ISBNValidationResult(
+                is_valid=False,
+                error=f"Invalid ISBN format: {isbn} (expected 10 or 13 digits)",
+            )
 
     if enable_lookup:
 
         @toolset.tool_plain
-        def lookup_isbn_metadata(isbn: str) -> dict:
+        def lookup_isbn_metadata(isbn: str) -> ISBNLookupResult:
             """Look up book metadata from authoritative ISBN databases.
 
             Queries Google Books API first, then falls back to Open Library
@@ -283,31 +323,39 @@ def build_isbn_toolset(enable_lookup: bool = True) -> FunctionToolset:
                 isbn: The ISBN to look up (will be normalized automatically).
 
             Returns:
-                dict with keys: success, title, authors, publisher, published_date,
-                description, isbn, source (API name), or error.
+                ISBNLookupResult with success status and metadata or error
             """
             lookup_call_count[0] += 1
             if lookup_call_count[0] > 2:
-                return {
-                    "success": False,
-                    "error": "lookup_isbn_metadata() can only be called twice per request",
-                }
+                return ISBNLookupResult(
+                    success=False,
+                    error="lookup_isbn_metadata() can only be called twice per request",
+                )
 
             # Validate ISBN first
             validation = validate_isbn(isbn)
-            if not validation.get("is_valid"):
-                return {
-                    "success": False,
-                    "error": validation.get("error", "Invalid ISBN"),
-                }
+            if not validation.is_valid:
+                return ISBNLookupResult(
+                    success=False,
+                    error=validation.error or "Invalid ISBN",
+                )
 
-            normalized = validation["normalized_isbn"]
+            normalized = validation.normalized_isbn
 
             # Try Google Books first
             logger.info(f"Querying Google Books API for ISBN {normalized}")
             result = _query_google_books(normalized)
             if result:
-                return {"success": True, **result}
+                return ISBNLookupResult(
+                    success=True,
+                    title=result.get("title"),
+                    authors=result.get("authors"),
+                    publisher=result.get("publisher"),
+                    published_date=result.get("published_date"),
+                    description=result.get("description"),
+                    isbn=result.get("isbn"),
+                    source=result.get("source"),
+                )
 
             # Fallback to Open Library
             logger.info(
@@ -315,12 +363,21 @@ def build_isbn_toolset(enable_lookup: bool = True) -> FunctionToolset:
             )
             result = _query_openlibrary(normalized)
             if result:
-                return {"success": True, **result}
+                return ISBNLookupResult(
+                    success=True,
+                    title=result.get("title"),
+                    authors=result.get("authors"),
+                    publisher=result.get("publisher"),
+                    published_date=result.get("published_date"),
+                    description=result.get("description"),
+                    isbn=result.get("isbn"),
+                    source=result.get("source"),
+                )
 
             # No results from either API
-            return {
-                "success": False,
-                "error": f"ISBN {normalized} not found in Google Books or Open Library",
-            }
+            return ISBNLookupResult(
+                success=False,
+                error=f"ISBN {normalized} not found in Google Books or Open Library",
+            )
 
     return toolset

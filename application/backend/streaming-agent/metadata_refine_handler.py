@@ -16,7 +16,6 @@ SSE event types emitted
 -----------------------
 text_delta       ``{"type": "text_delta", "delta": "<text>"}``
 metadata_update  ``{"type": "metadata_update", "field": "<name>", "value": <val>}``
-ready_to_save    ``{"type": "ready_to_save", "readyToSave": bool}``
 complete         ``{"type": "complete"}``
 error            ``{"type": "error", "message": "<reason>"}``
 """
@@ -30,7 +29,6 @@ import boto3
 from bookshelf_streaming_agent import BookshelfStreamingAgent
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
-from streaming_models import StreamingBookMetadataResponse
 
 logger = logging.getLogger(__name__)
 
@@ -107,7 +105,6 @@ class MetadataRefineHandler:
         prev_msg = ""
         prev_fields: dict = {}
         all_messages = None
-        final_partial: Optional[StreamingBookMetadataResponse] = None
 
         try:
             async with self._agent.run_stream(
@@ -126,8 +123,6 @@ class MetadataRefineHandler:
                             prev_fields[field] = value
                             yield _sse("metadata_update", {"field": field, "value": value})
 
-                    final_partial = partial
-
                 all_messages = result.all_messages()
 
         except Exception as exc:
@@ -139,8 +134,6 @@ class MetadataRefineHandler:
         if all_messages:
             _session_history[session_id] = list(all_messages)
 
-        ready = final_partial.readyToSave if final_partial else False
-        yield _sse("ready_to_save", {"readyToSave": ready})
         yield _sse("complete", {})
 
 

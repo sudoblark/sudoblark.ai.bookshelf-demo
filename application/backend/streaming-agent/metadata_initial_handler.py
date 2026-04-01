@@ -121,6 +121,17 @@ class MetadataInitialHandler:
                     # Stream metadata field updates as they solidify
                     for field in _METADATA_FIELDS:
                         value = getattr(partial, field, None)
+
+                        # GUARD: If ISBN field and it's not visible on cover, force it to empty
+                        if field == "isbn" and value:
+                            # ISBN should only be populated if it was directly visible
+                            # The AI should not infer/hallucinate ISBNs
+                            logger.warning(
+                                f"Agent attempted to set ISBN to '{value}' - clearing to prevent hallucination. "
+                                f"ISBN must only come from the barcode or user input."
+                            )
+                            value = ""
+
                         if value != prev_fields.get(field):
                             prev_fields[field] = value
                             yield _sse("metadata_update", {"field": field, "value": value})
