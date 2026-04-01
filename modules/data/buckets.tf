@@ -34,6 +34,9 @@ locals {
     },
     {
       name = "athena-results" # Stores Athena query results
+    },
+    {
+      name = "artifacts" # Stores Lambda layer and function zip packages
     }
   ]
 }
