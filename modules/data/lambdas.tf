@@ -40,39 +40,5 @@
 
 locals {
   # Define Lambda functions
-  lambdas = [
-    {
-      name          = "ops"
-      description   = "Read-only ops dashboard endpoints: GET /ops/files and GET /ops/files/{file_id}"
-      zip_file_path = "../../lambda-packages/ops.zip"
-      handler       = "lambda_function.handler"
-      runtime       = "python3.11"
-      timeout       = 30
-      memory_size   = 128
-      layers = [
-        # AWS Lambda Powertools for Python (eu-west-2, Python 3.11)
-        # See: https://docs.powertools.aws.dev/lambda/python/latest/#lambda-layer
-        "arn:aws:lambda:eu-west-2:017000801446:layer:AWSLambdaPowertoolsPythonV3-python311-x86_64:7"
-      ]
-      environment_variables = {
-        TRACKING_TABLE = "${var.account}-${local.project}-${local.application}-ingestion-tracking"
-        LOG_LEVEL      = "INFO"
-      }
-      iam_policy_statements = [
-        {
-          sid    = "IngestionTrackingRead"
-          effect = "Allow"
-          actions = [
-            "dynamodb:GetItem",
-            "dynamodb:Scan",
-            "dynamodb:Query"
-          ]
-          resources = [
-            "arn:aws:dynamodb:*:*:table/${var.account}-${local.project}-${local.application}-ingestion-tracking",
-            "arn:aws:dynamodb:*:*:table/${var.account}-${local.project}-${local.application}-ingestion-tracking/index/*"
-          ]
-        }
-      ]
-    }
-  ]
+  lambdas = []
 }

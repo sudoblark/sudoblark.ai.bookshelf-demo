@@ -41,8 +41,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Create Lambda deployment packages
-        run: bash scripts/bundle-lambdas.sh
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -80,8 +78,6 @@ jobs:
         include:
           - lambda: common
             path: application/backend/common
-          - lambda: ops
-            path: application/backend/restapi/ops
     steps:
       - name: Checkout
         uses: actions/checkout@v4

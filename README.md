@@ -300,13 +300,7 @@ cd ../..
 >
 > Run manually: `pre-commit run --all-files`
 
-**Step 3: Package Lambda functions**
-
-```sh
-bash scripts/bundle-lambdas.sh
-```
-
-> **💡 Lambda Packaging:** The bundle script packages each Lambda and automatically copies `application/backend/common/` into every ZIP so shared utilities are importable at runtime. `requirements.txt` contains minimal runtime dependencies for deployment; `requirements-ci.txt` contains additional dependencies (boto3, pandas, pyarrow) needed for local testing/CI that are provided by Lambda runtime or AWS layers in production.
+**Step 3: Deploy infrastructure**
 ```sh
 cd infrastructure/aws-sudoblark-development
 terraform init
@@ -316,8 +310,6 @@ terraform apply  # Type 'yes' to confirm
 
 **Expected resources created:**
 - 3 S3 buckets (landing, raw, processed)
-- 1 Lambda function (ops)
-- 2 IAM roles with appropriate permissions
 - 1 DynamoDB table (ingestion-tracking)
 - 1 Glue database
 - 1 Glue crawler (scheduled daily at 02:00 UTC)
@@ -532,7 +524,7 @@ tests/
 ├── conftest.py                   # Pytest fixtures and configuration
 ├── test_common.py                # Tests for shared common utilities
 ├── test_tracker.py               # Tests for ingestion tracking utility
-└── test_ops.py                   # Tests for ops dashboard API endpoints
+└── test_ops.py                   # Tests for ops dashboard endpoints (in streaming API)
 ```
 
 ### Linting and Security

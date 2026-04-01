@@ -22,12 +22,19 @@ POST /api/metadata/accept
     Save the confirmed metadata as JSON to the raw S3 bucket with Hive-style
     partitioning (``author={}/published_year={}/``).
 
+GET  /ops/files
+    List all tracked file uploads from the ingestion tracking table.
+
+GET  /ops/files/{file_id}
+    Get detailed tracking information for a specific upload by ID.
+
 Environment variables
 ---------------------
 BEDROCK_MODEL_ID       Bedrock model ID (required)
 BEDROCK_REGION         AWS region for Bedrock calls (default: eu-west-2)
 LANDING_BUCKET         S3 bucket name for uploads (required)
 RAW_BUCKET             S3 bucket name for accepted metadata JSON (required)
+TRACKING_TABLE         DynamoDB table name for ingestion tracking (required)
 CORS_ALLOWED_ORIGINS   Comma-separated allowed CORS origins (default: http://localhost:5173)
 """
 
@@ -40,6 +47,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from metadata_initial_handler import MetadataInitialHandler
 from metadata_refine_handler import MetadataRefineHandler
+from ops_handler import OpsHandler
 from presigned_handler import PresignedUrlHandler
 
 logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"))
@@ -62,6 +70,7 @@ _presigned = PresignedUrlHandler()
 _initial = MetadataInitialHandler()
 _refine = MetadataRefineHandler()
 _accept = AcceptHandler()
+_ops = OpsHandler()
 
 
 @app.get("/health")
@@ -87,3 +96,13 @@ async def metadata_refine(request: Request):
 @app.post("/api/metadata/accept")
 async def metadata_accept(request: Request):
     return await _accept.handle(request)
+
+
+@app.get("/ops/files")
+async def ops_list_files(request: Request):
+    return await _ops.handle_list(request)
+
+
+@app.get("/ops/files/{file_id}")
+async def ops_get_file(request: Request, file_id: str):
+    return await _ops.handle_get(request, file_id)
