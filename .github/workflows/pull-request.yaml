@@ -78,14 +78,8 @@ jobs:
     strategy:
       matrix:
         include:
-          - lambda: bookshelf-agent
-            path: application/backend/data-pipeline/bookshelf-agent
           - lambda: common
             path: application/backend/common
-          - lambda: landing-to-raw
-            path: application/backend/data-pipeline/landing-to-raw
-          - lambda: metadata-extractor
-            path: application/backend/data-pipeline/metadata-extractor
           - lambda: ops
             path: application/backend/restapi/ops
     steps:

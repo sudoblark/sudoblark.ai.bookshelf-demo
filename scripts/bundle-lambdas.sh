@@ -10,7 +10,6 @@
 # Source code lives under application/backend/ following the logical boundaries
 # that would be separate repos in a production micro-repo setup:
 #   application/backend/common/            — shared utilities (PyPI package equivalent)
-#   application/backend/data-pipeline/    — Step Functions pipeline Lambdas + agent layer
 #   application/backend/restapi/          — REST API Lambdas
 #
 # Usage: ./scripts/bundle-lambdas.sh
@@ -30,7 +29,6 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 # Source roots
 COMMON_DIR="${PROJECT_ROOT}/application/backend/common"
-DATA_PIPELINE_DIR="${PROJECT_ROOT}/application/backend/data-pipeline"
 RESTAPI_DIR="${PROJECT_ROOT}/application/backend/restapi"
 
 # ZIP output stays in lambda-packages/ — referenced by Terraform
@@ -44,14 +42,6 @@ TEMP_DIR="${OUTPUT_DIR}/tmp"
 layer_exclude_packages() {
   local name=$1
   case "$name" in
-    bookshelf-agent)
-      # Exclude packages provided by the Lambda runtime so they don't bloat the layer.
-      # pydantic-ai-slim[bedrock] declares boto3 as a dep; botocore alone is ~75 MB unzipped.
-      echo "boto3 boto3-*.dist-info botocore botocore-*.dist-info s3transfer s3transfer-*.dist-info jmespath jmespath-*.dist-info"
-      ;;
-    metadata-extractor)
-      echo "boto3 boto3-*.dist-info botocore botocore-*.dist-info s3transfer s3transfer-*.dist-info jmespath jmespath-*.dist-info Pillow Pillow-*.dist-info pydantic pydantic-*.dist-info pydantic_ai pydantic_ai-*.dist-info pydantic_ai_slim pydantic_ai_slim-*.dist-info pyarrow pyarrow-*.dist-info"
-      ;;
     *)
       echo ""
       ;;
@@ -230,26 +220,6 @@ echo ""
 
 success_count=0
 fail_count=0
-
-# --- Layers (data-pipeline) ---
-if bundle_layer "bookshelf-agent" "${DATA_PIPELINE_DIR}/bookshelf-agent"; then
-  success_count=$((success_count + 1))
-else
-  fail_count=$((fail_count + 1))
-fi
-
-# --- Data-pipeline Lambdas ---
-if bundle_lambda "landing-to-raw" "${DATA_PIPELINE_DIR}/landing-to-raw"; then
-  success_count=$((success_count + 1))
-else
-  fail_count=$((fail_count + 1))
-fi
-
-if bundle_lambda "metadata-extractor" "${DATA_PIPELINE_DIR}/metadata-extractor"; then
-  success_count=$((success_count + 1))
-else
-  fail_count=$((fail_count + 1))
-fi
 
 # --- REST API Lambdas ---
 if bundle_lambda "ops" "${RESTAPI_DIR}/ops"; then

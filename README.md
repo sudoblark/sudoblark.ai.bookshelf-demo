@@ -112,7 +112,6 @@ The `application/` folders map directly to three production repos:
 
 | Production repo | Maps to | Release trigger |
 |---|---|---|
-| `bookshelf.backend.etl` | `application/backend/data-pipeline/` | Data pipeline changes: new enrichment stages, AV rule updates, Parquet schema changes |
 | `bookshelf.backend.api` | `application/backend/restapi/` | API changes: new endpoints, response shape changes, auth updates |
 | `bookshelf.frontend.portal` | *(not yet in this repo)* | UI/UX changes: new dashboard views, styling, client-side logic |
 
@@ -230,9 +229,7 @@ This project demonstrates Sudoblark's **three-layer Terraform architecture**:
 
 ### Metadata Schema
 
-Extracted metadata is defined as the [`BookMetadata`](application/backend/data-pipeline/metadata-extractor/models.py) Pydantic model. That file is the single source of truth for field names, types, validation rules, and defaults — refer to it directly rather than any secondary table.
-
-Each processed record also includes `id` (UUID), `filename`, and `processed_at` (ISO 8601 timestamp) added by the processor at write time.
+Book metadata is extracted using the Bedrock streaming API and defined via Pydantic models in the streaming-agent handlers. Each accepted record is written to S3 as JSON with Hive-style partitioning (`author={author}/published_year={year}/{uuid}.json`) along with metadata provenance fields.
 ## Getting Started
 
 To get a local copy up and running follow these simple steps.
@@ -296,11 +293,7 @@ pre-commit install
 # Install Lambda dependencies for local testing
 cd application/backend/common
 pip install -r requirements.txt -r requirements-ci.txt
-cd ../data-pipeline/landing-to-raw
-pip install -r requirements.txt -r requirements-ci.txt
-cd ../metadata-extractor
-pip install -r requirements.txt -r requirements-ci.txt
-cd ../../../..
+cd ../..
 ```
 
 > **💡 Pre-commit hooks:** Automatically run code formatters and linters before each commit. This catches issues early before CI/CD.
@@ -323,9 +316,9 @@ terraform apply  # Type 'yes' to confirm
 
 **Expected resources created:**
 - 3 S3 buckets (landing, raw, processed)
-- 2 Lambda functions (file-router, metadata-extractor)
+- 1 Lambda function (ops)
 - 2 IAM roles with appropriate permissions
-- 3 S3 event notifications (one per supported image extension on the landing bucket)
+- 1 DynamoDB table (ingestion-tracking)
 - 1 Glue database
 - 1 Glue crawler (scheduled daily at 02:00 UTC)
 - 1 Athena workgroup
@@ -359,8 +352,6 @@ terraform apply  # Type 'yes' to confirm
    # Watch CloudWatch logs for file-router
    aws logs tail /aws/lambda/aws-sudoblark-development-bookshelf-demo-file-router --follow
 
-   # Watch metadata-extractor logs
-   aws logs tail /aws/lambda/aws-sudoblark-development-bookshelf-demo-metadata-extractor --follow
    ```
 
 4. **Run Glue Crawler** (or wait for daily schedule)
@@ -522,7 +513,7 @@ This project follows Sudoblark's Python quality standards with comprehensive tes
 pytest --cov=application/backend --cov-report=html --cov-report=term-missing
 
 # Run specific test file
-pytest tests/test_metadata_extractor.py -v
+pytest tests/test_tracker.py -v
 
 # Run with mocked AWS services
 pytest tests/test_file_router.py -v
@@ -540,8 +531,7 @@ pytest tests/test_file_router.py -v
 tests/
 ├── conftest.py                   # Pytest fixtures and configuration
 ├── test_common.py                # Tests for shared common utilities
-├── test_landing_to_raw.py        # Tests for AV scan + routing Lambda
-├── test_metadata_extractor.py    # Tests for Bedrock metadata extraction
+├── test_tracker.py               # Tests for ingestion tracking utility
 └── test_ops.py                   # Tests for ops dashboard API endpoints
 ```
 
@@ -649,7 +639,7 @@ Error: An error occurred (ResourceNotFoundException) when calling the InvokeMode
 ```
 Task timed out after 60.00 seconds
 ```
-**Solution:** Bedrock API calls may occasionally be slow. Increase the `metadata-extractor` Lambda timeout in `modules/data/lambdas.tf`.
+**Solution:** Check the streaming-agent logs and increase timeout if needed.
 
 **Issue: "Glue Crawler not finding data"**
 ```

@@ -1,9 +1,0 @@
-# Additional dependencies for local testing and CI
-# These are provided by AWS layers in production but needed locally
-boto3
-pyarrow
-aws-lambda-powertools
-# bookshelf-agent layer dependencies (provided by the layer at runtime)
-Pillow
-pydantic
-pydantic-ai-slim[bedrock]
