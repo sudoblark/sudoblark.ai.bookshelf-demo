@@ -1,11 +1,9 @@
 """Tests for bookshelf-agent Lambda layer."""
 
-import io
 from unittest.mock import MagicMock
 
 import pydantic_ai.models as pydantic_ai_models
 import pytest
-from PIL import Image
 from pydantic_ai import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models.function import AgentInfo, FunctionModel
@@ -15,7 +13,6 @@ pydantic_ai_models.ALLOW_MODEL_REQUESTS = False
 
 # bookshelf-agent is on sys.path via conftest.py (mirrors Lambda /opt/python)
 from agent import BookshelfAgent  # noqa: E402
-from image_processor import ImageProcessor  # noqa: E402
 from models import BookMetadata  # noqa: E402
 
 
@@ -59,56 +56,11 @@ class TestBookMetadata:
         assert m.published_year is None
 
 
-class TestImageProcessor:
-    """Tests for ImageProcessor.resize_to_jpeg."""
-
-    def _make_jpeg(self, width: int, height: int) -> bytes:
-        buf = io.BytesIO()
-        Image.new("RGB", (width, height), color="blue").save(buf, format="JPEG")
-        return buf.getvalue()
-
-    def test_resize_large_image(self):
-        """Should scale down images exceeding max_dim."""
-        img_bytes = self._make_jpeg(2000, 1500)
-        resized = ImageProcessor.resize_to_jpeg(img_bytes, max_dim=1024)
-        result = Image.open(io.BytesIO(resized))
-        assert result.format == "JPEG"
-        assert max(result.size) == 1024
-
-    def test_resize_small_image_not_upscaled(self):
-        """Should not upscale images smaller than max_dim."""
-        img_bytes = self._make_jpeg(500, 400)
-        resized = ImageProcessor.resize_to_jpeg(img_bytes, max_dim=1024)
-        result = Image.open(io.BytesIO(resized))
-        assert result.size == (500, 400)
-
-    def test_empty_bytes_raises(self):
-        """Should raise ValueError for empty bytes."""
-        with pytest.raises(ValueError, match="image_bytes must not be empty"):
-            ImageProcessor.resize_to_jpeg(b"")
-
-    def test_invalid_image_data_raises(self):
-        """Should raise an exception for non-image bytes."""
-        with pytest.raises(Exception):
-            ImageProcessor.resize_to_jpeg(b"not an image")
-
-
 class TestBookshelfAgent:
     """Tests for BookshelfAgent."""
 
     def _make_agent(self) -> BookshelfAgent:
         return BookshelfAgent("test-model", MagicMock())
-
-    def _make_image_bytes(self) -> bytes:
-        buf = io.BytesIO()
-        Image.new("RGB", (100, 100), color="red").save(buf, format="JPEG")
-        return buf.getvalue()
-
-    def test_run_empty_bytes_raises(self):
-        """Should raise ValueError when image_bytes is empty."""
-        agent = self._make_agent()
-        with pytest.raises(ValueError, match="image_bytes must not be empty"):
-            agent.run(b"")
 
     def test_run_returns_book_metadata(self):
         """Should return a populated BookMetadata instance."""
@@ -126,7 +78,7 @@ class TestBookshelfAgent:
                 }
             )
         ):
-            result = agent.run(self._make_image_bytes())
+            result = agent.run("Extract the book metadata.")
 
         assert isinstance(result, BookMetadata)
         assert result.title == "Dune"
@@ -142,12 +94,12 @@ class TestBookshelfAgent:
 
         with agent._agent.override(model=FunctionModel(failing_model)):
             with pytest.raises(Exception):
-                agent.run(self._make_image_bytes())
+                agent.run("Extract the book metadata.")
 
     def test_run_with_empty_toolsets(self):
         """Should accept an empty toolsets list without error."""
         agent = self._make_agent()
         with agent._agent.override(model=TestModel(custom_output_args={"title": "Test Book"})):
-            result = agent.run(self._make_image_bytes(), toolsets=[])
+            result = agent.run("Extract the book metadata.", toolsets=[])
 
         assert isinstance(result, BookMetadata)
