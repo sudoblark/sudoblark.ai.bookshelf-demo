@@ -1,11 +1,9 @@
 """Tests for bookshelf-agent Lambda layer."""
 
-import io
 from unittest.mock import MagicMock
 
 import pydantic_ai.models as pydantic_ai_models
 import pytest
-from PIL import Image
 from pydantic_ai import UnexpectedModelBehavior
 from pydantic_ai.messages import ModelMessage
 from pydantic_ai.models.function import AgentInfo, FunctionModel
@@ -15,8 +13,8 @@ pydantic_ai_models.ALLOW_MODEL_REQUESTS = False
 
 # bookshelf-agent is on sys.path via conftest.py (mirrors Lambda /opt/python)
 from agent import BookshelfAgent  # noqa: E402
-from image_processor import ImageProcessor  # noqa: E402
 from models import BookMetadata  # noqa: E402
+from s3_toolset import build_s3_chunked_reader  # noqa: E402
 
 
 class TestBookMetadata:
@@ -58,39 +56,10 @@ class TestBookMetadata:
         assert m.confidence is None
         assert m.published_year is None
 
-
-class TestImageProcessor:
-    """Tests for ImageProcessor.resize_to_jpeg."""
-
-    def _make_jpeg(self, width: int, height: int) -> bytes:
-        buf = io.BytesIO()
-        Image.new("RGB", (width, height), color="blue").save(buf, format="JPEG")
-        return buf.getvalue()
-
-    def test_resize_large_image(self):
-        """Should scale down images exceeding max_dim."""
-        img_bytes = self._make_jpeg(2000, 1500)
-        resized = ImageProcessor.resize_to_jpeg(img_bytes, max_dim=1024)
-        result = Image.open(io.BytesIO(resized))
-        assert result.format == "JPEG"
-        assert max(result.size) == 1024
-
-    def test_resize_small_image_not_upscaled(self):
-        """Should not upscale images smaller than max_dim."""
-        img_bytes = self._make_jpeg(500, 400)
-        resized = ImageProcessor.resize_to_jpeg(img_bytes, max_dim=1024)
-        result = Image.open(io.BytesIO(resized))
-        assert result.size == (500, 400)
-
-    def test_empty_bytes_raises(self):
-        """Should raise ValueError for empty bytes."""
-        with pytest.raises(ValueError, match="image_bytes must not be empty"):
-            ImageProcessor.resize_to_jpeg(b"")
-
-    def test_invalid_image_data_raises(self):
-        """Should raise an exception for non-image bytes."""
-        with pytest.raises(Exception):
-            ImageProcessor.resize_to_jpeg(b"not an image")
+    def test_isbn_empty_string_preserved(self):
+        """Should return empty string unchanged when isbn is explicitly empty."""
+        m = BookMetadata(isbn="")
+        assert m.isbn == ""
 
 
 class TestBookshelfAgent:
@@ -98,17 +67,6 @@ class TestBookshelfAgent:
 
     def _make_agent(self) -> BookshelfAgent:
         return BookshelfAgent("test-model", MagicMock())
-
-    def _make_image_bytes(self) -> bytes:
-        buf = io.BytesIO()
-        Image.new("RGB", (100, 100), color="red").save(buf, format="JPEG")
-        return buf.getvalue()
-
-    def test_run_empty_bytes_raises(self):
-        """Should raise ValueError when image_bytes is empty."""
-        agent = self._make_agent()
-        with pytest.raises(ValueError, match="image_bytes must not be empty"):
-            agent.run(b"")
 
     def test_run_returns_book_metadata(self):
         """Should return a populated BookMetadata instance."""
@@ -126,7 +84,7 @@ class TestBookshelfAgent:
                 }
             )
         ):
-            result = agent.run(self._make_image_bytes())
+            result = agent.run("Extract the book metadata.")
 
         assert isinstance(result, BookMetadata)
         assert result.title == "Dune"
@@ -142,12 +100,117 @@ class TestBookshelfAgent:
 
         with agent._agent.override(model=FunctionModel(failing_model)):
             with pytest.raises(Exception):
-                agent.run(self._make_image_bytes())
+                agent.run("Extract the book metadata.")
 
     def test_run_with_empty_toolsets(self):
         """Should accept an empty toolsets list without error."""
         agent = self._make_agent()
         with agent._agent.override(model=TestModel(custom_output_args={"title": "Test Book"})):
-            result = agent.run(self._make_image_bytes(), toolsets=[])
+            result = agent.run("Extract the book metadata.", toolsets=[])
 
         assert isinstance(result, BookMetadata)
+
+
+class TestS3Toolset:
+    """Tests for build_s3_chunked_reader toolset."""
+
+    def _setup_s3(
+        self, s3_client, content: bytes, bucket: str = "test-bucket", key: str = "book.jpg"
+    ):
+        s3_client.create_bucket(
+            Bucket=bucket,
+            CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
+        )
+        s3_client.put_object(Bucket=bucket, Key=key, Body=content)
+
+    def _get_tool_fn(self, toolset, name: str):
+        """Extract the raw callable from a FunctionToolset by tool name."""
+        return toolset.tools[name].function
+
+    def test_get_file_info_returns_metadata(self, s3_client):
+        """Should return bucket, key, size_bytes, content_type, and chunk_size_bytes."""
+        content = b"fake book image data"
+        self._setup_s3(s3_client, content)
+        toolset = build_s3_chunked_reader(s3_client, "test-bucket", "book.jpg")
+
+        result = self._get_tool_fn(toolset, "get_file_info")()
+
+        assert result["bucket"] == "test-bucket"
+        assert result["key"] == "book.jpg"
+        assert result["size_bytes"] == len(content)
+        assert "content_type" in result
+        assert result["chunk_size_bytes"] == 65_536
+
+    def test_read_next_chunk_lazy_total_size(self, s3_client):
+        """Should lazily fetch total_size via HEAD when called before get_file_info."""
+        content = b"Hello World"
+        self._setup_s3(s3_client, content)
+        toolset = build_s3_chunked_reader(s3_client, "test-bucket", "book.jpg")
+
+        result = self._get_tool_fn(toolset, "read_next_chunk")()
+
+        assert result["total_size"] == len(content)
+        assert result["bytes_read"] == len(content)
+
+    def test_read_next_chunk_normal(self, s3_client):
+        """Should return a chunk of data and advance position."""
+        content = b"ABCDEFGHIJ"
+        self._setup_s3(s3_client, content)
+        toolset = build_s3_chunked_reader(s3_client, "test-bucket", "book.jpg", chunk_size_bytes=4)
+        get_file_info = self._get_tool_fn(toolset, "get_file_info")
+        read_next_chunk = self._get_tool_fn(toolset, "read_next_chunk")
+
+        get_file_info()
+        result = read_next_chunk()
+
+        assert result["chunk"] == "ABCD"
+        assert result["bytes_read"] == 4
+        assert result["position"] == 4
+        assert result["end_of_file"] is False
+
+    def test_read_next_chunk_at_eof(self, s3_client):
+        """Should return end_of_file=True when position reaches total size."""
+        content = b"Hi"
+        self._setup_s3(s3_client, content)
+        toolset = build_s3_chunked_reader(
+            s3_client, "test-bucket", "book.jpg", chunk_size_bytes=100
+        )
+        read_next_chunk = self._get_tool_fn(toolset, "read_next_chunk")
+
+        read_next_chunk()  # reads all 2 bytes, position == total
+        result = read_next_chunk()  # position >= total
+
+        assert result["end_of_file"] is True
+        assert result["bytes_read"] == 0
+
+    def test_read_next_chunk_max_chunks_limit(self, s3_client):
+        """Should return end_of_file=True once max_chunks is reached."""
+        content = b"A" * 100
+        self._setup_s3(s3_client, content)
+        toolset = build_s3_chunked_reader(
+            s3_client, "test-bucket", "book.jpg", chunk_size_bytes=20, max_chunks=1
+        )
+        get_file_info = self._get_tool_fn(toolset, "get_file_info")
+        read_next_chunk = self._get_tool_fn(toolset, "read_next_chunk")
+
+        get_file_info()
+        read_next_chunk()  # chunks_read becomes 1
+        result = read_next_chunk()  # max_chunks limit hit
+
+        assert result["end_of_file"] is True
+        assert result["bytes_read"] == 0
+
+    def test_reset_position_rewinds(self, s3_client):
+        """Should reset position to 0 so subsequent reads restart from the beginning."""
+        content = b"ABCDEFGHIJ"
+        self._setup_s3(s3_client, content)
+        toolset = build_s3_chunked_reader(s3_client, "test-bucket", "book.jpg", chunk_size_bytes=4)
+        read_next_chunk = self._get_tool_fn(toolset, "read_next_chunk")
+        reset_position = self._get_tool_fn(toolset, "reset_position")
+
+        read_next_chunk()  # reads "ABCD", position=4
+        result = reset_position()
+        assert result["position"] == 0
+
+        result = read_next_chunk()
+        assert result["chunk"] == "ABCD"

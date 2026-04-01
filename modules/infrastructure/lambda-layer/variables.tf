@@ -1,3 +1,8 @@
+variable "artifacts_bucket" {
+  description = "S3 bucket ID to store Lambda layer zip packages before publishing"
+  type        = string
+}
+
 variable "layers" {
   description = "Enriched list of Lambda layers to create"
   type = list(object({

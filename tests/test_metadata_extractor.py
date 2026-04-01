@@ -67,45 +67,6 @@ class TestConfig:
             metadata_lambda.Config.from_env()
 
 
-class TestImageProcessor:
-    """Tests for ImageProcessor."""
-
-    def test_resize_large_image(self):
-        """Should resize a large image to the max dimension."""
-        img = Image.new("RGB", (2000, 1500), color="blue")
-        img_buffer = io.BytesIO()
-        img.save(img_buffer, format="JPEG")
-        img_bytes = img_buffer.getvalue()
-
-        resized = metadata_lambda.ImageProcessor.resize_to_jpeg(img_bytes, max_dim=1024)
-
-        resized_img = Image.open(io.BytesIO(resized))
-        assert resized_img.format == "JPEG"
-        assert max(resized_img.size) == 1024
-
-    def test_resize_small_image(self):
-        """Should not upscale images smaller than max_dim."""
-        img = Image.new("RGB", (500, 400), color="green")
-        img_buffer = io.BytesIO()
-        img.save(img_buffer, format="JPEG")
-        img_bytes = img_buffer.getvalue()
-
-        resized = metadata_lambda.ImageProcessor.resize_to_jpeg(img_bytes, max_dim=1024)
-
-        resized_img = Image.open(io.BytesIO(resized))
-        assert resized_img.size == (500, 400)
-
-    def test_resize_empty_bytes(self):
-        """Should raise ValueError for empty bytes."""
-        with pytest.raises(ValueError, match="image_bytes must not be empty"):
-            metadata_lambda.ImageProcessor.resize_to_jpeg(b"")
-
-    def test_resize_invalid_image_data(self):
-        """Should raise an exception for invalid image data."""
-        with pytest.raises(Exception):
-            metadata_lambda.ImageProcessor.resize_to_jpeg(b"not an image")
-
-
 class TestBookshelfAgent:
     """Tests for BookshelfAgent."""
 
@@ -113,13 +74,6 @@ class TestBookshelfAgent:
         if mock_client is None:
             mock_client = MagicMock()
         return metadata_lambda.BookshelfAgent("test-model", mock_client)
-
-    def test_run_empty_image_bytes(self):
-        """Should raise ValueError for empty image bytes."""
-        agent = self._make_agent()
-
-        with pytest.raises(ValueError, match="image_bytes must not be empty"):
-            agent.run(b"")
 
     def test_run_returns_book_metadata(self):
         """Should return a BookMetadata instance with extracted fields."""

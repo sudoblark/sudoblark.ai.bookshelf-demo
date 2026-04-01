@@ -187,13 +187,17 @@ def main(
     if list_files is not None:
         match = S3_BUCKET_PATTERN.match(list_files)
         if not match:
-            console.print(f"[bold red]ERROR:[/] --list-files value must be an S3 URI, got: {list_files}")
+            console.print(
+                f"[bold red]ERROR:[/] --list-files value must be an S3 URI, got: {list_files}"
+            )
             raise typer.Exit(code=1)
         _list_s3(bucket=match.group("bucket"), prefix=match.group("prefix"))
         return
 
     if file is None:
-        console.print("[bold red]ERROR:[/] provide a file path or use --list-files to browse the bucket.")
+        console.print(
+            "[bold red]ERROR:[/] provide a file path or use --list-files to browse the bucket."
+        )
         raise typer.Exit(code=1)
 
     s3_match = S3_URI_PATTERN.match(file)

@@ -6,12 +6,13 @@ from typing import Any, Dict
 from agent import BookshelfAgent
 from botocore.exceptions import ClientError
 from parquet_writer import ParquetWriter
+from s3_toolset import build_s3_chunked_reader
 
 logger = logging.getLogger(__name__)
 
 
 class BookshelfProcessor:
-    """Orchestrates image download, metadata extraction, and Parquet persistence."""
+    """Orchestrates metadata extraction from S3 and Parquet persistence."""
 
     def __init__(self, agent: BookshelfAgent, s3_client: Any) -> None:
         self._agent = agent
@@ -19,12 +20,12 @@ class BookshelfProcessor:
         self._writer = ParquetWriter(s3_client)
 
     def process(self, source_bucket: str, processed_bucket: str, image_key: str) -> str:
-        """Download an image from S3, extract its metadata, and write to Parquet.
+        """Extract book metadata from an S3 file and write to Parquet.
 
         Args:
-            source_bucket: S3 bucket containing the image (raw tier).
+            source_bucket: S3 bucket containing the file (raw tier).
             processed_bucket: S3 bucket for Parquet output (processed tier).
-            image_key: S3 key of the image file.
+            image_key: S3 key of the file.
 
         Returns:
             S3 key of the uploaded Parquet file.
@@ -39,11 +40,10 @@ class BookshelfProcessor:
         logger.info(f"Extracting metadata from s3://{source_bucket}/{image_key}")
 
         try:
-            image_obj = self._s3_client.get_object(Bucket=source_bucket, Key=image_key)
-            image_bytes: bytes = image_obj["Body"].read()
-            logger.info(f"Downloaded image: {len(image_bytes)} bytes")
-
-            book_metadata = self._agent.run(image_bytes)
+            toolset = build_s3_chunked_reader(self._s3_client, source_bucket, image_key)
+            book_metadata = self._agent.run(
+                "Extract the book metadata from the S3 file.", toolsets=[toolset]
+            )
             metadata = self._apply_defaults(book_metadata.model_dump(), image_key)
             logger.info(f"Extracted metadata: {metadata.get('title', 'Unknown')}")
 
