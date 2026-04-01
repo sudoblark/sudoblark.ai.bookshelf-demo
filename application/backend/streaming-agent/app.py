@@ -44,7 +44,7 @@ import os
 from accept_handler import AcceptHandler
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from metadata_initial_handler import MetadataInitialHandler
 from metadata_refine_handler import MetadataRefineHandler
 from ops_handler import OpsHandler
@@ -74,35 +74,35 @@ _ops = OpsHandler()
 
 
 @app.get("/health")
-async def health():
+async def health() -> JSONResponse:
     return JSONResponse({"status": "ok"})
 
 
 @app.get("/api/upload/presigned")
-async def get_presigned_url(request: Request):
+async def get_presigned_url(request: Request) -> JSONResponse:
     return await _presigned.handle(request)
 
 
 @app.post("/api/metadata/initial")
-async def metadata_initial(request: Request):
+async def metadata_initial(request: Request) -> StreamingResponse:
     return await _initial.handle(request)
 
 
 @app.post("/api/metadata/refine")
-async def metadata_refine(request: Request):
+async def metadata_refine(request: Request) -> StreamingResponse:
     return await _refine.handle(request)
 
 
 @app.post("/api/metadata/accept")
-async def metadata_accept(request: Request):
+async def metadata_accept(request: Request) -> JSONResponse:
     return await _accept.handle(request)
 
 
 @app.get("/ops/files")
-async def ops_list_files(request: Request):
+async def ops_list_files(request: Request) -> JSONResponse:
     return await _ops.handle_list(request)
 
 
 @app.get("/ops/files/{file_id}")
-async def ops_get_file(request: Request, file_id: str):
+async def ops_get_file(request: Request, file_id: str) -> JSONResponse:
     return await _ops.handle_get(request, file_id)
