@@ -126,7 +126,10 @@ class TestCompleteStage:
         tracker.start_stage(UPLOAD_ID, UploadStage.ROUTING, LANDING_BUCKET, LANDING_KEY)
         tracker.complete_stage(USER_ID, UPLOAD_ID, UploadStage.ROUTING, RAW_BUCKET, RAW_KEY)
         item = _get_item(dynamodb_resource)
-        assert item["stage_progress"][0]["destination"] == {"bucket": RAW_BUCKET, "key": RAW_KEY}
+        assert item["stage_progress"][0]["destination"] == {
+            "bucket": RAW_BUCKET,
+            "key": RAW_KEY,
+        }
 
     def test_sets_end_time_and_processing_time(self, tracker, dynamodb_resource):
         tracker.create_record(USER_ID, UPLOAD_ID)
