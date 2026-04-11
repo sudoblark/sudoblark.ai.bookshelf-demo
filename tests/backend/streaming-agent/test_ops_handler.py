@@ -62,7 +62,11 @@ def ops_handler(dynamodb_resource, monkeypatch):
 
 
 def _seed(
-    dynamodb_resource, upload_id, user_id=USER_ID, status="SUCCESS", stage_processing_time=None
+    dynamodb_resource,
+    upload_id,
+    user_id=USER_ID,
+    status="SUCCESS",
+    stage_processing_time=None,
 ):
     table = dynamodb_resource.Table(TABLE_NAME)
     stage_entry = {
@@ -71,8 +75,14 @@ def _seed(
         "start_time": "2026-03-31T10:00:00+00:00",
         "end_time": "2026-03-31T10:00:02+00:00",
         "processing_time": stage_processing_time or Decimal("2.345"),
-        "source": {"bucket": "landing", "key": f"uploads/{user_id}/{upload_id}/cover.jpg"},
-        "destination": {"bucket": "raw", "key": f"uploads/{user_id}/{upload_id}/cover.jpg"},
+        "source": {
+            "bucket": "landing",
+            "key": f"uploads/{user_id}/{upload_id}/cover.jpg",
+        },
+        "destination": {
+            "bucket": "raw",
+            "key": f"uploads/{user_id}/{upload_id}/cover.jpg",
+        },
         "error_message": None,
     }
     table.put_item(

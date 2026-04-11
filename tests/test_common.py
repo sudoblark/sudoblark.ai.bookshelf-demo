@@ -170,7 +170,10 @@ def _make_tracker(item: Optional[dict] = None):
     mock_resource.Table.return_value = mock_table
     if item is not None:
         mock_table.get_item.return_value = {"Item": item}
-    return BookshelfTracker(dynamodb_resource=mock_resource, table_name="test-table"), mock_table
+    return (
+        BookshelfTracker(dynamodb_resource=mock_resource, table_name="test-table"),
+        mock_table,
+    )
 
 
 class TestBookshelfTracker:

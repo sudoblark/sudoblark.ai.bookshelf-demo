@@ -111,11 +111,15 @@ def _list_s3(bucket: str, prefix: str) -> None:
             if obj["Key"].endswith(".parquet")
         ]
     except botocore.exceptions.ClientError as exc:
-        console.print(f"[bold red]ERROR:[/] Could not list s3://{bucket}/{prefix}: {exc}")
+        console.print(
+            f"[bold red]ERROR:[/] Could not list s3://{bucket}/{prefix}: {exc}"
+        )
         raise typer.Exit(code=1)
 
     if not objects:
-        console.print(f"[yellow]No .parquet files found under s3://{bucket}/{prefix}[/]")
+        console.print(
+            f"[yellow]No .parquet files found under s3://{bucket}/{prefix}[/]"
+        )
         return
 
     table = Table(

@@ -68,7 +68,10 @@ def sample_s3_event() -> Dict[str, Any]:
                 "eventSource": "aws:s3",
                 "eventName": "ObjectCreated:Put",
                 "s3": {
-                    "bucket": {"name": "test-bucket", "arn": "arn:aws:s3:::test-bucket"},
+                    "bucket": {
+                        "name": "test-bucket",
+                        "arn": "arn:aws:s3:::test-bucket",
+                    },
                     "object": {"key": "test-file.zip", "size": 1024},
                 },
             }
