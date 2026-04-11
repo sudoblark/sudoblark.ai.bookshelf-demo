@@ -136,7 +136,7 @@ jobs:
             test_files: tests/test_common.py tests/test_tracker.py
           - lambda: streaming-agent
             path: application/backend/streaming-agent
-            test_files: tests/test_ops.py
+            test_files: tests/backend/streaming-agent/
     steps:
       - name: Checkout
         uses: actions/checkout@v4
