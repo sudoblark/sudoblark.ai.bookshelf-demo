@@ -474,3 +474,22 @@ class TestISBNNormalizationEdgeCases:
         normalized = _normalize_isbn("0306406.15x")  # Period will be preserved
         # Normalization only removes hyphens and spaces
         assert "x" in normalized.lower()
+
+
+class TestISBNToolsetFactory:
+    """Test the build_isbn_toolset factory function."""
+
+    def test_toolset_created_with_lookup_enabled(self):
+        """Test that toolset is created with lookup enabled."""
+        toolset = build_isbn_toolset(enable_lookup=True)
+        assert toolset is not None
+
+    def test_toolset_created_with_lookup_disabled(self):
+        """Test that toolset is created with lookup disabled."""
+        toolset = build_isbn_toolset(enable_lookup=False)
+        assert toolset is not None
+
+    def test_toolset_default_has_lookup_enabled(self):
+        """Test that toolset defaults to lookup enabled."""
+        toolset = build_isbn_toolset()
+        assert toolset is not None

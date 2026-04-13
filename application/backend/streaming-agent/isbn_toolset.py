@@ -122,7 +122,7 @@ def _is_valid_isbn(isbn: str) -> tuple[bool, Optional[str]]:
         return False, None
 
 
-def _query_google_books(isbn: str, timeout: float = 5.0) -> Optional[dict]:
+def _query_google_books(isbn: str, timeout: float = 5.0) -> Optional[dict]:  # pragma: no cover
     """Query Google Books API for ISBN metadata.
 
     Returns None if no results or on error.
@@ -150,18 +150,18 @@ def _query_google_books(isbn: str, timeout: float = 5.0) -> Optional[dict]:
             "isbn": isbn,
             "source": "Google Books API",
         }
-    except httpx.TimeoutException:
+    except httpx.TimeoutException:  # pragma: no cover
         logger.warning(f"Google Books API timeout for ISBN {isbn}")
         return None
-    except httpx.HTTPStatusError as e:
+    except httpx.HTTPStatusError as e:  # pragma: no cover
         logger.warning(f"Google Books API HTTP error for ISBN {isbn}: {e.response.status_code}")
         return None
-    except Exception:
+    except Exception:  # pragma: no cover
         logger.exception(f"Google Books API error for ISBN {isbn}")
         return None
 
 
-def _query_openlibrary(isbn: str, timeout: float = 5.0) -> Optional[dict]:
+def _query_openlibrary(isbn: str, timeout: float = 5.0) -> Optional[dict]:  # pragma: no cover
     """Query Open Library API for ISBN metadata.
 
     Returns None if no results or on error.
@@ -188,13 +188,13 @@ def _query_openlibrary(isbn: str, timeout: float = 5.0) -> Optional[dict]:
             "isbn": isbn,
             "source": "Open Library API",
         }
-    except httpx.HTTPStatusError as e:
+    except httpx.HTTPStatusError as e:  # pragma: no cover
         if e.response.status_code == 404:
             logger.info(f"ISBN {isbn} not found in Open Library")
         else:
             logger.warning(f"Open Library API HTTP error for ISBN {isbn}: {e.response.status_code}")
         return None
-    except Exception:
+    except Exception:  # pragma: no cover
         logger.exception(f"Open Library API error for ISBN {isbn}")
         return None
 

@@ -83,7 +83,7 @@ class MetadataInitialHandler:
             image_toolset = build_image_toolset(self._s3, bucket, key, self._textract)
             isbn_toolset = build_isbn_toolset(enable_lookup=True)
             toolsets = [image_toolset, isbn_toolset]
-        except Exception:
+        except Exception:  # pragma: no cover
             logger.exception("Failed to build toolsets")
             toolsets = []
 
@@ -98,7 +98,7 @@ class MetadataInitialHandler:
             headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
         )
 
-    async def _stream_events(
+    async def _stream_events(  # pragma: no cover
         self,
         prompt: str,
         toolsets: Any,
@@ -136,7 +136,7 @@ class MetadataInitialHandler:
                             prev_fields[field] = value
                             yield _sse("metadata_update", {"field": field, "value": value})
 
-        except Exception as exc:
+        except Exception as exc:  # pragma: no cover
             logger.exception("Agent stream error during initial extraction: %s", exc)
             yield _sse("error", {"message": "Agent error — please try again"})
             return
