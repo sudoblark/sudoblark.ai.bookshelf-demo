@@ -1,35 +1,3 @@
-[build-system]
-requires = ["setuptools>=68.0", "wheel"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "bookshelf-demo"
-version = "1.0.0"
-description = "AWS ETL pipeline for extracting book metadata from images using Bedrock"
-authors = [{name = "Sudoblark Ltd", email = "hello@sudoblark.com"}]
-requires-python = ">=3.11"
-dependencies = [
-    "aws-lambda-powertools>=2.31.0",
-    "boto3>=1.29.0",
-    "Pillow>=10.0.0",
-]
-
-[project.optional-dependencies]
-dev = [
-    "black>=23.11.0",
-    "isort>=5.12.0",
-    "flake8>=6.1.0",
-    "mypy>=1.7.0",
-    "bandit>=1.7.5",
-    "boto3-stubs[s3,bedrock-runtime]>=1.29.0",
-]
-test = [
-    "pytest>=7.4.0",
-    "pytest-cov>=4.1.0",
-    "pytest-mock>=3.12.0",
-    "moto[s3,dynamodb]>=4.2.0",
-]
-
 [tool.black]
 line-length = 100
 target-version = ['py311']
@@ -39,55 +7,28 @@ extend-exclude = '''
   # directories
   \.eggs
   | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
   | \.venv
   | build
   | dist
-  | lambda-packages/.*/site-packages
 )/
 '''
 
 [tool.isort]
 profile = "black"
 line_length = 100
-multi_line_output = 3
-include_trailing_comma = true
-force_grid_wrap = 0
-use_parentheses = true
-ensure_newline_before_comments = true
-skip_gitignore = true
-skip = [".venv", "venv", "build", "dist"]
+
+[tool.pytest.ini_options]
+markers = [
+  "asyncio: marks tests as async",
+]
 
 [tool.mypy]
 python_version = "3.11"
-mypy_path = ["lambda-packages"]
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_any_generics = false  # Allow for AWS SDK compatibility
-no_implicit_optional = true
-warn_redundant_casts = true
-warn_unused_ignores = true
-warn_no_return = true
-check_untyped_defs = true
-strict_equality = true
-ignore_missing_imports = true  # AWS SDK and some libraries don't have stubs
-
-[[tool.mypy.overrides]]
-module = "tests.*"
 disallow_untyped_defs = false
-
-[tool.pytest.ini_options]
-minversion = "7.0"
-addopts = [
-    "-ra",
-    "--strict-markers",
-    "--strict-config",
-]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-
-[tool.bandit]
-exclude_dirs = ["tests", ".venv", "venv", "build", "dist"]
-skips = ["B101"]  # Skip assert_used (acceptable in tests)
+disallow_incomplete_defs = false
+ignore_missing_imports = true

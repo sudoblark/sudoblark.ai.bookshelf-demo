@@ -17,14 +17,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Create Lambda deployment packages
-        run: bash scripts/bundle-lambdas.sh
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:

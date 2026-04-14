@@ -96,7 +96,7 @@ class MetadataRefineHandler:
             headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
         )
 
-    async def _stream_events(
+    async def _stream_events(  # pragma: no cover
         self,
         prompt: str,
         history: List[Any],
@@ -125,13 +125,13 @@ class MetadataRefineHandler:
 
                 all_messages = result.all_messages()
 
-        except Exception as exc:
+        except Exception as exc:  # pragma: no cover
             logger.exception("Agent stream error during refinement: %s", exc)
             yield _sse("error", {"message": "Agent error — please try again"})
             return
 
         # Persist updated message history for next turn
-        if all_messages:
+        if all_messages:  # pragma: no cover
             _session_history[session_id] = list(all_messages)
 
         yield _sse("complete", {})

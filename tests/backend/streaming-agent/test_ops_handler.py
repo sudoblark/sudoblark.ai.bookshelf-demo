@@ -2,6 +2,7 @@
 
 import importlib
 import json
+import os
 import sys
 from decimal import Decimal
 from unittest.mock import MagicMock
@@ -54,10 +55,7 @@ def ops_handler(dynamodb_resource, monkeypatch):
     sys.modules.pop("ops_handler", None)
     sys.path.insert(
         0,
-        __import__("os").path.join(
-            __import__("os").path.dirname(__file__),
-            "../application/backend/streaming-agent",
-        ),
+        os.path.join(os.path.dirname(__file__), "../../../application/backend/streaming-agent"),
     )
     mod = importlib.import_module("ops_handler")
     return mod.OpsHandler(dynamodb_resource=dynamodb_resource)

@@ -1,7 +1,0 @@
-# Lambda layer dependencies (deployment)
-# Exclude: boto3 (provided by Lambda runtime)
-# pydantic-ai-slim[bedrock] includes only the core framework and the boto3-backed
-# BedrockConverseModel provider. Avoids bundling unused provider SDKs (Anthropic,
-# OpenAI, Google, etc.) that would push the layer over the 262 MB unzipped limit.
-pydantic-ai-slim[bedrock]
-pyarrow

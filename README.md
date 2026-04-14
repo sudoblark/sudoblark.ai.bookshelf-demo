@@ -76,31 +76,30 @@
 >
 > This repository is pre-configured to deploy to **Sudoblark's AWS infrastructure**. If you want to deploy to your own AWS account, you'll need to modify the Terraform configuration files to match your environment (account names, bucket names, state backend, etc.).
 
-The Bookshelf Demo showcases a serverless ETL pipeline built entirely on AWS. Upload a single book cover image, and watch as AI automatically extracts metadata, structures it in Parquet format, and makes it queryable via SQL.
+The Bookshelf Demo showcases a complete, full-stack application for extracting book metadata from images using AWS and AI. Upload a book cover via the web interface, refine the extracted metadata through a conversational loop, and save confirmed books to your collection.
 
 **What You'll Learn:**
 
 | Topic | What the demo teaches |
 |---|---|
-| **Event-Driven Pipeline Design** | How to build fully decoupled processing stages where each component communicates only via storage events — no direct service-to-service calls, no orchestration layer |
-| **Cloud-Portable Patterns** | The underlying pattern (object storage event → serverless compute → object storage) maps cleanly across clouds — see table below |
-| **AI/ML Integration** | How to wire a foundation model into a serverless pipeline for practical vision tasks, and where the equivalent service sits on other clouds |
+| **Streaming AI Integration** | How to build real-time user experiences with Server-Sent Events, pydantic-ai agent streaming, and stateful conversation sessions |
+| **Presigned URLs & Browser Uploads** | Securely uploading files directly from the browser to S3 without routing through your API — reducing latency and costs |
+| **Full-Stack Web Development** | React frontend with Vite, FastAPI backend with async handlers, and integrating managed AI services into a seamless UX |
 | **Infrastructure as Code** | Data-driven Terraform patterns that keep resource definitions as simple data structures — easy to replicate, extend, or port |
-| **Production Engineering** | OOP handlers with shared code modules, automated testing (pytest + moto), CI/CD, and security scanning |
+| **Production Engineering** | Type-safe async handlers, comprehensive testing with pytest, CI/CD automation, and modern development workflows |
 
 **Cloud equivalence — the same pattern, different providers:**
 
 | Concept | AWS (this demo) | GCP | Azure |
 |---|---|---|---|
 | Object storage | S3 | Cloud Storage | Blob Storage |
-| Storage events | S3 Event Notifications | Eventarc / Pub/Sub | Event Grid |
-| Serverless compute | Lambda | Cloud Functions | Azure Functions |
-| Managed AI model | Bedrock (Claude 3 Haiku) | Vertex AI | Azure OpenAI |
-| Columnar query engine | Athena | BigQuery | Synapse Analytics |
-| Schema discovery | Glue Crawler | Dataplex / BigQuery auto-detect | Purview |
+| Container orchestration | ECS Fargate | Cloud Run | Container Instances |
+| API Gateway | API Gateway | Cloud Endpoints | API Management |
+| Managed AI model | Bedrock (Claude) | Vertex AI | Azure OpenAI |
+| NoSQL database | DynamoDB | Firestore | Cosmos DB |
 | IaC | Terraform | Terraform | Terraform |
 
-**Perfect for:** Software engineers and cloud architects who want to understand event-driven pipeline design as a reusable pattern, demonstrated end-to-end on AWS.
+**Perfect for:** Full-stack developers and cloud architects who want to understand modern AI-powered web applications with streaming interactions, demonstrated end-to-end on AWS.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -108,17 +107,18 @@ The Bookshelf Demo showcases a serverless ETL pipeline built entirely on AWS. Up
 
 This repository is a **mono-repo for demo convenience**. In production, each application component would live in its own repository with its own CI pipeline and release cadence — so a hotfix to the API never requires redeploying the ETL pipeline, and a frontend release never blocks on backend changes.
 
-The `application/` folders map directly to three production repos:
+In a micro-repo setup, the repository to functionality mapping would be as follows:
 
-| Production repo | Maps to | Release trigger |
+| Production repo | Maps to | Purpose |
 |---|---|---|
-| `bookshelf.backend.etl` | `application/backend/data-pipeline/` | Data pipeline changes: new enrichment stages, AV rule updates, Parquet schema changes |
-| `bookshelf.backend.api` | `application/backend/restapi/` | API changes: new endpoints, response shape changes, auth updates |
-| `bookshelf.frontend.portal` | *(not yet in this repo)* | UI/UX changes: new dashboard views, styling, client-side logic |
+| `bookshelf.backend.openapi-lambdas` | `modules/data/lambdas.tf` (future) | Static REST endpoints (presigned URLs, accept, bookshelf queries) via Lambda |
+| `bookshelf.backend.streaming-container` | `application/backend/streaming-agent/` | Streaming metadata extraction service (ECS Fargate or container) |
+| `bookshelf.backend.shared-components` | `application/backend/common/` | Shared utilities (BookshelfTracker, response helpers, etc.) as versioned PyPI package |
+| `bookshelf.frontend.portal` | `application/frontend/` | React UI consuming the APIs |
 
-**Note on Terraform:** The infrastructure in `modules/` and `infrastructure/` is intentionally left as a single coupled state in this demo. In production each repo would own its infrastructure, but splitting Terraform state introduces cross-state references that would add complexity without adding teaching value here.
+**Note on Terraform:** The infrastructure in `modules/` and `infrastructure/` is intentionally left as a single coupled state in this demo. In production, each service would own its Terraform, but splitting state introduces cross-service references that add complexity without teaching value here.
 
-The shared utilities in `application/backend/common/` would become a versioned **PyPI package** (`bookshelf-common`) consumed as a pinned dependency by both backend repos. In this demo it is instead bundled directly into each Lambda ZIP by `scripts/bundle-lambdas.sh` to avoid the overhead of publishing a package.
+**Production split rationale:** Static endpoints (presigned URL generation, accept confirmation) stay on Lambda for cost efficiency, whilst streaming metadata extraction requires a persistent container (ECS Fargate). Shared utilities are versioned and imported by both services.
 
 > **💡 Why a mono-repo here?** A single clone, a single `terraform apply`, and a single test run is enough to get the full system running. That removes friction for a demo or workshop while keeping the component boundaries clear enough to reason about the production shape.
 
@@ -137,58 +137,61 @@ The shared utilities in `application/backend/common/` would become a versioned *
 <!-- ARCHITECTURE -->
 ## Architecture
 
-The system uses an **event-driven, serverless ETL pipeline**:
+The system uses a **streaming API architecture** with a React frontend and FastAPI backend:
 
 ```mermaid
 graph TB
-    subgraph "User Actions"
-        A[Upload Image]
+    subgraph "Browser"
+        A[React UI]
+        B[Upload Component]
+        C[Metadata Refinement UI]
     end
 
-    subgraph "AWS Cloud - Event-Driven Pipeline"
-        subgraph "Landing Zone"
-            B[S3: Landing Bucket]
+    subgraph "Development Environment"
+        D[Vite Dev Server<br/>Port 5173]
+        E[FastAPI Streaming Agent<br/>Port 8000]
+    end
+
+    subgraph "AWS Cloud"
+        subgraph "Storage"
+            F[S3: Landing Bucket<br/>Presigned URLs]
+            G[S3: Raw Bucket<br/>Hive-partitioned JSON]
         end
 
-        subgraph "Processing Layer"
-            C[Lambda: File Router]
-            D[S3: Raw Bucket]
-            E[Lambda: Metadata Extractor]
-        end
-
-        subgraph "Storage Layer"
-            F[S3: Processed Bucket]
-            G[Glue: Crawler]
-            H[Glue: Data Catalog]
-        end
-
-        subgraph "Query Layer"
-            I[Athena: Workgroup]
+        subgraph "Tracking"
+            H[DynamoDB:<br/>Ingestion Tracking Table]
         end
 
         subgraph "AI Services"
-            J[Bedrock: Claude 3 Haiku]
+            I[Bedrock:<br/>Claude Streaming]
         end
     end
 
-    A -->|cover.jpg| B
-    B -->|S3 Event| C
-    C -->|Copy image| D
-    D -->|S3 Event| E
-    E -->|Extract metadata| J
-    J -->|Return JSON| E
-    E -->|Write Parquet| F
-    G -->|Discover schema| F
-    G -->|Update| H
-    I -->|Query| H
+    A -->|dev server| D
+    B -->|presigned URL request| E
+    E -->|generate presigned URL| F
+    B -->|PUT file directly| F
+    C -->|POST /api/metadata/initial<br/>SSE streaming| E
+    E -->|vision analysis| I
+    I -->|stream tokens| E
+    E -->|update tracking| H
+    C -->|POST /api/metadata/refine<br/>SSE streaming| E
+    E -->|continue conversation| I
+    C -->|POST /api/metadata/accept| E
+    E -->|write JSON| G
+    E -->|update tracking| H
 
+    classDef browser fill:#61DAFB,stroke:#232F3E,color:#000
+    classDef devserver fill:#646695,stroke:#232F3E,color:#fff
     classDef storage fill:#569A31,stroke:#232F3E,color:#fff
     classDef compute fill:#FF6600,stroke:#232F3E,color:#fff
     classDef ai fill:#8C4FFF,stroke:#232F3E,color:#fff
 
-    class B,D,F storage
-    class C,E,G compute
-    class J ai
+    class A,B,C browser
+    class D devserver
+    class F,G storage
+    class E compute
+    class I ai
 ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -209,30 +212,46 @@ This project demonstrates Sudoblark's **three-layer Terraform architecture**:
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-### ETL Pipeline Flow
+### Application Flow
 
-**Step-by-step processing:**
+**Step-by-step interaction:**
 
-1. **Upload**: User uploads a single image to `landing/uploads/{user_id}/{upload_id}/` in the Landing bucket
-2. **Route**: S3 event triggers File Router Lambda → copies image to Raw bucket
-3. **Analyze**: S3 event triggers Metadata Extractor Lambda for each image
-4. **AI Processing**: Lambda sends image to Bedrock Claude 3 Haiku with vision prompt
-5. **Store**: Lambda writes extracted metadata as Parquet to Processed bucket
-6. **Catalog**: Glue Crawler (scheduled daily) discovers schema
-7. **Query**: Users query metadata via Athena SQL
+1. **Upload**: User selects book cover image in React UI and clicks upload
+2. **Presigned URL**: Frontend requests presigned S3 PUT URL from backend
+3. **Direct Upload**: Browser uploads file directly to S3 Landing bucket (no API gateway)
+4. **Initial Analysis**: Frontend calls `POST /api/metadata/initial` with file location
+5. **Streaming Extraction**: Backend streams metadata tokens as SSE (Server-Sent Events) in real-time
+6. **User Refinement**: User sees initial metadata and can ask follow-up questions (multi-turn)
+7. **Refinement Stream**: Frontend calls `POST /api/metadata/refine` for each question
+8. **Accept**: User confirms metadata by clicking "Accept"
+9. **Persist**: Backend writes accepted metadata as JSON to Raw bucket with Hive-style partitioning
+10. **Track**: Ingestion-tracking table updated with file status throughout
 
 **Processing Time:**
-- File routing: ~1-2 seconds per image
-- Metadata extraction: ~3-8 seconds per image (Bedrock API call)
-- Glue crawl: ~30-60 seconds (scheduled, not blocking)
+- Presigned URL generation: ~100ms
+- Initial metadata extraction (streaming): ~3-8 seconds per image (Bedrock API + streaming overhead)
+- Refinement turns: ~1-3 seconds per question
+- Accept (S3 write): ~200-500ms
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+### API Endpoints
+
+The streaming agent exposes the following HTTP endpoints:
+
+| Endpoint | Method | Purpose | Response |
+|---|---|---|---|
+| `/health` | GET | Container health check | `{"status": "ok"}` |
+| `/api/upload/presigned` | GET | Generate presigned S3 PUT URL | `{"url": "...", "session_id": "..."}` |
+| `/api/metadata/initial` | POST | Extract metadata from uploaded image | Server-Sent Events (streaming tokens) |
+| `/api/metadata/refine` | POST | Multi-turn refinement conversation | Server-Sent Events (streaming tokens) |
+| `/api/metadata/accept` | POST | Save confirmed metadata to S3 | `{"status": "accepted", "saved_key": "...", "upload_id": "..."}` |
+| `/ops/files` | GET | List all uploaded files with status | `[{"upload_id": "...", "current_status": "...", ...}]` |
+| `/ops/files/{file_id}` | GET | Get details for a single upload | `{"upload_id": "...", "stage_progress": [...], ...}` |
+
 ### Metadata Schema
 
-Extracted metadata is defined as the [`BookMetadata`](application/backend/data-pipeline/metadata-extractor/models.py) Pydantic model. That file is the single source of truth for field names, types, validation rules, and defaults — refer to it directly rather than any secondary table.
-
-Each processed record also includes `id` (UUID), `filename`, and `processed_at` (ISO 8601 timestamp) added by the processor at write time.
+Book metadata is extracted using the pydantic-ai streaming API with Claude as the foundation model. Each accepted record is written to S3 as JSON with Hive-style partitioning (`author={author}/published_year={year}/{uuid}.json`) along with metadata provenance fields (filename, upload_id, extraction timestamp).
 ## Getting Started
 
 To get a local copy up and running follow these simple steps.
@@ -240,11 +259,10 @@ To get a local copy up and running follow these simple steps.
 ### Prerequisites
 
 **Important Constraints:**
-- ⚠️ **AWS Costs**: Running this infrastructure will incur AWS charges (Lambda, S3, Glue, Athena, Bedrock API calls)
+- ⚠️ **AWS Costs**: Running this infrastructure will incur AWS charges (ECS Fargate, S3, DynamoDB, Bedrock API calls). Typical demo: $5-15/day
 - 🌍 **Region Lock**: Infrastructure must deploy to `eu-west-2` (London) due to Bedrock model availability
-- 🏗️ **Demo Code**: This is workshop/learning code - not production-hardened (limited error handling, no alerting)
-- 📦 **Manual Packaging**: Lambda functions must be packaged locally before Terraform deployment
-- 🗑️ **Force Destroy**: All S3 buckets and Athena workgroups are configured with `force_destroy = true` — running the destroy pipeline will permanently delete all bucket contents and query history without confirmation. This is intentional for a demo environment but should never be used in production.
+- 🏗️ **Demo Code**: This is workshop/learning code - not production-hardened (no authentication yet, limited error handling)
+- 🗑️ **Force Destroy**: All S3 buckets are configured with `force_destroy = true` — running `terraform destroy` will permanently delete all bucket contents without confirmation. This is intentional for a demo environment but should never be used in production.
 
 **Required Tools & Access:**
 
@@ -259,13 +277,19 @@ To get a local copy up and running follow these simple steps.
   terraform --version
   ```
 
-* **Python** 3.11+
+* **Python** 3.11+ and **Node.js** 18+
   ```sh
   python --version  # Should be 3.11 or higher
+  node --version    # Should be 18.0.0 or higher
   ```
 
-* **AWS Bedrock Model Access** - Claude 3 Haiku must be enabled:
-  - Model ID: `anthropic.claude-3-haiku-20240307-v1:0`
+* **Docker** (optional, for running backend via docker-compose)
+  ```sh
+  docker --version
+  ```
+
+* **AWS Bedrock Model Access** - Claude 3.5 Sonnet must be enabled:
+  - Model ID: `anthropic.claude-3-5-sonnet-20241022-v2:0`
   - Region: `eu-west-2` (London)
   - Access: Enable in AWS Bedrock console
 
@@ -280,40 +304,37 @@ git clone https://github.com/sudoblark/sudoblark.ai.bookshelf-demo.git
 cd sudoblark.ai.bookshelf-demo
 ```
 
-**Step 2: Set up Python environment**
+**Step 2: Set up development environment**
 
 ```sh
-# Create virtual environment
+# Create Python virtual environment
 python -m venv .venv
 source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 
-# Install development dependencies
+# Install development dependencies (all backends + testing)
 pip install -r requirements-dev.txt
 
 # Install pre-commit hooks (highly recommended)
 pre-commit install
 
-# Install Lambda dependencies for local testing
-cd application/backend/common
-pip install -r requirements.txt -r requirements-ci.txt
-cd ../data-pipeline/landing-to-raw
-pip install -r requirements.txt -r requirements-ci.txt
-cd ../metadata-extractor
-pip install -r requirements.txt -r requirements-ci.txt
-cd ../../../..
+# Install backend dependencies
+cd application/backend/streaming-agent
+pip install -r requirements.txt
+cd ../common
+pip install -r requirements.txt
+cd ../../..
+
+# Install frontend dependencies
+cd application/frontend
+npm install
+cd ../..
 ```
 
 > **💡 Pre-commit hooks:** Automatically run code formatters and linters before each commit. This catches issues early before CI/CD.
 >
 > Run manually: `pre-commit run --all-files`
 
-**Step 3: Package Lambda functions**
-
-```sh
-bash scripts/bundle-lambdas.sh
-```
-
-> **💡 Lambda Packaging:** The bundle script packages each Lambda and automatically copies `application/backend/common/` into every ZIP so shared utilities are importable at runtime. `requirements.txt` contains minimal runtime dependencies for deployment; `requirements-ci.txt` contains additional dependencies (boto3, pandas, pyarrow) needed for local testing/CI that are provided by Lambda runtime or AWS layers in production.
+**Step 3: Deploy infrastructure (AWS resources)**
 ```sh
 cd infrastructure/aws-sudoblark-development
 terraform init
@@ -322,13 +343,97 @@ terraform apply  # Type 'yes' to confirm
 ```
 
 **Expected resources created:**
-- 3 S3 buckets (landing, raw, processed)
-- 2 Lambda functions (file-router, metadata-extractor)
-- 2 IAM roles with appropriate permissions
-- 3 S3 event notifications (one per supported image extension on the landing bucket)
-- 1 Glue database
-- 1 Glue crawler (scheduled daily at 02:00 UTC)
-- 1 Athena workgroup
+- 2 S3 buckets (landing, raw)
+- 1 DynamoDB table (ingestion-tracking)
+
+> **Note:** Terraform currently provisions only storage and tracking. The streaming agent runs locally (docker-compose or uvicorn). ECS Fargate deployment infrastructure is a future enhancement.
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
+## Local Development
+
+### Running the Backend
+
+The backend is a FastAPI application that can run locally or in a container.
+
+**Option 1: Using Docker Compose (Recommended)**
+
+```sh
+cd application/backend/streaming-agent
+
+# Set required environment variables
+export AWS_DEFAULT_REGION=eu-west-2
+export BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
+export LANDING_BUCKET=$(aws s3 ls | grep landing | awk '{print $3}')
+export RAW_BUCKET=$(aws s3 ls | grep raw | awk '{print $3}')
+export TRACKING_TABLE=$(aws dynamodb list-tables --query 'TableNames[?contains(@, `ingestion-tracking`)]' --output text)
+
+# Start the backend on http://localhost:8000
+docker-compose up
+```
+
+**Option 2: Using uvicorn directly**
+
+```sh
+cd application/backend/streaming-agent
+
+# Set environment variables (same as above, plus AWS credentials)
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+
+# Start the backend on http://localhost:8000
+uvicorn app:app --reload --host 0.0.0.0 --port 8000
+```
+
+### Running the Frontend
+
+```sh
+cd application/frontend
+
+# Start Vite dev server on http://localhost:5173
+npm run dev
+```
+
+The frontend is configured to proxy all `/api/*` requests to `http://localhost:8000` (see `vite.config.ts`).
+
+### Required Environment Variables
+
+| Variable | Required | Default | Description |
+|---|---|---|---|
+| `AWS_DEFAULT_REGION` | Yes | — | AWS region (must be `eu-west-2`) |
+| `AWS_ACCESS_KEY_ID` | Yes (if not using IAM role) | — | AWS access key |
+| `AWS_SECRET_ACCESS_KEY` | Yes (if not using IAM role) | — | AWS secret key |
+| `BEDROCK_MODEL_ID` | Yes | `anthropic.claude-3-5-sonnet-20241022-v2:0` | Bedrock model to use |
+| `BEDROCK_REGION` | No | `eu-west-2` | Region for Bedrock API |
+| `LANDING_BUCKET` | Yes | — | S3 bucket name for landing zone |
+| `RAW_BUCKET` | Yes | — | S3 bucket name for accepted metadata |
+| `TRACKING_TABLE` | Yes | — | DynamoDB table name for ingestion tracking |
+| `CORS_ALLOWED_ORIGINS` | No | `http://localhost:5173` | Comma-separated list of allowed origins |
+| `LOG_LEVEL` | No | `INFO` | Python logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+| `ISBN_LOOKUP_ENABLED` | No | `true` | Enable ISBN API lookup for book enrichment |
+
+### Quick Start
+
+```sh
+# Terminal 1: Start backend
+cd application/backend/streaming-agent
+docker-compose up  # or uvicorn app:app --reload
+
+# Terminal 2: Start frontend
+cd application/frontend
+npm run dev
+
+# Open browser to http://localhost:5173
+# Upload a book cover image and test the flow
+```
+
+### Architecture Notes
+
+- **No authentication** is implemented yet (all endpoints are public) — Cognito integration is on the roadmap
+- **Presigned S3 URLs** allow direct browser upload without routing through the API Gateway
+- **Server-Sent Events (SSE)** stream metadata extraction tokens in real-time for live UX
+- **Stateful sessions** keep conversation history in-process (single container), not persisted across restarts
+- **Bedrock streaming** allows token-by-token responses rather than waiting for full completions
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -337,175 +442,68 @@ terraform apply  # Type 'yes' to confirm
 
 ### Basic Workflow
 
-1. **Prepare a book cover image**
-   ```sh
-   # Navigate to demo images directory
-   cd data/demo-images
+The typical user flow through the application:
 
-   # Download sample book covers (optional - skip if images already exist)
-   # This downloads ~400-600 book covers from Open Library
-   ./download_covers.sh
-   ```
+1. **Start development servers** (see Local Development section above)
 
-2. **Upload a single image to S3 Landing bucket**
-   ```sh
-   LANDING_BUCKET=$(aws s3 ls | grep landing | awk '{print $3}')
-   # Key format: uploads/{user_id}/{upload_id}/{filename}
-   aws s3 cp cover.jpg s3://${LANDING_BUCKET}/uploads/default/demo-upload/cover.jpg
-   ```
+2. **Open the UI** - Navigate to http://localhost:5173 in your browser
 
-3. **Monitor processing** (optional)
-   ```sh
-   # Watch CloudWatch logs for file-router
-   aws logs tail /aws/lambda/aws-sudoblark-development-bookshelf-demo-file-router --follow
+3. **Upload a book cover**
+   - Click "Add your first book"
+   - Select a book cover image from your computer (JPG, PNG, etc.)
+   - The file is uploaded directly to S3 via presigned URL (no API Gateway)
 
-   # Watch metadata-extractor logs
-   aws logs tail /aws/lambda/aws-sudoblark-development-bookshelf-demo-metadata-extractor --follow
-   ```
+4. **Watch streaming extraction**
+   - The app displays "Extracting..." while tokens stream from Bedrock
+   - You see metadata appearing in real-time: title → author → ISBN → description
+   - This takes 3-8 seconds depending on image complexity
 
-4. **Run Glue Crawler** (or wait for daily schedule)
-   ```sh
-   aws glue start-crawler --name aws-sudoblark-development-bookshelf-demo-bookshelf-metadata-crawler
-   ```
+5. **Refine metadata (optional)**
+   - Ask clarifying questions: "Is this a 2024 publication?"
+   - Each question streams a refinement response in real-time
+   - The UI maintains conversation context
 
-5. **Query with Athena**
-   ```sql
-   -- View all extracted book metadata
-   SELECT *
-   FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-   LIMIT 10;
+6. **Confirm and save**
+   - Click "Save to bookshelf" once metadata is correct
+   - Metadata is written to S3 (`s3://raw-bucket/author=X/published_year=Y/uuid.json`)
+   - DynamoDB tracking table updates with success status
 
-   -- Find books by author
-   SELECT title, author, published_year
-   FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-   WHERE author LIKE '%George%'
-   ORDER BY published_year DESC;
-
-   -- Count books by publisher
-   SELECT publisher, COUNT(*) as book_count
-   FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-   GROUP BY publisher
-   ORDER BY book_count DESC;
-   ```
+7. **View operations (debugging)**
+   - Click the "Ops" tab in the header (not yet implemented in frontend)
+   - Or query directly: `curl http://localhost:8000/ops/files`
+   - Lists all uploads with their processing status
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-### Advanced Examples
+### Testing the API Directly
 
-**Group books by author:**
-```sql
-SELECT
-    author,
-    COUNT(*) as book_count,
-    MIN(published_year) as earliest_publication,
-    MAX(published_year) as latest_publication,
-    ROUND(AVG(confidence), 2) as avg_confidence
-FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-WHERE author IS NOT NULL AND author != ''
-GROUP BY author
-ORDER BY book_count DESC, author ASC;
+For development and debugging, you can call the API directly:
+
+**Get presigned URL:**
+```sh
+curl -s 'http://localhost:8000/api/upload/presigned?filename=cover.jpg' | jq .
 ```
 
-**Group books by publication year:**
-```sql
-SELECT
-    published_year,
-    COUNT(*) as book_count,
-    COUNT(DISTINCT author) as unique_authors,
-    COUNT(DISTINCT publisher) as unique_publishers,
-    ROUND(AVG(confidence), 2) as avg_confidence
-FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-WHERE published_year IS NOT NULL
-GROUP BY published_year
-ORDER BY published_year DESC;
+**Extract metadata (streaming SSE):**
+```sh
+# After uploading a file to the landing bucket
+curl -X POST 'http://localhost:8000/api/metadata/initial' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "bucket": "aws-sudoblark-development-bookshelf-demo-landing",
+    "key": "uploads/demo/test/cover.jpg",
+    "filename": "cover.jpg"
+  }' | tail -20  # Shows raw SSE events
 ```
 
-**Data quality metrics:**
-```sql
-WITH base_stats AS (
-    SELECT
-        COUNT(*) as total_rows,
-        COUNT(DISTINCT id) as unique_ids,
-        COUNT(DISTINCT LOWER(TRIM(title || '|' || author))) as unique_books
-    FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-),
-field_stats AS (
-    SELECT
-        -- Title analysis
-        COUNT(CASE WHEN title IS NOT NULL AND title != '' THEN 1 END) as titles_present,
-        COUNT(CASE WHEN title IS NULL OR title = '' THEN 1 END) as titles_missing,
+**List all uploads:**
+```sh
+curl -s 'http://localhost:8000/ops/files' | jq '.[] | {upload_id, current_status, created_at}'
+```
 
-        -- Author analysis
-        COUNT(CASE WHEN author IS NOT NULL AND author != '' THEN 1 END) as authors_present,
-        COUNT(CASE WHEN author IS NULL OR author = '' THEN 1 END) as authors_missing,
-
-        -- ISBN analysis
-        COUNT(CASE WHEN isbn IS NOT NULL AND isbn != '' THEN 1 END) as isbns_present,
-        COUNT(CASE WHEN isbn IS NULL OR isbn = '' THEN 1 END) as isbns_missing,
-
-        -- Publisher analysis
-        COUNT(CASE WHEN publisher IS NOT NULL AND publisher != '' THEN 1 END) as publishers_present,
-        COUNT(CASE WHEN publisher IS NULL OR publisher = '' THEN 1 END) as publishers_missing,
-
-        -- Year analysis
-        COUNT(CASE WHEN published_year IS NOT NULL THEN 1 END) as years_present,
-        COUNT(CASE WHEN published_year IS NULL THEN 1 END) as years_missing,
-
-        -- Description analysis
-        COUNT(CASE WHEN description IS NOT NULL AND description != '' THEN 1 END) as descriptions_present,
-        COUNT(CASE WHEN description IS NULL OR description = '' THEN 1 END) as descriptions_missing,
-
-        -- Confidence analysis
-        ROUND(AVG(confidence), 3) as avg_confidence,
-        ROUND(MIN(confidence), 3) as min_confidence,
-        ROUND(MAX(confidence), 3) as max_confidence,
-        COUNT(CASE WHEN confidence < 0.7 THEN 1 END) as low_confidence_count,
-
-        -- Completeness score (books with all core fields)
-        COUNT(CASE
-            WHEN title IS NOT NULL AND title != ''
-            AND author IS NOT NULL AND author != ''
-            AND published_year IS NOT NULL
-            THEN 1
-        END) as complete_records
-    FROM "aws-sudoblark-development-bookshelf-demo-bookshelf"."processed"
-)
-SELECT
-    b.total_rows,
-    b.unique_ids,
-    b.total_rows - b.unique_ids as duplicate_ids,
-    b.unique_books,
-    b.total_rows - b.unique_books as duplicate_books,
-
-    f.titles_present,
-    f.titles_missing,
-    ROUND(CAST(f.titles_present AS DOUBLE) / b.total_rows * 100, 1) as title_completeness_pct,
-
-    f.authors_present,
-    f.authors_missing,
-    ROUND(CAST(f.authors_present AS DOUBLE) / b.total_rows * 100, 1) as author_completeness_pct,
-
-    f.isbns_present,
-    f.isbns_missing,
-    ROUND(CAST(f.isbns_present AS DOUBLE) / b.total_rows * 100, 1) as isbn_completeness_pct,
-
-    f.publishers_present,
-    f.publishers_missing,
-
-    f.years_present,
-    f.years_missing,
-
-    f.descriptions_present,
-    f.descriptions_missing,
-
-    f.avg_confidence,
-    f.min_confidence,
-    f.max_confidence,
-    f.low_confidence_count,
-
-    f.complete_records,
-    ROUND(CAST(f.complete_records AS DOUBLE) / b.total_rows * 100, 1) as complete_records_pct
-FROM base_stats b, field_stats f;
+**Get single upload details:**
+```sh
+curl -s 'http://localhost:8000/ops/files/{upload_id}' | jq .
 ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -522,7 +520,7 @@ This project follows Sudoblark's Python quality standards with comprehensive tes
 pytest --cov=application/backend --cov-report=html --cov-report=term-missing
 
 # Run specific test file
-pytest tests/test_metadata_extractor.py -v
+pytest tests/test_tracker.py -v
 
 # Run with mocked AWS services
 pytest tests/test_file_router.py -v
@@ -540,9 +538,8 @@ pytest tests/test_file_router.py -v
 tests/
 ├── conftest.py                   # Pytest fixtures and configuration
 ├── test_common.py                # Tests for shared common utilities
-├── test_landing_to_raw.py        # Tests for AV scan + routing Lambda
-├── test_metadata_extractor.py    # Tests for Bedrock metadata extraction
-└── test_ops.py                   # Tests for ops dashboard API endpoints
+├── test_tracker.py               # Tests for ingestion tracking utility
+└── test_ops.py                   # Tests for ops dashboard endpoints (in streaming API)
 ```
 
 ### Linting and Security
@@ -634,6 +631,38 @@ aws lambda invoke \
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
+## Current Limitations
+
+This is an **active demo under development**. The following features are coming but not yet implemented:
+
+| Feature | Status | Notes |
+|---|---|---|
+| **Authentication / Authorization** | 🚫 Not started | All endpoints are public. Cognito integration planned. |
+| **Bookshelf Display** | 🚫 Not started | Backend can store accepted books, but no frontend page to list them. |
+| **Ook Chat** | 🚧 Stub only | Frontend page exists, backend streaming not implemented. |
+| **Embeddings & Similarity** | 🚫 Not started | Can compute book similarity via Bedrock Titan embeddings + cosine similarity. |
+| **Persistence across restarts** | ⚠️ Partial | Session state is in-process only; DynamoDB tracking persists. |
+| **Error handling** | ⚠️ Basic | Limited error messages and recovery logic (demo code). |
+| **Production deployment** | 🚧 In progress | Terraform for ECS Fargate / App Runner not yet implemented. |
+
+**What works:**
+- ✅ File upload via presigned URLs
+- ✅ Streaming metadata extraction with pydantic-ai
+- ✅ Multi-turn conversation refinement
+- ✅ Metadata acceptance and S3 storage
+- ✅ Ingestion tracking (DynamoDB)
+- ✅ Local development (docker-compose or uvicorn)
+
+**Next priority features:**
+1. Bookshelf display page (query accepted books from S3/DynamoDB)
+2. Ops dashboard UI (visualise ingestion tracking status)
+3. Ook chat interface (full streaming chat implementation)
+4. Cognito authentication and user scoping
+5. Embeddings and similarity search (Bedrock Titan + cosine similarity)
+6. Production deployment infrastructure (ECS Fargate + ALB)
+
+<p align="right">(<a href="#readme-top">back to top</a>)</p>
+
 <!-- TROUBLESHOOTING -->
 ## Troubleshooting
 
@@ -643,31 +672,48 @@ aws lambda invoke \
 ```
 Error: An error occurred (ResourceNotFoundException) when calling the InvokeModel operation
 ```
-**Solution:** Ensure Claude 3 Haiku is enabled in AWS Bedrock console (eu-west-2 region).
+**Solution:** Ensure Claude 3.5 Sonnet is enabled in AWS Bedrock console (eu-west-2 region):
+```sh
+aws bedrock list-foundation-models --region eu-west-2 --by-provider anthropic
+```
 
-**Issue: "Lambda timeout"**
+**Issue: "Backend won't start - missing environment variables"**
 ```
-Task timed out after 60.00 seconds
+KeyError: 'LANDING_BUCKET'
 ```
-**Solution:** Bedrock API calls may occasionally be slow. Increase the `metadata-extractor` Lambda timeout in `modules/data/lambdas.tf`.
+**Solution:** Set all required environment variables (see table in Local Development section):
+```sh
+export LANDING_BUCKET=$(aws s3 ls | grep landing | awk '{print $3}')
+export RAW_BUCKET=$(aws s3 ls | grep raw | awk '{print $3}')
+export TRACKING_TABLE=$(aws dynamodb list-tables --query 'TableNames[?contains(@, `ingestion-tracking`)]' --output text)
+```
 
-**Issue: "Glue Crawler not finding data"**
+**Issue: "CORS error - frontend can't reach backend"**
 ```
-No tables found in database
+Access to XMLHttpRequest blocked by CORS policy
 ```
 **Solution:**
-1. Verify Parquet files exist in processed bucket: `aws s3 ls s3://BUCKET-NAME/processed/`
-2. Manually trigger crawler: `aws glue start-crawler --name CRAWLER-NAME`
-3. Check crawler logs in CloudWatch
+1. Ensure backend is running on http://localhost:8000
+2. Check `CORS_ALLOWED_ORIGINS` env var includes `http://localhost:5173`
+3. Verify Vite proxy is configured correctly in `application/frontend/vite.config.ts`
 
-**Issue: "Module not found in Lambda"**
+**Issue: "Frontend stuck on 'Extracting...' or times out"**
 ```
-ModuleNotFoundError: No module named 'PIL'
+No tokens appearing, UI hangs
 ```
-**Solution:** Re-package Lambda with dependencies:
-```sh
-bash scripts/bundle-lambdas.sh
+**Solution:**
+1. Check backend logs: `docker-compose logs streaming-agent` (or `uvicorn` output)
+2. Verify AWS credentials are set correctly
+3. Test Bedrock connectivity: `aws bedrock-runtime invoke-model --model-id anthropic.claude-3-5-sonnet-20241022-v2:0 --body '{"messages":[{"role":"user","content":"test"}]}'`
+
+**Issue: "S3 upload fails - Access Denied"**
 ```
+Error: Access Denied when uploading to presigned URL
+```
+**Solution:**
+1. Verify IAM credentials have S3 access
+2. Check presigned URL TTL (should be 5-10 minutes)
+3. Ensure URL is for the correct bucket
 
 **Issue: "Terraform state locked"**
 ```
@@ -680,58 +726,63 @@ terraform force-unlock LOCK_ID
 
 ### Debugging Tips
 
-**View Lambda logs:**
+**Check backend health:**
 ```sh
-# Tail logs in real-time
-aws logs tail /aws/lambda/FUNCTION-NAME --follow
-
-# View recent logs
-aws logs filter-log-events \
-  --log-group-name /aws/lambda/FUNCTION-NAME \
-  --start-time $(date -u -d '10 minutes ago' +%s)000
+curl http://localhost:8000/health
 ```
 
-**Test Lambda locally:**
+**Monitor backend logs (docker-compose):**
+```sh
+cd application/backend/streaming-agent
+docker-compose logs -f streaming-agent
+```
+
+**Monitor backend logs (uvicorn):**
+```sh
+# Set LOG_LEVEL=DEBUG for verbose output
+export LOG_LEVEL=DEBUG
+uvicorn app:app --reload
+```
+
+**Inspect saved metadata in S3:**
+```sh
+RAW_BUCKET=$(aws s3 ls | grep raw | awk '{print $3}')
+aws s3 ls s3://${RAW_BUCKET}/ --recursive  # List all saved files
+aws s3 cp s3://${RAW_BUCKET}/author=John%20Doe/published_year=2024/uuid.json - | jq .  # View single file
+```
+
+**Check DynamoDB tracking table:**
+```sh
+TRACKING_TABLE=$(aws dynamodb list-tables --query 'TableNames[?contains(@, `ingestion-tracking`)]' --output text)
+aws dynamodb scan --table-name ${TRACKING_TABLE} --limit 10 | jq '.Items[]'
+```
+
+**Test metadata extraction directly (curl SSE):**
+```sh
+# Start a metadata extraction and see SSE events in real-time
+curl -N -X POST 'http://localhost:8000/api/metadata/initial' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "bucket": "YOUR_LANDING_BUCKET",
+    "key": "path/to/cover.jpg",
+    "filename": "cover.jpg"
+  }'
+```
+
+**Run tests locally:**
 ```sh
 # Activate venv
 source .venv/bin/activate
 
-# Set environment variables
-export RAW_BUCKET=raw
-export LOG_LEVEL=DEBUG
+# Run all tests with coverage
+pytest --cov=application/backend tests/ -v
 
-# Run unit tests
-python -m pytest tests/test_file_router.py -v
+# Run specific test file
+pytest tests/test_ops.py -v
+
+# Run with detailed output
+pytest -vv --tb=short tests/
 ```
-
-**Check S3 event notifications:**
-```sh
-aws s3api get-bucket-notification-configuration \
-  --bucket BUCKET-NAME
-```
-
-**Inspect individual Parquet records locally:**
-
-Download a file from the processed bucket and use `scripts/read_parquet.py` to examine its contents without needing Athena:
-
-```sh
-# Install script dependencies (one-off)
-pip install -r scripts/requirements.txt
-
-# Check for available commands to list files from s3, and read local/remove parquet
-python scripts/read_parquet.py --help
-
-# For example
-PROCESSED_BUCKET=$(aws s3 ls | grep processed | awk '{print $3}')
-python scripts/read_parquet.py --list-files s3://$PROCESSED_BUCKET
-
-
-# Read directly from S3 (no local download needed)
-PROCESSED_BUCKET=$(aws s3 ls | grep processed | awk '{print $3}')
-python scripts/read_parquet.py s3://${PROCESSED_BUCKET}/processed/some-file.parquet
-```
-
-This is useful when iterating on the Lambda output format or verifying that a specific record was written with the expected field values.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

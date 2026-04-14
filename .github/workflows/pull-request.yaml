@@ -41,8 +41,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Create Lambda deployment packages
-        run: bash scripts/bundle-lambdas.sh
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -78,16 +76,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - lambda: bookshelf-agent
-            path: application/backend/data-pipeline/bookshelf-agent
           - lambda: common
             path: application/backend/common
-          - lambda: landing-to-raw
-            path: application/backend/data-pipeline/landing-to-raw
-          - lambda: metadata-extractor
-            path: application/backend/data-pipeline/metadata-extractor
-          - lambda: ops
-            path: application/backend/restapi/ops
+          - lambda: streaming-agent
+            path: application/backend/streaming-agent
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -139,16 +131,12 @@ jobs:
     strategy:
       matrix:
         include:
-          - lambda: bookshelf-agent
-            path: application/backend/data-pipeline/bookshelf-agent
           - lambda: common
             path: application/backend/common
-          - lambda: landing-to-raw
-            path: application/backend/data-pipeline/landing-to-raw
-          - lambda: metadata-extractor
-            path: application/backend/data-pipeline/metadata-extractor
-          - lambda: ops
-            path: application/backend/restapi/ops
+            test_files: tests/test_common.py tests/test_tracker.py
+          - lambda: streaming-agent
+            path: application/backend/streaming-agent
+            test_files: tests/backend/streaming-agent/
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -172,9 +160,7 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          TEST_FILE="test_${{ matrix.lambda }}.py"
-          TEST_FILE="${TEST_FILE//-/_}"
-          pytest tests/${TEST_FILE} \
+          pytest ${{ matrix.test_files }} \
             --cov=${{ matrix.path }} \
             --cov-report=term-missing --cov-report=html \
             --cov-fail-under=80
@@ -185,6 +171,30 @@ jobs:
         with:
           name: coverage-report-${{ matrix.lambda }}
           path: htmlcov/
+
+  frontend_quality:
+    name: Frontend Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: refs/pull/${{ github.event.pull_request.number }}/merge
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: application/frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: application/frontend
+        run: npm ci
+
+      - name: TypeScript Check & Build
+        working-directory: application/frontend
+        run: npm run build
 
   test:
     name: Terraform Test
@@ -226,9 +236,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-
-      - name: Create Lambda deployment packages
-        run: bash scripts/bundle-lambdas.sh
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4

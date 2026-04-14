@@ -1,6 +1,6 @@
 """Pydantic models for the bookshelf streaming agent service."""
 
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -39,7 +39,7 @@ class StreamingBookMetadataResponse(BaseModel):
 
     @field_validator("published_year", mode="before")
     @classmethod
-    def validate_published_year(cls, v: any) -> Optional[int]:
+    def validate_published_year(cls, v: Any) -> Optional[int]:
         """Convert invalid year values to None.
 
         The agent may return strings like 'Unknown', 'N/A', etc. when the year
