@@ -1,6 +1,8 @@
 services:
   streaming-agent:
-    build: .
+    build:
+      context: ..
+      dockerfile: streaming-agent/Dockerfile
     ports:
       - "8000:8000"
     environment:
@@ -8,7 +10,7 @@ services:
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
       AWS_DEFAULT_REGION: ${AWS_DEFAULT_REGION:-eu-west-2}
-      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-anthropic.claude-3-5-sonnet-20241022-v2:0}
+      BEDROCK_MODEL_ID: ${BEDROCK_MODEL_ID:-anthropic.claude-3-7-sonnet-20250219-v1:0}
       BEDROCK_REGION: ${AWS_DEFAULT_REGION:-eu-west-2}
       LANDING_BUCKET: ${LANDING_BUCKET}
       RAW_BUCKET: ${RAW_BUCKET}

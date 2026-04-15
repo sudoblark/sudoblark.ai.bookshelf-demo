@@ -2,9 +2,23 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  padding: 2rem;
+  gap: 2rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+/* Empty state */
+.page > .container {
+  display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
-  padding: 3rem 2rem;
+  gap: 1.5rem;
+  text-align: center;
+  max-width: 420px;
+  margin: auto;
 }
 
 .container {
@@ -54,4 +68,227 @@
 
 .ctaButton:active {
   transform: scale(0.98);
+}
+
+/* Stats Row */
+.statsRow {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.statCard {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  padding: 1.5rem;
+  text-align: center;
+}
+
+.statLabel {
+  font-size: var(--font-sm);
+  color: #888;
+  margin-bottom: 0.5rem;
+}
+
+.statValue {
+  font-size: var(--font-xl);
+  font-weight: 600;
+  color: #e8e8e8;
+}
+
+.statSubtext {
+  font-size: var(--font-xs);
+  color: #666;
+  margin-top: 0.25rem;
+}
+
+/* Search Bar */
+.searchBar {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.75rem;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  color: #e8e8e8;
+  font-size: var(--font-sm);
+}
+
+.searchInput::placeholder {
+  color: #666;
+}
+
+.searchInput:focus {
+  outline: none;
+  border-color: #7c6ff7;
+}
+
+.searchField {
+  padding: 0.75rem;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  color: #e8e8e8;
+  font-size: var(--font-sm);
+  cursor: pointer;
+}
+
+.searchField:focus {
+  outline: none;
+  border-color: #7c6ff7;
+}
+
+.searchButton,
+.clearButton {
+  padding: 0.75rem 1.5rem;
+  background: #7c6ff7;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: var(--font-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  white-space: nowrap;
+}
+
+.searchButton:hover,
+.clearButton:hover {
+  background: #6058d4;
+}
+
+.clearButton {
+  background: #555;
+}
+
+.clearButton:hover {
+  background: #444;
+}
+
+/* Error and Loading */
+.error {
+  padding: 1rem;
+  background: #3a1a1a;
+  border: 1px solid #5a2a2a;
+  border-radius: 8px;
+  color: #ff8888;
+  text-align: center;
+  font-size: var(--font-sm);
+}
+
+.loading {
+  padding: 2rem;
+  text-align: center;
+  color: #888;
+  font-size: var(--font-sm);
+}
+
+.noResults {
+  padding: 2rem;
+  text-align: center;
+  color: #888;
+  font-size: var(--font-sm);
+}
+
+/* Book Grid */
+.bookGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 1.5rem;
+}
+
+.bookCard {
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  padding: 1.5rem;
+  transition: transform 0.15s, border-color 0.15s;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.bookCard:hover {
+  border-color: #7c6ff7;
+  transform: translateY(-2px);
+}
+
+.bookTitle {
+  font-size: var(--font-base);
+  font-weight: 600;
+  color: #e8e8e8;
+  line-height: 1.4;
+  min-height: 2.8em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.bookAuthor {
+  font-size: var(--font-sm);
+  color: #aaa;
+}
+
+.bookYear {
+  font-size: var(--font-xs);
+  color: #666;
+}
+
+.confidenceBadge {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  background: #7c6ff7;
+  color: #fff;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: var(--font-xs);
+  font-weight: 600;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: auto;
+  padding-top: 1rem;
+}
+
+.paginationButton {
+  padding: 0.5rem 1rem;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  color: #e8e8e8;
+  cursor: pointer;
+  font-size: var(--font-sm);
+  transition: background 0.15s;
+}
+
+.paginationButton:hover:not(:disabled) {
+  background: #3a3a3a;
+  border-color: #7c6ff7;
+}
+
+.paginationButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pageInfo {
+  color: #888;
+  font-size: var(--font-sm);
+  white-space: nowrap;
 }
