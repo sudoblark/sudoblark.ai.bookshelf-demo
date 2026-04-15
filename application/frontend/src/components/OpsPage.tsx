@@ -119,16 +119,59 @@ export function OpsPage({ onNavigateToNewBook }: Props) {
                   <tr key={`detail-${file.upload_id}`}>
                     <td colSpan={5} className={styles.detailCell}>
                       <div className={styles.detail}>
-                        <h3>Stage Progress</h3>
-                        <div className={styles.stageList}>
-                          {file.stage_progress.map((stage, idx) => (
-                            <div key={idx} className={styles.stageItem}>
-                              <div className={styles.stageName}>{stage.stage_name}</div>
-                              <div className={styles.stageStatus}>{stage.status}</div>
-                              {stage.processing_time && (
-                                <div className={styles.stageTime}>
-                                  {stage.processing_time}s
+                        <h3>Pipeline Progress</h3>
+                        <div className={styles.progressContainer}>
+                          <div className={styles.progressBar}>
+                            {["user_upload", "routing", "av_scan", "enrichment"].map((stageName, idx) => {
+                              const stageData = file.stage_progress.find(s => s.stage_name === stageName);
+                              const isComplete = stageData?.status === "success";
+                              const isFailed = stageData?.status === "failed";
+                              const isActive = stageData?.status === "in_progress";
+
+                              return (
+                                <div key={stageName} className={styles.stageNode}>
+                                  <div
+                                    className={`${styles.stageCircle} ${
+                                      isComplete ? styles.stageSuccess : ""
+                                    } ${isActive ? styles.stageActive : ""} ${
+                                      isFailed ? styles.stageFailed : ""
+                                    }`}
+                                  >
+                                    {isComplete && "✓"}
+                                    {isFailed && "✕"}
+                                    {isActive && "⟳"}
+                                    {!stageData && "○"}
+                                  </div>
+                                  <div className={styles.stageLabelSmall}>
+                                    {stageName.replace("_", "\n")}
+                                  </div>
+                                  {stageData?.processing_time && (
+                                    <div className={styles.stageTimeSmall}>
+                                      {stageData.processing_time}s
+                                    </div>
+                                  )}
                                 </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div className={styles.stageDetails}>
+                          {file.stage_progress.map((stage, idx) => (
+                            <div
+                              key={idx}
+                              className={`${styles.stageDetailItem} ${
+                                stage.status === "success" ? styles.detailSuccess : ""
+                              } ${stage.status === "failed" ? styles.detailFailed : ""} ${
+                                stage.status === "in_progress" ? styles.detailInProgress : ""
+                              }`}
+                            >
+                              <div className={styles.detailName}>{stage.stage_name}</div>
+                              <div className={styles.detailStatus}>{stage.status}</div>
+                              {stage.processing_time && (
+                                <div className={styles.detailTime}>{stage.processing_time}s</div>
+                              )}
+                              {stage.error_message && (
+                                <div className={styles.detailError}>{stage.error_message}</div>
                               )}
                             </div>
                           ))}

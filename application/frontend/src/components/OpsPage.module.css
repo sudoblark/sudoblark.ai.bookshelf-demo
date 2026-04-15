@@ -204,46 +204,160 @@
   letter-spacing: 0.05em;
 }
 
-.stageList {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+/* Progress bar visualization */
+.progressContainer {
+  margin-bottom: 2rem;
 }
 
-.stageItem {
+.progressBar {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  background: #1a1a1a;
+  border-radius: 8px;
+  align-items: flex-start;
+}
+
+.stageNode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.stageCircle {
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #333333;
+  color: #999;
+  font-weight: 600;
+  font-size: var(--font-base);
+  border: 2px solid #3a3a3a;
+}
+
+.stageSuccess {
+  background: #1a4a1a;
+  color: #88dd88;
+  border-color: #4a8a4a;
+}
+
+.stageFailed {
+  background: #4a1a1a;
+  color: #ff8888;
+  border-color: #8a4a4a;
+}
+
+.stageActive {
+  background: #4a3a1a;
+  color: #ffdd88;
+  border-color: #8a7a4a;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+.stageLabelSmall {
+  font-size: var(--font-xs);
+  color: #888;
+  text-align: center;
+  line-height: 1.2;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.stageTimeSmall {
+  font-size: var(--font-xs);
+  color: #666;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Stage details section */
+.stageDetails {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.stageDetailItem {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
   gap: 1rem;
-  padding: 0.5rem;
-  background: #2a2a2a;
+  align-items: center;
+  padding: 0.75rem;
+  background: #1a1a1a;
+  border-left: 3px solid #3a3a3a;
   border-radius: 4px;
   font-size: var(--font-xs);
 }
 
-.stageName {
-  min-width: 120px;
-  font-weight: 500;
+.detailSuccess {
+  border-left-color: #4a8a4a;
+  background: #1a2a1a;
+}
+
+.detailFailed {
+  border-left-color: #8a4a4a;
+  background: #2a1a1a;
+}
+
+.detailInProgress {
+  border-left-color: #8a7a4a;
+  background: #2a2a1a;
+}
+
+.detailName {
+  font-weight: 600;
   color: #e8e8e8;
   text-transform: capitalize;
 }
 
-.stageStatus {
-  min-width: 100px;
-  padding: 0.25rem 0.5rem;
+.detailStatus {
+  padding: 0.25rem 0.75rem;
   border-radius: 3px;
+  font-weight: 600;
   text-transform: capitalize;
-  font-weight: 500;
+  width: fit-content;
+  background: #333333;
+  color: #aaa;
 }
 
-.stageItem .stageStatus {
+.stageDetailItem.detailSuccess .detailStatus {
   background: #1a4a1a;
   color: #88dd88;
 }
 
-.stageTime {
-  margin-left: auto;
-  color: #999;
+.stageDetailItem.detailFailed .detailStatus {
+  background: #4a1a1a;
+  color: #ff8888;
+}
+
+.stageDetailItem.detailInProgress .detailStatus {
+  background: #4a3a1a;
+  color: #ffdd88;
+}
+
+.detailTime {
+  color: #666;
   font-variant-numeric: tabular-nums;
+}
+
+.detailError {
+  grid-column: 1 / -1;
+  color: #ff8888;
+  font-style: italic;
 }
 
 /* Expand arrow */
