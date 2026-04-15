@@ -5,6 +5,8 @@ import {
   BookshelfOverview,
   CatalogueResponse,
   SearchResponse,
+  OpsListResponse,
+  OpsDetailResponse,
 } from "./types";
 
 export async function getPresignedUrl(filename: string): Promise<PresignedUrlResponse> {
@@ -121,5 +123,19 @@ export async function searchBookshelf(
     `/api/bookshelf/search?query=${encodeURIComponent(query)}&field=${field}`
   );
   if (!res.ok) throw new Error(`Failed to search: ${res.statusText}`);
+  return res.json();
+}
+
+// Ops dashboard API functions
+
+export async function getOpsFiles(): Promise<OpsListResponse> {
+  const res = await fetch("/api/ops/files");
+  if (!res.ok) throw new Error(`Failed to fetch ops files: ${res.statusText}`);
+  return res.json();
+}
+
+export async function getOpsFile(fileId: string): Promise<OpsDetailResponse> {
+  const res = await fetch(`/api/ops/files/${encodeURIComponent(fileId)}`);
+  if (!res.ok) throw new Error(`Failed to fetch ops file: ${res.statusText}`);
   return res.json();
 }

@@ -47,3 +47,34 @@ export interface SearchResponse {
   query: string;
   field: string;
 }
+
+// Ops dashboard types
+
+export interface StageProgress {
+  stage_name: string;
+  status: "in_progress" | "success" | "failed";
+  start_time: string;
+  end_time: string | null;
+  processing_time: string | null;
+  source: { bucket: string; key: string } | null;
+  destination: { bucket: string; key: string } | null;
+  error_message: string | null;
+}
+
+export interface UploadFile {
+  upload_id: string;
+  user_id: string;
+  current_status: "QUEUED" | "IN_PROGRESS" | "SUCCESS" | "FAILED";
+  stage_progress: StageProgress[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OpsListResponse {
+  files: UploadFile[];
+  count: number;
+}
+
+export interface OpsDetailResponse {
+  file: UploadFile;
+}
