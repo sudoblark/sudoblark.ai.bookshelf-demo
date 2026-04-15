@@ -1,4 +1,11 @@
-import { BookMetadata, PresignedUrlResponse, StreamEvent } from "./types";
+import {
+  BookMetadata,
+  PresignedUrlResponse,
+  StreamEvent,
+  BookshelfOverview,
+  CatalogueResponse,
+  SearchResponse,
+} from "./types";
 
 export async function getPresignedUrl(filename: string): Promise<PresignedUrlResponse> {
   const res = await fetch(`/api/upload/presigned?filename=${encodeURIComponent(filename)}`);
@@ -84,5 +91,35 @@ export async function acceptMetadata(
     body: JSON.stringify({ metadata, filename }),
   });
   if (!res.ok) throw new Error(`Accept request failed: ${res.statusText}`);
+  return res.json();
+}
+
+// Bookshelf API functions
+
+export async function getBookshelfOverview(): Promise<BookshelfOverview> {
+  const res = await fetch("/api/bookshelf/overview");
+  if (!res.ok) throw new Error(`Failed to fetch overview: ${res.statusText}`);
+  return res.json();
+}
+
+export async function getBookshelfCatalogue(
+  page: number = 1,
+  pageSize: number = 5
+): Promise<CatalogueResponse> {
+  const res = await fetch(
+    `/api/bookshelf/catalogue?page=${page}&page_size=${pageSize}`
+  );
+  if (!res.ok) throw new Error(`Failed to fetch catalogue: ${res.statusText}`);
+  return res.json();
+}
+
+export async function searchBookshelf(
+  query: string,
+  field: "title" | "author" = "title"
+): Promise<SearchResponse> {
+  const res = await fetch(
+    `/api/bookshelf/search?query=${encodeURIComponent(query)}&field=${field}`
+  );
+  if (!res.ok) throw new Error(`Failed to search: ${res.statusText}`);
   return res.json();
 }
