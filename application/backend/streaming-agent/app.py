@@ -22,11 +22,22 @@ POST /api/metadata/accept
     Save the confirmed metadata as JSON to the raw S3 bucket with Hive-style
     partitioning (``author={}/published_year={}/``).
 
-GET  /ops/files
+GET  /api/ops/files
     List all tracked file uploads from the ingestion tracking table.
 
-GET  /ops/files/{file_id}
+GET  /api/ops/files/{file_id}
     Get detailed tracking information for a specific upload by ID.
+
+GET  /api/bookshelf/overview
+    High-level bookshelf stats: total count, most common author.
+
+GET  /api/bookshelf/catalogue
+    Paginated list of books (5 per page by default).
+    Query params: page (1-indexed), page_size (max 20).
+
+GET  /api/bookshelf/search
+    Search books by title or author.
+    Query params: query (required), field (title|author).
 
 Environment variables
 ---------------------
@@ -42,6 +53,7 @@ import logging
 import os
 
 from accept_handler import AcceptHandler
+from bookshelf_handler import BookshelfHandler
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -71,6 +83,7 @@ _initial = MetadataInitialHandler()
 _refine = MetadataRefineHandler()
 _accept = AcceptHandler()
 _ops = OpsHandler()
+_bookshelf = BookshelfHandler()
 
 
 @app.get("/health")
@@ -98,11 +111,26 @@ async def metadata_accept(request: Request) -> JSONResponse:
     return await _accept.handle(request)
 
 
-@app.get("/ops/files")
+@app.get("/api/ops/files")
 async def ops_list_files(request: Request) -> JSONResponse:
     return await _ops.handle_list(request)
 
 
-@app.get("/ops/files/{file_id}")
+@app.get("/api/ops/files/{file_id}")
 async def ops_get_file(request: Request, file_id: str) -> JSONResponse:
     return await _ops.handle_get(request, file_id)
+
+
+@app.get("/api/bookshelf/overview")
+async def bookshelf_overview(request: Request) -> JSONResponse:
+    return await _bookshelf.handle_overview(request)
+
+
+@app.get("/api/bookshelf/catalogue")
+async def bookshelf_catalogue(request: Request) -> JSONResponse:
+    return await _bookshelf.handle_catalogue(request)
+
+
+@app.get("/api/bookshelf/search")
+async def bookshelf_search(request: Request) -> JSONResponse:
+    return await _bookshelf.handle_search(request)

@@ -246,8 +246,11 @@ The streaming agent exposes the following HTTP endpoints:
 | `/api/metadata/initial` | POST | Extract metadata from uploaded image | Server-Sent Events (streaming tokens) |
 | `/api/metadata/refine` | POST | Multi-turn refinement conversation | Server-Sent Events (streaming tokens) |
 | `/api/metadata/accept` | POST | Save confirmed metadata to S3 | `{"status": "accepted", "saved_key": "...", "upload_id": "..."}` |
-| `/ops/files` | GET | List all uploaded files with status | `[{"upload_id": "...", "current_status": "...", ...}]` |
-| `/ops/files/{file_id}` | GET | Get details for a single upload | `{"upload_id": "...", "stage_progress": [...], ...}` |
+| `/api/ops/files` | GET | List all uploaded files with status | `{"files": [...], "count": N}` |
+| `/api/ops/files/{file_id}` | GET | Get details for a single upload | `{"file": {...}}` |
+| `/api/bookshelf/overview` | GET | Get bookshelf statistics | `{"total_books": N, "most_common_author": str, "most_common_author_count": N}` |
+| `/api/bookshelf/catalogue` | GET | Get paginated list of books | `{"books": [...], "page": N, "page_size": N, "total_books": N, "total_pages": N}` |
+| `/api/bookshelf/search` | GET | Search books by title or author | `{"books": [...], "total_results": N, "query": str, "field": str}` |
 
 ### Metadata Schema
 
@@ -288,8 +291,8 @@ To get a local copy up and running follow these simple steps.
   docker --version
   ```
 
-* **AWS Bedrock Model Access** - Claude 3.5 Sonnet must be enabled:
-  - Model ID: `anthropic.claude-3-5-sonnet-20241022-v2:0`
+* **AWS Bedrock Model Access** - Claude 3.7 Sonnet must be enabled:
+  - Model ID: `anthropic.claude-3-7-sonnet-20250219-v1:0`
   - Region: `eu-west-2` (London)
   - Access: Enable in AWS Bedrock console
 
@@ -361,9 +364,11 @@ The backend is a FastAPI application that can run locally or in a container.
 ```sh
 cd application/backend/streaming-agent
 
+eval $(aws configure export-credentials --format env)
+
 # Set required environment variables
 export AWS_DEFAULT_REGION=eu-west-2
-export BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
+export BEDROCK_MODEL_ID=anthropic.claude-3-7-sonnet-20250219-v1:0
 export LANDING_BUCKET=$(aws s3 ls | grep landing | awk '{print $3}')
 export RAW_BUCKET=$(aws s3 ls | grep raw | awk '{print $3}')
 export TRACKING_TABLE=$(aws dynamodb list-tables --query 'TableNames[?contains(@, `ingestion-tracking`)]' --output text)
@@ -403,7 +408,7 @@ The frontend is configured to proxy all `/api/*` requests to `http://localhost:8
 | `AWS_DEFAULT_REGION` | Yes | — | AWS region (must be `eu-west-2`) |
 | `AWS_ACCESS_KEY_ID` | Yes (if not using IAM role) | — | AWS access key |
 | `AWS_SECRET_ACCESS_KEY` | Yes (if not using IAM role) | — | AWS secret key |
-| `BEDROCK_MODEL_ID` | Yes | `anthropic.claude-3-5-sonnet-20241022-v2:0` | Bedrock model to use |
+| `BEDROCK_MODEL_ID` | Yes | `anthropic.claude-3-7-sonnet-20250219-v1:0` | Bedrock model to use |
 | `BEDROCK_REGION` | No | `eu-west-2` | Region for Bedrock API |
 | `LANDING_BUCKET` | Yes | — | S3 bucket name for landing zone |
 | `RAW_BUCKET` | Yes | — | S3 bucket name for accepted metadata |
@@ -468,9 +473,13 @@ The typical user flow through the application:
    - Metadata is written to S3 (`s3://raw-bucket/author=X/published_year=Y/uuid.json`)
    - DynamoDB tracking table updates with success status
 
-7. **View operations (debugging)**
-   - Click the "Ops" tab in the header (not yet implemented in frontend)
-   - Or query directly: `curl http://localhost:8000/ops/files`
+7. **View bookshelf**
+   - Click the "Bookshelf" tab to see all accepted books
+   - Overview stats show total count and most common author
+   - Browse paginated grid or search by title/author
+
+8. **View operations (debugging)**
+   - Query directly: `curl http://localhost:8000/api/ops/files`
    - Lists all uploads with their processing status
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -498,12 +507,27 @@ curl -X POST 'http://localhost:8000/api/metadata/initial' \
 
 **List all uploads:**
 ```sh
-curl -s 'http://localhost:8000/ops/files' | jq '.[] | {upload_id, current_status, created_at}'
+curl -s 'http://localhost:8000/api/ops/files' | jq '.files[] | {upload_id, current_status, created_at}'
 ```
 
 **Get single upload details:**
 ```sh
-curl -s 'http://localhost:8000/ops/files/{upload_id}' | jq .
+curl -s 'http://localhost:8000/api/ops/files/{upload_id}' | jq .
+```
+
+**Get bookshelf overview:**
+```sh
+curl -s 'http://localhost:8000/api/bookshelf/overview' | jq .
+```
+
+**Get paginated books:**
+```sh
+curl -s 'http://localhost:8000/api/bookshelf/catalogue?page=1&page_size=5' | jq .
+```
+
+**Search books:**
+```sh
+curl -s 'http://localhost:8000/api/bookshelf/search?query=sanderson&field=author' | jq .
 ```
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -638,7 +662,7 @@ This is an **active demo under development**. The following features are coming 
 | Feature | Status | Notes |
 |---|---|---|
 | **Authentication / Authorization** | 🚫 Not started | All endpoints are public. Cognito integration planned. |
-| **Bookshelf Display** | 🚫 Not started | Backend can store accepted books, but no frontend page to list them. |
+| **Bookshelf Display** | ✅ Complete | Backend S3 queries with overview stats, pagination, search. Frontend React UI with grid layout. |
 | **Ook Chat** | 🚧 Stub only | Frontend page exists, backend streaming not implemented. |
 | **Embeddings & Similarity** | 🚫 Not started | Can compute book similarity via Bedrock Titan embeddings + cosine similarity. |
 | **Persistence across restarts** | ⚠️ Partial | Session state is in-process only; DynamoDB tracking persists. |
@@ -651,15 +675,16 @@ This is an **active demo under development**. The following features are coming 
 - ✅ Multi-turn conversation refinement
 - ✅ Metadata acceptance and S3 storage
 - ✅ Ingestion tracking (DynamoDB)
+- ✅ Bookshelf display (overview, pagination, search)
 - ✅ Local development (docker-compose or uvicorn)
 
 **Next priority features:**
-1. Bookshelf display page (query accepted books from S3/DynamoDB)
-2. Ops dashboard UI (visualise ingestion tracking status)
-3. Ook chat interface (full streaming chat implementation)
-4. Cognito authentication and user scoping
-5. Embeddings and similarity search (Bedrock Titan + cosine similarity)
-6. Production deployment infrastructure (ECS Fargate + ALB)
+1. Ops dashboard UI (visualise ingestion tracking status)
+2. Ook chat interface (full streaming chat implementation)
+3. Cognito authentication and user scoping
+4. Embeddings and similarity search (Bedrock Titan + cosine similarity)
+5. Production deployment infrastructure (ECS Fargate + ALB)
+6. Production migration of bookshelf queries to DynamoDB (see ADR-0001)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -672,7 +697,7 @@ This is an **active demo under development**. The following features are coming 
 ```
 Error: An error occurred (ResourceNotFoundException) when calling the InvokeModel operation
 ```
-**Solution:** Ensure Claude 3.5 Sonnet is enabled in AWS Bedrock console (eu-west-2 region):
+**Solution:** Ensure Claude 3.7 Sonnet is enabled in AWS Bedrock console (eu-west-2 region):
 ```sh
 aws bedrock list-foundation-models --region eu-west-2 --by-provider anthropic
 ```
@@ -704,7 +729,7 @@ No tokens appearing, UI hangs
 **Solution:**
 1. Check backend logs: `docker-compose logs streaming-agent` (or `uvicorn` output)
 2. Verify AWS credentials are set correctly
-3. Test Bedrock connectivity: `aws bedrock-runtime invoke-model --model-id anthropic.claude-3-5-sonnet-20241022-v2:0 --body '{"messages":[{"role":"user","content":"test"}]}'`
+3. Test Bedrock connectivity: `aws bedrock-runtime invoke-model --model-id anthropic.claude-3-7-sonnet-20250219-v1:0 --body '{"messages":[{"role":"user","content":"test"}]}'`
 
 **Issue: "S3 upload fails - Access Denied"**
 ```
@@ -812,7 +837,7 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 
 This project was built using industry-leading tools and services:
 
-* [AWS Bedrock](https://aws.amazon.com/bedrock/) - Claude 3 Haiku foundation model
+* [AWS Bedrock](https://aws.amazon.com/bedrock/) - Claude foundation models
 * [Terraform](https://www.terraform.io/) - Infrastructure as Code
 * [GitHub Actions](https://github.com/features/actions) - CI/CD automation
 * [pytest](https://pytest.org/) - Python testing framework

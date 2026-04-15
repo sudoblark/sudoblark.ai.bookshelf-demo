@@ -4,10 +4,16 @@ RUN useradd --create-home --shell /bin/bash appuser
 
 WORKDIR /app
 
-COPY requirements.txt .
+COPY streaming-agent/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+# Copy backend directory (includes streaming-agent and common modules)
+COPY --chown=appuser:appuser .. .
+
+# Set PYTHONPATH so common module is importable
+ENV PYTHONPATH=/app:$PYTHONPATH
+
+WORKDIR /app/streaming-agent
 
 USER appuser
 
