@@ -2,10 +2,11 @@ import { useState } from "react";
 import { BookshelfPage } from "./components/BookshelfPage";
 import { MetadataPage } from "./components/MetadataPage";
 import { OokChatPage } from "./components/OokChatPage";
+import { OpsPage } from "./components/OpsPage";
 import { Shell } from "./components/Shell";
 import { UploadPage } from "./components/UploadPage";
 
-type TabId = "bookshelf" | "new-book" | "ook-chat";
+type TabId = "bookshelf" | "new-book" | "ook-chat" | "ops";
 
 interface UploadContext {
   sessionId: string;
@@ -27,6 +28,10 @@ export default function App() {
   }
 
   function handleNavigateTab(tab: TabId) {
+    // Clear upload context when leaving the new-book tab to ensure each session is independent
+    if (activeTab === "new-book" && tab !== "new-book") {
+      setUploadCtx(null);
+    }
     setActiveTab(tab);
   }
 
@@ -53,6 +58,8 @@ export default function App() {
         );
       case "ook-chat":
         return <OokChatPage />;
+      case "ops":
+        return <OpsPage onNavigateToNewBook={handleNavigateToNewBook} />;
     }
   }
 

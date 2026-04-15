@@ -52,6 +52,7 @@ CORS_ALLOWED_ORIGINS   Comma-separated allowed CORS origins (default: http://loc
 import logging
 import os
 
+import boto3
 from accept_handler import AcceptHandler
 from bookshelf_handler import BookshelfHandler
 from fastapi import FastAPI, Request
@@ -78,10 +79,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+_dynamodb = boto3.resource("dynamodb")
+
 _presigned = PresignedUrlHandler()
-_initial = MetadataInitialHandler()
+_initial = MetadataInitialHandler(dynamodb_resource=_dynamodb)
 _refine = MetadataRefineHandler()
-_accept = AcceptHandler()
+_accept = AcceptHandler(dynamodb_resource=_dynamodb)
 _ops = OpsHandler()
 _bookshelf = BookshelfHandler()
 

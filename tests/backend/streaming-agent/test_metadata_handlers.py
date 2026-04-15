@@ -148,16 +148,10 @@ class TestMetadataInitialHandler:
     @pytest.mark.asyncio
     @patch("metadata_initial_handler.boto3.client")
     @patch("metadata_initial_handler.BookshelfStreamingAgent")
-    @patch("metadata_initial_handler.build_image_toolset")
-    @patch("metadata_initial_handler.build_isbn_toolset")
-    async def test_handle_valid_request(
-        self, mock_isbn_toolset, mock_image_toolset, mock_agent_class, mock_boto3
-    ):
+    async def test_handle_valid_request(self, mock_agent_class, mock_boto3):
         """Test valid request handling."""
         mock_agent_instance = MagicMock()
         mock_agent_class.return_value = mock_agent_instance
-        mock_image_toolset.return_value = MagicMock()
-        mock_isbn_toolset.return_value = MagicMock()
 
         handler = MetadataInitialHandler()
 
@@ -178,16 +172,10 @@ class TestMetadataInitialHandler:
     @pytest.mark.asyncio
     @patch("metadata_initial_handler.boto3.client")
     @patch("metadata_initial_handler.BookshelfStreamingAgent")
-    @patch("metadata_initial_handler.build_image_toolset")
-    @patch("metadata_initial_handler.build_isbn_toolset")
-    async def test_handle_filename_defaults(
-        self, mock_isbn_toolset, mock_image_toolset, mock_agent_class, mock_boto3
-    ):
+    async def test_handle_filename_defaults(self, mock_agent_class, mock_boto3):
         """Test that filename defaults to 'book cover'."""
         mock_agent_instance = MagicMock()
         mock_agent_class.return_value = mock_agent_instance
-        mock_image_toolset.return_value = MagicMock()
-        mock_isbn_toolset.return_value = MagicMock()
 
         handler = MetadataInitialHandler()
 
@@ -214,27 +202,25 @@ class TestMetadataInitialHandler:
         """Test that streaming response has correct headers."""
         with patch("metadata_initial_handler.boto3.client"):
             with patch("metadata_initial_handler.BookshelfStreamingAgent"):
-                with patch("metadata_initial_handler.build_image_toolset"):
-                    with patch("metadata_initial_handler.build_isbn_toolset"):
-                        handler = MetadataInitialHandler()
+                handler = MetadataInitialHandler()
 
-                        import asyncio
+                import asyncio
 
-                        async def test_headers():
-                            mock_request = AsyncMock()
-                            mock_request.json.return_value = {
-                                "bucket": "test-bucket",
-                                "key": "test.jpg",
-                            }
+                async def test_headers():
+                    mock_request = AsyncMock()
+                    mock_request.json.return_value = {
+                        "bucket": "test-bucket",
+                        "key": "test.jpg",
+                    }
 
-                            response = await handler.handle(mock_request)
+                    response = await handler.handle(mock_request)
 
-                            # Verify SSE headers
-                            assert response.media_type == "text/event-stream"
-                            assert response.headers["X-Accel-Buffering"] == "no"
-                            assert response.headers["Cache-Control"] == "no-cache"
+                    # Verify SSE headers
+                    assert response.media_type == "text/event-stream"
+                    assert response.headers["X-Accel-Buffering"] == "no"
+                    assert response.headers["Cache-Control"] == "no-cache"
 
-                        asyncio.run(test_headers())
+                asyncio.run(test_headers())
 
 
 class TestMetadataRefineHandler:
@@ -463,35 +449,3 @@ class TestSessionHistory:
                 # Verify agent was created with refinement=True
                 call_kwargs = mock_agent_class.call_args[1]
                 assert call_kwargs.get("refinement") is True
-
-
-class TestToolsetBuildingErrors:
-    """Test error handling during toolset construction."""
-
-    @pytest.mark.asyncio
-    @patch("metadata_initial_handler.boto3.client")
-    @patch("metadata_initial_handler.BookshelfStreamingAgent")
-    @patch("metadata_initial_handler.build_image_toolset")
-    @patch("metadata_initial_handler.build_isbn_toolset")
-    async def test_toolset_build_failure_falls_back_to_empty_list(
-        self, mock_isbn_toolset, mock_image_toolset, mock_agent_class, mock_boto3
-    ):
-        """Test that toolset build failures result in empty toolset list."""
-        mock_agent_instance = MagicMock()
-        mock_agent_class.return_value = mock_agent_instance
-
-        # Simulate toolset building failure
-        mock_image_toolset.side_effect = RuntimeError("S3 access failed")
-        mock_isbn_toolset.side_effect = RuntimeError("ISBN lookup failed")
-
-        handler = MetadataInitialHandler()
-
-        mock_request = AsyncMock()
-        mock_request.json.return_value = {
-            "bucket": "test-bucket",
-            "key": "test.jpg",
-        }
-
-        # Should not raise, but return empty toolsets
-        response = await handler.handle(mock_request)
-        assert response is not None
