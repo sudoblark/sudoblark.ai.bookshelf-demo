@@ -47,17 +47,10 @@
         <li><a href="#metadata-schema">Metadata Schema</a></li>
       </ul>
     </li>
-    <li>
-      <a href="#getting-started">Getting Started</a>
-      <ul>
-        <li><a href="#prerequisites">Prerequisites</a></li>
-        <li><a href="#installation">Installation</a></li>
-      </ul>
-    </li>
-    <li><a href="#usage">Usage</a></li>
+    <li><a href="#getting-started">Getting Started</a></li>
     <li><a href="#testing">Testing</a></li>
     <li><a href="#deployment">Deployment</a></li>
-    <li><a href="#troubleshooting">Troubleshooting</a></li>
+    <li><a href="#current-limitations">Current Limitations</a></li>
     <li><a href="#license">License</a></li>
     <li><a href="#contact">Contact</a></li>
     <li><a href="#acknowledgments">Acknowledgments</a></li>
@@ -220,18 +213,20 @@ This project demonstrates Sudoblark's **three-layer Terraform architecture**:
 2. **Presigned URL**: Frontend requests presigned S3 PUT URL from backend
 3. **Direct Upload**: Browser uploads file directly to S3 Landing bucket (no API gateway)
 4. **Initial Analysis**: Frontend calls `POST /api/metadata/initial` with file location
-5. **Streaming Extraction**: Backend streams metadata tokens as SSE (Server-Sent Events) in real-time
+
+   Backend pipeline:
+   - OCR extraction via AWS Textract
+   - ISBN regex matching from OCR text
+   - ISBN metadata lookup (Google Books → Open Library fallback)
+   - Agent categorizes extracted data + performs fallback title/author lookup if needed
+   - Streams metadata updates as SSE
+
+5. **Streaming Extraction**: Frontend receives metadata updates in real-time as Server-Sent Events (SSE)
 6. **User Refinement**: User sees initial metadata and can ask follow-up questions (multi-turn)
 7. **Refinement Stream**: Frontend calls `POST /api/metadata/refine` for each question
 8. **Accept**: User confirms metadata by clicking "Accept"
 9. **Persist**: Backend writes accepted metadata as JSON to Raw bucket with Hive-style partitioning
 10. **Track**: Ingestion-tracking table updated with file status throughout
-
-**Processing Time:**
-- Presigned URL generation: ~100ms
-- Initial metadata extraction (streaming): ~3-8 seconds per image (Bedrock API + streaming overhead)
-- Refinement turns: ~1-3 seconds per question
-- Accept (S3 write): ~200-500ms
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -257,278 +252,17 @@ The streaming agent exposes the following HTTP endpoints:
 Book metadata is extracted using the pydantic-ai streaming API with Claude as the foundation model. Each accepted record is written to S3 as JSON with Hive-style partitioning (`author={author}/published_year={year}/{uuid}.json`) along with metadata provenance fields (filename, upload_id, extraction timestamp).
 ## Getting Started
 
-To get a local copy up and running follow these simple steps.
-
-### Prerequisites
-
-**Important Constraints:**
-- ⚠️ **AWS Costs**: Running this infrastructure will incur AWS charges (ECS Fargate, S3, DynamoDB, Bedrock API calls). Typical demo: $5-15/day
-- 🌍 **Region Lock**: Infrastructure must deploy to `eu-west-2` (London) due to Bedrock model availability
-- 🏗️ **Demo Code**: This is workshop/learning code - not production-hardened (no authentication yet, limited error handling)
-- 🗑️ **Force Destroy**: All S3 buckets are configured with `force_destroy = true` — running `terraform destroy` will permanently delete all bucket contents without confirmation. This is intentional for a demo environment but should never be used in production.
-
-**Required Tools & Access:**
-
-* **AWS Account** with Bedrock access enabled in eu-west-2
-  ```sh
-  # Verify AWS CLI configured
-  aws sts get-caller-identity
-  ```
-
-* **Terraform** 1.6+ (check `.terraform-version` file)
-  ```sh
-  terraform --version
-  ```
-
-* **Python** 3.11+ and **Node.js** 18+
-  ```sh
-  python --version  # Should be 3.11 or higher
-  node --version    # Should be 18.0.0 or higher
-  ```
-
-* **Docker** (optional, for running backend via docker-compose)
-  ```sh
-  docker --version
-  ```
-
-* **AWS Bedrock Model Access** - Claude 3.7 Sonnet must be enabled:
-  - Model ID: `anthropic.claude-3-7-sonnet-20250219-v1:0`
-  - Region: `eu-west-2` (London)
-  - Access: Enable in AWS Bedrock console
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-### Installation
-
-**Step 1: Clone the repository**
-
-```sh
-git clone https://github.com/sudoblark/sudoblark.ai.bookshelf-demo.git
-cd sudoblark.ai.bookshelf-demo
-```
-
-**Step 2: Set up development environment**
-
-```sh
-# Create Python virtual environment
-python -m venv .venv
-source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-
-# Install development dependencies (all backends + testing)
-pip install -r requirements-dev.txt
-
-# Install pre-commit hooks (highly recommended)
-pre-commit install
-
-# Install backend dependencies
-cd application/backend/streaming-agent
-pip install -r requirements.txt
-cd ../common
-pip install -r requirements.txt
-cd ../../..
-
-# Install frontend dependencies
-cd application/frontend
-npm install
-cd ../..
-```
-
-> **💡 Pre-commit hooks:** Automatically run code formatters and linters before each commit. This catches issues early before CI/CD.
->
-> Run manually: `pre-commit run --all-files`
-
-**Step 3: Deploy infrastructure (AWS resources)**
-```sh
-cd infrastructure/aws-sudoblark-development
-terraform init
-terraform plan  # Review changes
-terraform apply  # Type 'yes' to confirm
-```
-
-**Expected resources created:**
-- 2 S3 buckets (landing, raw)
-- 1 DynamoDB table (ingestion-tracking)
-
-> **Note:** Terraform currently provisions only storage and tracking. The streaming agent runs locally (docker-compose or uvicorn). ECS Fargate deployment infrastructure is a future enhancement.
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-## Local Development
-
-### Running the Backend
-
-The backend is a FastAPI application that can run locally or in a container.
-
-**Option 1: Using Docker Compose (Recommended)**
-
-```sh
-cd application/backend/streaming-agent
-
-eval $(aws configure export-credentials --format env)
-
-# Set required environment variables
-export AWS_DEFAULT_REGION=eu-west-2
-export BEDROCK_MODEL_ID=anthropic.claude-3-7-sonnet-20250219-v1:0
-export LANDING_BUCKET=$(aws s3 ls | grep landing | awk '{print $3}')
-export RAW_BUCKET=$(aws s3 ls | grep raw | awk '{print $3}')
-export TRACKING_TABLE=$(aws dynamodb list-tables --query 'TableNames[?contains(@, `ingestion-tracking`)]' --output text)
-
-# Start the backend on http://localhost:8000
-docker-compose up
-```
-
-**Option 2: Using uvicorn directly**
-
-```sh
-cd application/backend/streaming-agent
-
-# Set environment variables (same as above, plus AWS credentials)
-export AWS_ACCESS_KEY_ID=...
-export AWS_SECRET_ACCESS_KEY=...
-
-# Start the backend on http://localhost:8000
-uvicorn app:app --reload --host 0.0.0.0 --port 8000
-```
-
-### Running the Frontend
-
-```sh
-cd application/frontend
-
-# Start Vite dev server on http://localhost:5173
-npm run dev
-```
-
-The frontend is configured to proxy all `/api/*` requests to `http://localhost:8000` (see `vite.config.ts`).
-
-### Required Environment Variables
-
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `AWS_DEFAULT_REGION` | Yes | — | AWS region (must be `eu-west-2`) |
-| `AWS_ACCESS_KEY_ID` | Yes (if not using IAM role) | — | AWS access key |
-| `AWS_SECRET_ACCESS_KEY` | Yes (if not using IAM role) | — | AWS secret key |
-| `BEDROCK_MODEL_ID` | Yes | `anthropic.claude-3-7-sonnet-20250219-v1:0` | Bedrock model to use |
-| `BEDROCK_REGION` | No | `eu-west-2` | Region for Bedrock API |
-| `LANDING_BUCKET` | Yes | — | S3 bucket name for landing zone |
-| `RAW_BUCKET` | Yes | — | S3 bucket name for accepted metadata |
-| `TRACKING_TABLE` | Yes | — | DynamoDB table name for ingestion tracking |
-| `CORS_ALLOWED_ORIGINS` | No | `http://localhost:5173` | Comma-separated list of allowed origins |
-| `LOG_LEVEL` | No | `INFO` | Python logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
-| `ISBN_LOOKUP_ENABLED` | No | `true` | Enable ISBN API lookup for book enrichment |
-
-### Quick Start
-
-```sh
-# Terminal 1: Start backend
-cd application/backend/streaming-agent
-docker-compose up  # or uvicorn app:app --reload
-
-# Terminal 2: Start frontend
-cd application/frontend
-npm run dev
-
-# Open browser to http://localhost:5173
-# Upload a book cover image and test the flow
-```
-
-### Architecture Notes
-
-- **No authentication** is implemented yet (all endpoints are public) — Cognito integration is on the roadmap
-- **Presigned S3 URLs** allow direct browser upload without routing through the API Gateway
-- **Server-Sent Events (SSE)** stream metadata extraction tokens in real-time for live UX
-- **Stateful sessions** keep conversation history in-process (single container), not persisted across restarts
-- **Bedrock streaming** allows token-by-token responses rather than waiting for full completions
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-<!-- USAGE EXAMPLES -->
-## Usage
-
-### Basic Workflow
-
-The typical user flow through the application:
-
-1. **Start development servers** (see Local Development section above)
-
-2. **Open the UI** - Navigate to http://localhost:5173 in your browser
-
-3. **Upload a book cover**
-   - Click "Add your first book"
-   - Select a book cover image from your computer (JPG, PNG, etc.)
-   - The file is uploaded directly to S3 via presigned URL (no API Gateway)
-
-4. **Watch streaming extraction**
-   - The app displays "Extracting..." while tokens stream from Bedrock
-   - You see metadata appearing in real-time: title → author → ISBN → description
-   - This takes 3-8 seconds depending on image complexity
-
-5. **Refine metadata (optional)**
-   - Ask clarifying questions: "Is this a 2024 publication?"
-   - Each question streams a refinement response in real-time
-   - The UI maintains conversation context
-
-6. **Confirm and save**
-   - Click "Save to bookshelf" once metadata is correct
-   - Metadata is written to S3 (`s3://raw-bucket/author=X/published_year=Y/uuid.json`)
-   - DynamoDB tracking table updates with success status
-
-7. **View bookshelf**
-   - Click the "Bookshelf" tab to see all accepted books
-   - Overview stats show total count and most common author
-   - Browse paginated grid or search by title/author
-
-8. **View operations (debugging)**
-   - Query directly: `curl http://localhost:8000/api/ops/files`
-   - Lists all uploads with their processing status
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-### Testing the API Directly
-
-For development and debugging, you can call the API directly:
-
-**Get presigned URL:**
-```sh
-curl -s 'http://localhost:8000/api/upload/presigned?filename=cover.jpg' | jq .
-```
-
-**Extract metadata (streaming SSE):**
-```sh
-# After uploading a file to the landing bucket
-curl -X POST 'http://localhost:8000/api/metadata/initial' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "bucket": "aws-sudoblark-development-bookshelf-demo-landing",
-    "key": "uploads/demo/test/cover.jpg",
-    "filename": "cover.jpg"
-  }' | tail -20  # Shows raw SSE events
-```
-
-**List all uploads:**
-```sh
-curl -s 'http://localhost:8000/api/ops/files' | jq '.files[] | {upload_id, current_status, created_at}'
-```
-
-**Get single upload details:**
-```sh
-curl -s 'http://localhost:8000/api/ops/files/{upload_id}' | jq .
-```
-
-**Get bookshelf overview:**
-```sh
-curl -s 'http://localhost:8000/api/bookshelf/overview' | jq .
-```
-
-**Get paginated books:**
-```sh
-curl -s 'http://localhost:8000/api/bookshelf/catalogue?page=1&page_size=5' | jq .
-```
-
-**Search books:**
-```sh
-curl -s 'http://localhost:8000/api/bookshelf/search?query=sanderson&field=author' | jq .
-```
+**⚠️ All setup, installation, and local development instructions are in [docs/demo-execution.md](docs/demo-execution.md)**
+
+This includes:
+- Prerequisites and tool verification
+- Step-by-step installation and environment setup
+- Credential export for AWS SSO
+- Running backend and frontend locally
+- 5 complete end-to-end test scenarios
+- Debugging checklist and performance notes
+
+Start there for hands-on guidance.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -593,8 +327,6 @@ bandit -r application/backend/
 <!-- DEPLOYMENT -->
 ## Deployment
 
-### CI/CD Pipeline
-
 This project uses **GitHub Actions** for continuous integration and deployment:
 
 **Pull Request Workflow** (`.github/workflows/pull-request.yaml`):
@@ -607,209 +339,44 @@ This project uses **GitHub Actions** for continuous integration and deployment:
 - `apply.yaml` - Deploy infrastructure to AWS
 - `destroy.yaml` - Tear down infrastructure (use with caution)
 
-### Deployment Environments
-
-| Environment | AWS Account | Region | Purpose |
-|-------------|-------------|--------|---------|
-| Development | sudoblark-development | eu-west-2 | Testing and experimentation |
-
-### Manual Deployment
-
-```sh
-# Navigate to infrastructure directory
-cd infrastructure/aws-sudoblark-development
-
-# Initialize Terraform (first time only)
-terraform init
-
-# Review changes
-terraform plan -out=tfplan
-
-# Apply changes
-terraform apply tfplan
-
-# Destroy infrastructure (when no longer needed)
-terraform destroy
-```
-
-### Deployment Verification
-
-```sh
-# Verify S3 buckets created
-aws s3 ls | grep bookshelf-demo
-
-# Verify Lambda functions deployed
-aws lambda list-functions \
-  --query 'Functions[?contains(FunctionName, `bookshelf-demo`)].FunctionName'
-
-# Verify Glue resources
-aws glue get-database --name aws-sudoblark-development-bookshelf-demo-bookshelf
-aws glue get-crawler --name aws-sudoblark-development-bookshelf-demo-bookshelf-crawler
-
-# Test Lambda invocation
-aws lambda invoke \
-  --function-name aws-sudoblark-development-bookshelf-demo-file-router \
-  --payload '{}' \
-  response.json
-```
+For manual deployment and verification steps, see [docs/demo-execution.md](docs/demo-execution.md).
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ## Current Limitations
 
-This is an **active demo under development**. The following features are coming but not yet implemented:
+This is a **workshop demo** showcasing real AWS patterns. The following features are either in progress or planned:
 
 | Feature | Status | Notes |
 |---|---|---|
 | **Authentication / Authorization** | 🚫 Not started | All endpoints are public. Cognito integration planned. |
-| **Bookshelf Display** | ✅ Complete | Backend S3 queries with overview stats, pagination, search. Frontend React UI with grid layout. |
-| **Ook Chat** | 🚧 Stub only | Frontend page exists, backend streaming not implemented. |
-| **Embeddings & Similarity** | 🚫 Not started | Can compute book similarity via Bedrock Titan embeddings + cosine similarity. |
+| **Metadata Extraction** | ✅ Complete | OCR via Textract, ISBN lookup via Google Books/Open Library, agent categorization, fallback enrichment. |
+| **Bookshelf Display** | ✅ Complete | Overview stats, paginated grid, search by title/author. Uses S3 direct queries (production: migrate to DynamoDB per ADR-0001). |
+| **Ops Dashboard** | ✅ Complete | Real-time tracking of upload pipeline stages, status visibility, error details. |
+| **Ook Chat** | 🚧 Stub only | Frontend page exists, backend streaming not yet implemented. |
+| **Embeddings & Similarity** | 🚫 Not started | Can compute book similarity via Bedrock Titan embeddings. |
 | **Persistence across restarts** | ⚠️ Partial | Session state is in-process only; DynamoDB tracking persists. |
-| **Error handling** | ⚠️ Basic | Limited error messages and recovery logic (demo code). |
 | **Production deployment** | 🚧 In progress | Terraform for ECS Fargate / App Runner not yet implemented. |
 
 **What works:**
-- ✅ File upload via presigned URLs
-- ✅ Streaming metadata extraction with pydantic-ai
-- ✅ Multi-turn conversation refinement
-- ✅ Metadata acceptance and S3 storage
-- ✅ Ingestion tracking (DynamoDB)
+- ✅ File upload via presigned URLs (direct browser → S3)
+- ✅ Streaming metadata extraction (OCR + ISBN lookup + agent categorization)
+- ✅ Multi-turn conversation refinement (streaming tokens)
+- ✅ Metadata acceptance and S3 storage (Hive-partitioned JSON)
+- ✅ Ingestion tracking with audit trail (DynamoDB)
 - ✅ Bookshelf display (overview, pagination, search)
+- ✅ Ops dashboard with pipeline visibility
 - ✅ Local development (docker-compose or uvicorn)
 
 **Next priority features:**
-1. Ops dashboard UI (visualise ingestion tracking status)
-2. Ook chat interface (full streaming chat implementation)
-3. Cognito authentication and user scoping
-4. Embeddings and similarity search (Bedrock Titan + cosine similarity)
-5. Production deployment infrastructure (ECS Fargate + ALB)
-6. Production migration of bookshelf queries to DynamoDB (see ADR-0001)
+1. Ook chat interface (full streaming chat implementation)
+2. Cognito authentication and user scoping
+3. Embeddings and similarity search
+4. Production deployment infrastructure (ECS Fargate + ALB)
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
-<!-- TROUBLESHOOTING -->
-## Troubleshooting
-
-### Common Issues
-
-**Issue: "Bedrock model not accessible"**
-```
-Error: An error occurred (ResourceNotFoundException) when calling the InvokeModel operation
-```
-**Solution:** Ensure Claude 3.7 Sonnet is enabled in AWS Bedrock console (eu-west-2 region):
-```sh
-aws bedrock list-foundation-models --region eu-west-2 --by-provider anthropic
-```
-
-**Issue: "Backend won't start - missing environment variables"**
-```
-KeyError: 'LANDING_BUCKET'
-```
-**Solution:** Set all required environment variables (see table in Local Development section):
-```sh
-export LANDING_BUCKET=$(aws s3 ls | grep landing | awk '{print $3}')
-export RAW_BUCKET=$(aws s3 ls | grep raw | awk '{print $3}')
-export TRACKING_TABLE=$(aws dynamodb list-tables --query 'TableNames[?contains(@, `ingestion-tracking`)]' --output text)
-```
-
-**Issue: "CORS error - frontend can't reach backend"**
-```
-Access to XMLHttpRequest blocked by CORS policy
-```
-**Solution:**
-1. Ensure backend is running on http://localhost:8000
-2. Check `CORS_ALLOWED_ORIGINS` env var includes `http://localhost:5173`
-3. Verify Vite proxy is configured correctly in `application/frontend/vite.config.ts`
-
-**Issue: "Frontend stuck on 'Extracting...' or times out"**
-```
-No tokens appearing, UI hangs
-```
-**Solution:**
-1. Check backend logs: `docker-compose logs streaming-agent` (or `uvicorn` output)
-2. Verify AWS credentials are set correctly
-3. Test Bedrock connectivity: `aws bedrock-runtime invoke-model --model-id anthropic.claude-3-7-sonnet-20250219-v1:0 --body '{"messages":[{"role":"user","content":"test"}]}'`
-
-**Issue: "S3 upload fails - Access Denied"**
-```
-Error: Access Denied when uploading to presigned URL
-```
-**Solution:**
-1. Verify IAM credentials have S3 access
-2. Check presigned URL TTL (should be 5-10 minutes)
-3. Ensure URL is for the correct bucket
-
-**Issue: "Terraform state locked"**
-```
-Error: Error acquiring the state lock
-```
-**Solution:** Someone else is running Terraform, or previous run didn't complete. Wait or force unlock (dangerous):
-```sh
-terraform force-unlock LOCK_ID
-```
-
-### Debugging Tips
-
-**Check backend health:**
-```sh
-curl http://localhost:8000/health
-```
-
-**Monitor backend logs (docker-compose):**
-```sh
-cd application/backend/streaming-agent
-docker-compose logs -f streaming-agent
-```
-
-**Monitor backend logs (uvicorn):**
-```sh
-# Set LOG_LEVEL=DEBUG for verbose output
-export LOG_LEVEL=DEBUG
-uvicorn app:app --reload
-```
-
-**Inspect saved metadata in S3:**
-```sh
-RAW_BUCKET=$(aws s3 ls | grep raw | awk '{print $3}')
-aws s3 ls s3://${RAW_BUCKET}/ --recursive  # List all saved files
-aws s3 cp s3://${RAW_BUCKET}/author=John%20Doe/published_year=2024/uuid.json - | jq .  # View single file
-```
-
-**Check DynamoDB tracking table:**
-```sh
-TRACKING_TABLE=$(aws dynamodb list-tables --query 'TableNames[?contains(@, `ingestion-tracking`)]' --output text)
-aws dynamodb scan --table-name ${TRACKING_TABLE} --limit 10 | jq '.Items[]'
-```
-
-**Test metadata extraction directly (curl SSE):**
-```sh
-# Start a metadata extraction and see SSE events in real-time
-curl -N -X POST 'http://localhost:8000/api/metadata/initial' \
-  -H 'Content-Type: application/json' \
-  -d '{
-    "bucket": "YOUR_LANDING_BUCKET",
-    "key": "path/to/cover.jpg",
-    "filename": "cover.jpg"
-  }'
-```
-
-**Run tests locally:**
-```sh
-# Activate venv
-source .venv/bin/activate
-
-# Run all tests with coverage
-pytest --cov=application/backend tests/ -v
-
-# Run specific test file
-pytest tests/test_ops.py -v
-
-# Run with detailed output
-pytest -vv --tb=short tests/
-```
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+For troubleshooting, debugging tips, and common issues, see [docs/demo-execution.md](docs/demo-execution.md).
 
 <!-- LICENSE -->
 ## License

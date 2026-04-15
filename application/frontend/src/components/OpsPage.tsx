@@ -56,8 +56,9 @@ export function OpsPage({ onNavigateToNewBook }: Props) {
   }
 
   function getFilteredFiles(): UploadFile[] {
-    if (statusFilter === "ALL") return files;
-    return files.filter((file) => file.current_status === statusFilter);
+    let filtered = statusFilter === "ALL" ? files : files.filter((file) => file.current_status === statusFilter);
+    // Sort by created_at descending (newest first)
+    return filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }
 
   // Empty state
@@ -150,7 +151,7 @@ export function OpsPage({ onNavigateToNewBook }: Props) {
                         <h3>Pipeline Progress</h3>
                         <div className={styles.progressContainer}>
                           <div className={styles.progressBar}>
-                            {["user_upload", "routing", "av_scan", "enrichment"].map((stageName, idx) => {
+                            {["user_upload", "enrichment", "routing", "av_scan"].map((stageName, idx) => {
                               const stageData = file.stage_progress.find(s => s.stage_name === stageName);
                               const isComplete = stageData?.status === "success";
                               const isFailed = stageData?.status === "failed";
