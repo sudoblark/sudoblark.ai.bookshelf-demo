@@ -18,6 +18,7 @@ export interface PresignedUrlResponse {
 export type StreamEvent =
   | { type: "text_delta"; delta: string }
   | { type: "metadata_update"; field: keyof BookMetadata; value: BookMetadata[keyof BookMetadata] }
+  | { type: "upload_id"; upload_id: string }
   | { type: "complete" }
   | { type: "error"; message: string };
 

@@ -26,6 +26,7 @@ import uuid
 from typing import Any, Optional
 
 import boto3
+from common.tracker import BookshelfTracker, UploadStage
 from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 
@@ -40,9 +41,13 @@ def _sanitise(value: str) -> str:
 class AcceptHandler:
     """Saves accepted metadata to S3 with Hive-style partitioning."""
 
-    def __init__(self, s3_client: Any = None) -> None:
+    def __init__(self, s3_client: Any = None, dynamodb_resource: Any = None) -> None:
         self._s3 = s3_client or boto3.client("s3")
         self._raw_bucket: str = os.environ["RAW_BUCKET"]
+        self._tracker = BookshelfTracker(
+            dynamodb_resource=dynamodb_resource,
+            table_name=os.environ.get("TRACKING_TABLE", ""),
+        )
 
     async def handle(self, request: Request) -> JSONResponse:
         """Write metadata JSON to the raw bucket and return the saved key."""
@@ -53,13 +58,18 @@ class AcceptHandler:
 
         metadata: Optional[dict] = body.get("metadata")
         filename: str = body.get("filename", "unknown")
+        upload_id: str = body.get("upload_id", "")
 
         if not metadata:
             raise HTTPException(status_code=400, detail="metadata is required")
 
         author = _sanitise(str(metadata.get("author", "unknown")))
         year = metadata.get("published_year") or "unknown"
-        upload_id = str(uuid.uuid4())
+
+        # If no upload_id provided, generate one (for backwards compatibility with old frontend)
+        if not upload_id:
+            upload_id = str(uuid.uuid4())
+
         key = f"author={author}/published_year={year}/{upload_id}.json"
 
         payload = json.dumps(
@@ -67,6 +77,8 @@ class AcceptHandler:
             indent=2,
             default=str,
         ).encode("utf-8")
+
+        user_id = "anonymous"  # TODO: extract from auth context in production
 
         try:
             self._s3.put_object(
@@ -77,7 +89,35 @@ class AcceptHandler:
             )
         except Exception:
             logger.exception("Failed to write metadata to s3://%s/%s", self._raw_bucket, key)
+            # Mark ENRICHMENT as failed
+            if upload_id:
+                try:
+                    self._tracker.fail_stage(
+                        user_id=user_id,
+                        upload_id=upload_id,
+                        stage=UploadStage.ENRICHMENT,
+                        error_message="Failed to save metadata to S3",
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to mark ENRICHMENT stage as failed for upload_id=%s", upload_id
+                    )
             raise HTTPException(status_code=500, detail="Failed to save metadata")
+
+        # Mark the ENRICHMENT stage as complete in DynamoDB after successful S3 write
+        if upload_id:
+            try:
+                self._tracker.complete_stage(
+                    user_id=user_id,
+                    upload_id=upload_id,
+                    stage=UploadStage.ENRICHMENT,
+                    dest_bucket=self._raw_bucket,
+                    dest_key=key,
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to mark ENRICHMENT stage as complete for upload_id=%s", upload_id
+                )
 
         logger.info("Saved metadata to s3://%s/%s", self._raw_bucket, key)
         return JSONResponse({"status": "accepted", "saved_key": key, "upload_id": upload_id})

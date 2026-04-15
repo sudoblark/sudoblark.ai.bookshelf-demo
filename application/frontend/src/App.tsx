@@ -28,6 +28,10 @@ export default function App() {
   }
 
   function handleNavigateTab(tab: TabId) {
+    // Clear upload context when leaving the new-book tab to ensure each session is independent
+    if (activeTab === "new-book" && tab !== "new-book") {
+      setUploadCtx(null);
+    }
     setActiveTab(tab);
   }
 

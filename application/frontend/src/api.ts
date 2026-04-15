@@ -85,12 +85,13 @@ export async function* streamRefinedMetadata(
 
 export async function acceptMetadata(
   metadata: BookMetadata,
-  filename: string
+  filename: string,
+  upload_id: string = ""
 ): Promise<{ status: string; saved_key: string; upload_id: string }> {
   const res = await fetch("/api/metadata/accept", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ metadata, filename }),
+    body: JSON.stringify({ metadata, filename, upload_id }),
   });
   if (!res.ok) throw new Error(`Accept request failed: ${res.statusText}`);
   return res.json();

@@ -5,6 +5,7 @@ One-shot cold classification of a newly uploaded book cover.  The handler:
 1. Parses ``{bucket, key, filename}`` from the request body.
 2. Builds an S3 chunked-reader toolset (reused from the bookshelf-agent layer).
 3. Streams the ``BookshelfStreamingAgent`` response as SSE.
+4. Tracks upload progress in DynamoDB: creates record on first call, marks stages.
 
 SSE event types emitted
 -----------------------
@@ -17,10 +18,12 @@ error            ``{"type": "error", "message": "<reason>"}``
 import json
 import logging
 import os
+import uuid
 from typing import Any, AsyncGenerator, Optional
 
 import boto3
 from bookshelf_streaming_agent import BookshelfStreamingAgent
+from common.tracker import BookshelfTracker, UploadStage
 from fastapi import Request
 from fastapi.responses import StreamingResponse
 from image_toolset import build_image_toolset
@@ -47,6 +50,7 @@ class MetadataInitialHandler:
         agent: Optional[BookshelfStreamingAgent] = None,
         s3_client: Any = None,
         textract_client: Any = None,
+        dynamodb_resource: Any = None,
     ) -> None:
         self._model_id: str = os.environ["BEDROCK_MODEL_ID"]
         region: str = os.environ.get(
@@ -59,6 +63,12 @@ class MetadataInitialHandler:
             bedrock_client = boto3.client("bedrock-runtime", region_name=region)
             agent = BookshelfStreamingAgent(model_id=self._model_id, bedrock_client=bedrock_client)
         self._agent = agent
+
+        # DynamoDB tracking for ingestion pipeline
+        self._tracker = BookshelfTracker(
+            dynamodb_resource=dynamodb_resource,
+            table_name=os.environ.get("TRACKING_TABLE", ""),
+        )
 
     async def handle(self, request: Request) -> StreamingResponse:
         """Parse body, build toolset, and return a streaming SSE response."""
@@ -78,6 +88,11 @@ class MetadataInitialHandler:
 
             raise HTTPException(status_code=400, detail="bucket and key are required")
 
+        # Generate a unique upload_id for this extraction session.
+        # This is returned to the client for subsequent refinement/accept calls.
+        upload_id = str(uuid.uuid4())
+        user_id = "anonymous"  # TODO: extract from auth context in production
+
         # Build the image toolset for efficient extraction via Textract OCR and ISBN toolset.
         try:
             image_toolset = build_image_toolset(self._s3, bucket, key, self._textract)
@@ -92,8 +107,16 @@ class MetadataInitialHandler:
             "Use the file-reading tools to inspect the image, then return all metadata fields."
         )
 
+        # Create tracking record and mark USER_UPLOAD as complete (file already landed via presigned URL)
+        try:
+            self._tracker.create_record(user_id, upload_id)
+            self._tracker.start_stage(upload_id, UploadStage.USER_UPLOAD, bucket, key)
+            self._tracker.complete_stage(user_id, upload_id, UploadStage.USER_UPLOAD, bucket, key)
+        except Exception:
+            logger.exception("Failed to initialize tracking for upload_id=%s", upload_id)
+
         return StreamingResponse(
-            self._stream_events(prompt, toolsets),
+            self._stream_events(prompt, toolsets, upload_id, user_id, bucket, key),
             media_type="text/event-stream",
             headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
         )
@@ -102,9 +125,24 @@ class MetadataInitialHandler:
         self,
         prompt: str,
         toolsets: Any,
+        upload_id: str,
+        user_id: str,
+        bucket: str,
+        key: str,
     ) -> AsyncGenerator[str, None]:
         prev_msg = ""
         prev_fields: dict = {}
+
+        # Emit the upload_id immediately so client can track this session
+        yield _sse("upload_id", {"upload_id": upload_id})
+
+        # Start the ENRICHMENT stage (extraction + refinement + acceptance)
+        try:
+            self._tracker.start_stage(upload_id, UploadStage.ENRICHMENT, bucket, key)
+        except Exception:
+            logger.exception(
+                "Failed to mark ENRICHMENT stage as started for upload_id=%s", upload_id
+            )
 
         try:
             async with self._agent.run_stream(
@@ -138,6 +176,18 @@ class MetadataInitialHandler:
 
         except Exception as exc:  # pragma: no cover
             logger.exception("Agent stream error during initial extraction: %s", exc)
+            try:
+                # Mark the ENRICHMENT stage as failed in DynamoDB
+                self._tracker.fail_stage(
+                    user_id=user_id,
+                    upload_id=upload_id,
+                    stage=UploadStage.ENRICHMENT,
+                    error_message=f"Bedrock API error: {str(exc)}",
+                )
+            except Exception:
+                logger.exception(
+                    "Failed to mark ENRICHMENT stage as failed for upload_id=%s", upload_id
+                )
             yield _sse("error", {"message": "Agent error — please try again"})
             return
 

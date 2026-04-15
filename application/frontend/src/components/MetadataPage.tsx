@@ -34,6 +34,7 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
   const [saved, setSaved] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [userInput, setUserInput] = useState("");
+  const [uploadId, setUploadId] = useState<string>(sessionId); // Track the backend upload_id
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -58,6 +59,8 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
             });
           } else if (event.type === "metadata_update") {
             setMetadata((prev) => ({ ...prev, [event.field]: event.value }));
+          } else if (event.type === "upload_id") {
+            setUploadId(event.upload_id);
           } else if (event.type === "complete") {
             setExtracting(false);
           } else if (event.type === "error") {
@@ -110,7 +113,7 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
 
   async function handleSave() {
     try {
-      const result = await acceptMetadata(metadata, filename);
+      const result = await acceptMetadata(metadata, filename, uploadId);
       setSaved(result.saved_key);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Save failed");
