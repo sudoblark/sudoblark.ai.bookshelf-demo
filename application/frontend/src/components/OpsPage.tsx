@@ -7,11 +7,14 @@ interface Props {
   onNavigateToNewBook: () => void;
 }
 
+type StatusFilter = "ALL" | "IN_PROGRESS" | "SUCCESS" | "FAILED";
+
 export function OpsPage({ onNavigateToNewBook }: Props) {
   const [files, setFiles] = useState<UploadFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("ALL");
 
   useEffect(() => {
     async function fetchFiles() {
@@ -52,6 +55,11 @@ export function OpsPage({ onNavigateToNewBook }: Props) {
     }
   }
 
+  function getFilteredFiles(): UploadFile[] {
+    if (statusFilter === "ALL") return files;
+    return files.filter((file) => file.current_status === statusFilter);
+  }
+
   // Empty state
   if (!loading && files.length === 0) {
     return (
@@ -79,7 +87,27 @@ export function OpsPage({ onNavigateToNewBook }: Props) {
       {loading && <div className={styles.loading}>Loading files...</div>}
 
       {!loading && files.length > 0 && (
-        <div className={styles.tableContainer}>
+        <>
+          <div className={styles.filterBar}>
+            <span className={styles.filterLabel}>Filter by status:</span>
+            <div className={styles.filterButtons}>
+              {(["ALL", "IN_PROGRESS", "SUCCESS", "FAILED"] as StatusFilter[]).map((filter) => (
+                <button
+                  key={filter}
+                  className={`${styles.filterButton} ${statusFilter === filter ? styles.filterActive : ""}`}
+                  onClick={() => setStatusFilter(filter)}
+                >
+                  {filter === "ALL" ? "All" : filter.replace("_", " ")}
+                  <span className={styles.filterCount}>
+                    {filter === "ALL"
+                      ? files.length
+                      : files.filter((f) => f.current_status === filter).length}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className={styles.tableContainer}>
           <table className={styles.table}>
             <thead>
               <tr>
@@ -91,7 +119,7 @@ export function OpsPage({ onNavigateToNewBook }: Props) {
               </tr>
             </thead>
             <tbody>
-              {files.map((file) => [
+              {getFilteredFiles().map((file) => [
                 <tr
                   key={`row-${file.upload_id}`}
                   className={styles.row}
@@ -184,6 +212,7 @@ export function OpsPage({ onNavigateToNewBook }: Props) {
             </tbody>
           </table>
         </div>
+        </>
       )}
     </div>
   );

@@ -88,6 +88,71 @@
   font-size: var(--font-sm);
 }
 
+/* Filter bar */
+.filterBar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: #2a2a2a;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  flex-wrap: wrap;
+}
+
+.filterLabel {
+  font-size: var(--font-sm);
+  color: #aaa;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.filterButtons {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.filterButton {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: #1a1a1a;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  color: #999;
+  font-size: var(--font-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filterButton:hover {
+  border-color: #7c6ff7;
+  color: #e8e8e8;
+}
+
+.filterActive {
+  background: #7c6ff7;
+  border-color: #7c6ff7;
+  color: #fff;
+}
+
+.filterCount {
+  display: inline-block;
+  padding: 0.125rem 0.5rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+  font-size: var(--font-xs);
+  font-weight: 600;
+}
+
+.filterActive .filterCount {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 /* Table */
 .tableContainer {
   border: 1px solid #3a3a3a;
