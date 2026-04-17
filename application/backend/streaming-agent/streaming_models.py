@@ -1,6 +1,6 @@
 """Pydantic models for the bookshelf streaming agent service."""
 
-from typing import Any, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -66,3 +66,39 @@ class StreamingBookMetadataResponse(BaseModel):
                 pass
             return None
         return None
+
+
+class ToolExecution(BaseModel):
+    """Details of a single tool execution for audit trail."""
+
+    name: str = Field(description="Tool name (e.g., 'list_books')")
+    inputs: str = Field(
+        description='Tool inputs as a human-readable string (e.g., \'query="Sanderson", field="author"\')'
+    )
+    result_summary: str = Field(description="Brief summary of results (e.g., 'Found 3 books')")
+    execution_time_ms: float = Field(description="Time taken to execute tool in milliseconds")
+
+
+class OokChatResponse(BaseModel):
+    """Ook chat response with message and tool usage tracking.
+
+    Used as the pydantic-ai ``output_type`` for free-text chat so the agent
+    uses tools and streams responses. Shows what tools were called and their results.
+    """
+
+    message: str = Field(
+        default="",
+        description="Conversational response from Ook about the bookshelf",
+    )
+    tools_used: List[str] = Field(
+        default_factory=list,
+        description="Names of tools called during this response (e.g., ['list_books', 'get_overview'])",
+    )
+    tool_executions: List[ToolExecution] = Field(
+        default_factory=list,
+        description="Detailed execution info for each tool call (for audit trail)",
+    )
+    is_error: bool = Field(
+        default=False,
+        description="True if an error occurred during processing",
+    )
