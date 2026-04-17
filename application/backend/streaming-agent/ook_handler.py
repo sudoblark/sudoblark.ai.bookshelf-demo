@@ -11,7 +11,7 @@ from bookshelf_streaming_agent import BookshelfStreamingAgent
 from bookshelf_toolset import build_bookshelf_toolset
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
-from streaming_models import OokChatResponse
+from streaming_models import StreamingAgentResponse
 from tool_tracker import ToolTracker
 
 logger = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ class OokHandler:
                 model_id=self._model_id,
                 bedrock_client=bedrock_client,
                 system_prompt=OOK_SYSTEM_PROMPT,
-                output_type=OokChatResponse,
+                output_type=StreamingAgentResponse,
             )
         else:
             self._agent = agent

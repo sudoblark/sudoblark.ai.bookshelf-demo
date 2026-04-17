@@ -79,43 +79,22 @@ class ToolExecution(BaseModel):
     execution_time_ms: float = Field(description="Time taken to execute tool in milliseconds")
 
 
-class OokChatResponse(BaseModel):
-    """Ook chat response with message and tool usage tracking.
+class StreamingAgentResponse(BaseModel):
+    """Streaming agent response with message and tool tracking.
 
-    Used as the pydantic-ai ``output_type`` for free-text chat so the agent
-    uses tools and streams responses. Shows what tools were called and their results.
+    Used as the pydantic-ai ``output_type`` for agent responses that use tools.
+    Provides conversational message plus audit trail of tool executions.
     """
 
     message: str = Field(
         default="",
-        description="Conversational response from Ook about the bookshelf",
+        description="Conversational response from the agent",
     )
     tools_used: List[str] = Field(
         default_factory=list,
-        description="Names of tools called during this response (e.g., ['list_books', 'get_overview'])",
+        description="Names of tools called during this response",
     )
     tool_executions: List[ToolExecution] = Field(
         default_factory=list,
         description="Detailed execution info for each tool call (for audit trail)",
-    )
-    is_error: bool = Field(
-        default=False,
-        description="True if an error occurred during processing",
-    )
-
-
-class MetadataExtractionResponse(BaseModel):
-    """Metadata extraction response with conversational message and tool tracking.
-
-    Used as the pydantic-ai ``output_type`` for metadata extraction so the agent
-    uses tools and streams responses. Similar to OokChatResponse but for book cataloging.
-    """
-
-    message: str = Field(
-        default="",
-        description="Conversational response from the extraction agent",
-    )
-    tools_used: List[str] = Field(
-        default_factory=list,
-        description="Names of tools called during extraction (e.g., ['extract_ocr_text', 'lookup_isbn_metadata'])",
     )

@@ -42,71 +42,60 @@ class ToolTracker:
         if result is None or not result:
             return "No results"
 
-        # Metadata extraction tools
-        if tool_name == "extract_ocr_text":
-            if isinstance(result, dict):
-                if "error" in result:
-                    return f"OCR failed: {result['error']}"
-                line_count = result.get("line_count", 0)
-                confidence = result.get("confidence", 0.0)
-                return f"Extracted {line_count} lines (confidence: {confidence:.1%})"
-            return "OCR extraction completed"
+        # Check for errors first
+        if isinstance(result, dict) and "error" in result:
+            return f"{tool_name} failed: {result['error']}"
 
-        if tool_name == "extract_isbn":
-            if isinstance(result, dict):
-                if "error" in result:
-                    return f"ISBN extraction failed: {result['error']}"
-                isbn = result.get("isbn")
-                if isbn:
-                    return f"Found ISBN: {isbn}"
-                return "No ISBN found on cover"
-            return "ISBN extraction completed"
+        # Strategy dict maps tool names to summarization functions
+        summarizers = {
+            "extract_ocr_text": lambda r: (
+                f"Extracted {r.get('line_count', 0)} lines "
+                f"(confidence: {r.get('confidence', 0.0):.1%})"
+                if isinstance(r, dict)
+                else "OCR completed"
+            ),
+            "extract_isbn": lambda r: (
+                f"Found ISBN: {r.get('isbn')}"
+                if isinstance(r, dict) and r.get("isbn")
+                else "No ISBN found"
+            ),
+            "lookup_isbn_metadata": lambda r: (
+                f"Found '{r.get('title', 'Unknown')}' via {r.get('source', 'Database')}"
+                if isinstance(r, dict)
+                else "Lookup completed"
+            ),
+            "lookup_by_title_author": lambda r: (
+                f"Found '{r.get('title', 'Unknown')}' (ISBN: {r.get('isbn', 'N/A')})"
+                if isinstance(r, dict)
+                else "Lookup completed"
+            ),
+            "update_metadata_field": lambda r: (
+                f"Updated {r.get('field', 'field')} to: {r.get('value', '')}"
+                if isinstance(r, dict)
+                else "Update completed"
+            ),
+            "list_books": lambda r: (
+                f"Retrieved {len(r)} book{'s' if len(r) != 1 else ''}"
+                if isinstance(r, list)
+                else "Retrieval completed"
+            ),
+            "search_books": lambda r: (
+                f"Found {len(r)} matching book{'s' if len(r) != 1 else ''}"
+                if isinstance(r, list)
+                else "Search completed"
+            ),
+            "get_overview": lambda r: (
+                f"{r.get('total_books', 0)} total; "
+                f"top author: {r.get('most_common_author', 'Unknown')} "
+                f"({r.get('most_common_author_count', 0)} books)"
+                if isinstance(r, dict)
+                else "Overview completed"
+            ),
+        }
 
-        if tool_name == "lookup_isbn_metadata":
-            if isinstance(result, dict):
-                if "error" in result:
-                    return f"ISBN lookup failed: {result['error']}"
-                title = result.get("title", "Unknown")
-                source = result.get("source", "Database")
-                return f"Found '{title}' via {source}"
-            return "ISBN lookup completed"
-
-        if tool_name == "lookup_by_title_author":
-            if isinstance(result, dict):
-                if "error" in result:
-                    return f"Title/author lookup failed: {result['error']}"
-                title = result.get("title", "Unknown")
-                isbn = result.get("isbn", "N/A")
-                return f"Found '{title}' (ISBN: {isbn})"
-            return "Title/author lookup completed"
-
-        if tool_name == "update_metadata_field":
-            if isinstance(result, dict):
-                if "error" in result:
-                    return f"Update failed: {result['error']}"
-                field = result.get("field", "field")
-                value = result.get("value", "")
-                return f"Updated {field} to: {value}"
-            return "Metadata field updated"
-
-        # Bookshelf query tools
-        if tool_name == "list_books":
-            books = result if isinstance(result, list) else []
-            count = len(books)
-            return f"Retrieved {count} book{'' if count == 1 else 's'}"
-
-        if tool_name == "search_books":
-            books = result if isinstance(result, list) else []
-            count = len(books)
-            return f"Found {count} matching book{'' if count == 1 else 's'}"
-
-        if tool_name == "get_overview":
-            if isinstance(result, dict):
-                total = result.get("total_books", 0)
-                author = result.get("most_common_author", "Unknown")
-                count = result.get("most_common_author_count", 0)
-                return f"{total} total books; most common author: {author} ({count} books)"
-            return "Overview retrieved"
+        summarizer = summarizers.get(tool_name)
+        if summarizer:
+            return summarizer(result)
 
         # Fallback for unknown tools
         if isinstance(result, list):

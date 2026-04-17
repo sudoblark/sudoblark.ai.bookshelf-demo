@@ -23,7 +23,7 @@ from bookshelf_streaming_agent import BookshelfStreamingAgent
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
 from metadata_toolset import build_metadata_toolset
-from streaming_models import MetadataExtractionResponse
+from streaming_models import StreamingAgentResponse
 from tool_tracker import ToolTracker
 
 logger = logging.getLogger(__name__)
@@ -34,36 +34,17 @@ _session_history: dict[str, list] = {}
 
 # Metadata extraction system prompt
 METADATA_SYSTEM_PROMPT = """\
-You are an AI assistant helping users catalog books from cover images.
+You are cataloging books from cover images.
 
-You have access to tools to:
-- extract_ocr_text(): Extract text from the book cover image using OCR
-- extract_isbn(): Find ISBN pattern in the extracted text
-- lookup_isbn_metadata(): Look up book details by ISBN from online databases
-- lookup_by_title_author(): Look up book details by title and author (fallback)
-- update_metadata_field(): Update individual metadata fields based on user corrections
+You have access to tools to extract and update metadata:
+- extract_ocr_text: Extract text from cover images
+- extract_isbn: Find ISBN patterns in text
+- lookup_isbn_metadata: Look up book details by ISBN
+- lookup_by_title_author: Look up by title/author (fallback)
+- update_metadata_field: Populate discovered metadata fields (title, author, isbn, publisher, etc)
 
-When given a book cover:
-1. First, extract the OCR text from the image using extract_ocr_text()
-2. Try to find an ISBN in the extracted text using extract_isbn()
-3. If ISBN is found, look up the book details using lookup_isbn_metadata()
-4. If ISBN is not found, try searching by title/author using lookup_by_title_author()
-5. Use update_metadata_field() to set each discovered field
-   (title, author, publisher, isbn, published_year, description)
-6. Present the extracted metadata conversationally and ask if anything needs fixing
-
-When the user provides corrections:
-- Accept their feedback and use update_metadata_field() to make changes
-- Be friendly and confirmatory
-
-Format your responses conversationally. Say things like:
-- "I found the ISBN on the cover: 978-0-7432-7356-5"
-- "Looking that up... The book is 'The Way of Kings' by Brandon Sanderson, published by Tor"
-- "Found it! Here's what I extracted: Title, Author, ISBN, and Publisher are all set"
-- "Updated the author to Sanderson"
-
-IMPORTANT: Always use update_metadata_field() for discovered metadata.
-This ensures the UI stays in sync with extraction results.
+Extract metadata and use update_metadata_field to populate the UI with your findings.
+Present results conversationally and accept user corrections. Be concise and friendly.
 """
 
 
@@ -92,7 +73,7 @@ class MetadataHandler:
                 model_id=self._model_id,
                 bedrock_client=bedrock_client,
                 system_prompt=METADATA_SYSTEM_PROMPT,
-                output_type=MetadataExtractionResponse,  # Structured output to properly stream with tools
+                output_type=StreamingAgentResponse,
             )
         else:
             self._agent = agent
