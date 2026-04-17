@@ -39,6 +39,11 @@ GET  /api/bookshelf/search
     Search books by title or author.
     Query params: query (required), field (title|author).
 
+POST /api/ook/chat
+    General AI chat interface for exploring the user's bookshelf.
+    Request: {session_id: str, message: str}
+    Streams SSE — see ``ook_handler.py``.
+
 Environment variables
 ---------------------
 BEDROCK_MODEL_ID       Bedrock model ID (required)
@@ -60,6 +65,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, StreamingResponse
 from metadata_initial_handler import MetadataInitialHandler
 from metadata_refine_handler import MetadataRefineHandler
+from ook_handler import OokHandler
 from ops_handler import OpsHandler
 from presigned_handler import PresignedUrlHandler
 
@@ -87,6 +93,7 @@ _refine = MetadataRefineHandler()
 _accept = AcceptHandler(dynamodb_resource=_dynamodb)
 _ops = OpsHandler()
 _bookshelf = BookshelfHandler()
+_ook = OokHandler()
 
 
 @app.get("/health")
@@ -137,3 +144,8 @@ async def bookshelf_catalogue(request: Request) -> JSONResponse:
 @app.get("/api/bookshelf/search")
 async def bookshelf_search(request: Request) -> JSONResponse:
     return await _bookshelf.handle_search(request)
+
+
+@app.post("/api/ook/chat")
+async def ook_chat(request: Request) -> StreamingResponse:
+    return await _ook.handle(request)

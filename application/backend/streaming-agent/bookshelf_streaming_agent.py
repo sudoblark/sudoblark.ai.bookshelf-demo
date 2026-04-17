@@ -61,15 +61,49 @@ class BookshelfStreamingAgent:
     Instantiate once per handler; ``run_stream`` is called per request.
     """
 
-    def __init__(self, model_id: str, bedrock_client: Any, refinement: bool = False) -> None:
+    def __init__(
+        self,
+        model_id: str,
+        bedrock_client: Any,
+        refinement: bool = False,
+        system_prompt: Optional[str] = None,
+        output_type: Optional[type] = None,
+    ) -> None:
+        """Initialize BookshelfStreamingAgent.
+
+        Args:
+            model_id: Bedrock model ID.
+            bedrock_client: Boto3 bedrock-runtime client.
+            refinement: If True, use REFINEMENT_SYSTEM_PROMPT (default: False).
+            system_prompt: Custom system prompt (overrides refinement flag).
+            output_type: Custom output type (default: StreamingBookMetadataResponse).
+                         Pass False for free-text chat without structured output.
+        """
         provider = BedrockProvider(bedrock_client=bedrock_client)
         model = BedrockConverseModel(model_id, provider=provider)
-        system_prompt = REFINEMENT_SYSTEM_PROMPT if refinement else INITIAL_SYSTEM_PROMPT
-        self._agent: Agent[None, StreamingBookMetadataResponse] = Agent(
-            model,
-            output_type=StreamingBookMetadataResponse,
-            system_prompt=system_prompt,
-        )
+
+        # Determine system prompt: custom > refinement flag > default
+        if system_prompt is not None:
+            final_prompt = system_prompt
+        else:
+            final_prompt = REFINEMENT_SYSTEM_PROMPT if refinement else INITIAL_SYSTEM_PROMPT
+
+        # Determine output type: custom > default (StreamingBookMetadataResponse)
+        # If False passed explicitly, no structured output (free-text chat)
+        if output_type is False:  # Sentinel for "no output type"
+            self._agent: Agent[None, None] = Agent(
+                model,
+                system_prompt=final_prompt,
+            )
+        else:
+            final_output_type = (
+                output_type if output_type is not None else StreamingBookMetadataResponse
+            )
+            self._agent: Agent[None, Any] = Agent(
+                model,
+                output_type=final_output_type,
+                system_prompt=final_prompt,
+            )
 
     def run_stream(
         self,
