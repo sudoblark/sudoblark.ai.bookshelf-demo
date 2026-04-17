@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { acceptMetadata, streamInitialMetadata, streamRefinedMetadata } from "../api";
-import { BookMetadata } from "../types";
+import { BookMetadata, ToolExecution } from "../types";
+import { ToolsModal } from "./ToolsModal";
 import styles from "./MetadataPage.module.css";
 
 interface Message {
   role: "user" | "assistant";
   content: string;
+  executions?: ToolExecution[];
 }
 
 interface Props {
@@ -34,7 +36,9 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
   const [saved, setSaved] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [userInput, setUserInput] = useState("");
-  const [uploadId, setUploadId] = useState<string>(sessionId); // Track the backend upload_id
+  const [uploadId] = useState<string>(sessionId); // Session ID is upload ID
+  const [expandedToolsIdx, setExpandedToolsIdx] = useState<number | null>(null);
+  const [modalToolExecutions, setModalToolExecutions] = useState<ToolExecution[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -57,10 +61,34 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
               }
               return [...prev, { role: "assistant", content: event.delta }];
             });
-          } else if (event.type === "metadata_update") {
-            setMetadata((prev) => ({ ...prev, [event.field]: event.value }));
-          } else if (event.type === "upload_id") {
-            setUploadId(event.upload_id);
+          } else if (event.type === "tool_executions") {
+            // Attach tool executions to the last assistant message
+            setMessages((prev) => {
+              const last = prev[prev.length - 1];
+              if (last && last.role === "assistant") {
+                return [
+                  ...prev.slice(0, -1),
+                  { ...last, executions: event.executions || [] },
+                ];
+              }
+              return prev;
+            });
+
+            // Extract metadata updates from update_metadata_field tool calls
+            for (const exec of event.executions || []) {
+              if (exec.name === "update_metadata_field") {
+                // Parse the inputs to get field and value
+                // Format: "field = value"
+                const match = exec.inputs.match(/^(\w+)\s*=\s*(.+)$/);
+                if (match) {
+                  const [, field, value] = match;
+                  setMetadata((prev) => ({
+                    ...prev,
+                    [field as keyof BookMetadata]: value,
+                  }));
+                }
+              }
+            }
           } else if (event.type === "complete") {
             setExtracting(false);
           } else if (event.type === "error") {
@@ -89,7 +117,7 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
     setMessages((prev) => [...prev, { role: "user", content: msg }]);
 
     try {
-      for await (const event of streamRefinedMetadata(sessionId, msg, metadata)) {
+      for await (const event of streamRefinedMetadata(sessionId, msg)) {
         if (event.type === "text_delta") {
           setMessages((prev) => {
             const last = prev[prev.length - 1];
@@ -98,8 +126,34 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
             }
             return [...prev, { role: "assistant", content: event.delta }];
           });
-        } else if (event.type === "metadata_update") {
-          setMetadata((prev) => ({ ...prev, [event.field]: event.value }));
+        } else if (event.type === "tool_executions") {
+          // Attach tool executions to the last assistant message
+          setMessages((prev) => {
+            const last = prev[prev.length - 1];
+            if (last && last.role === "assistant") {
+              return [
+                ...prev.slice(0, -1),
+                { ...last, executions: event.executions || [] },
+              ];
+            }
+            return prev;
+          });
+
+          // Extract metadata updates from tool executions
+          for (const exec of event.executions || []) {
+            if (exec.name === "update_metadata_field") {
+              // Parse the inputs to get field and value
+              // Format: "field = value"
+              const match = exec.inputs.match(/^(\w+)\s*=\s*(.+)$/);
+              if (match) {
+                const [, field, value] = match;
+                setMetadata((prev) => ({
+                  ...prev,
+                  [field as keyof BookMetadata]: value,
+                }));
+              }
+            }
+          }
         } else if (event.type === "error") {
           setError(event.message);
         }
@@ -168,26 +222,31 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
             label="Title"
             value={metadata.title}
             onChange={(v) => setMetadata((p) => ({ ...p, title: v }))}
+            disabled={extracting}
           />
           <CardField
             label="Author"
             value={metadata.author}
             onChange={(v) => setMetadata((p) => ({ ...p, author: v }))}
+            disabled={extracting}
           />
           <CardField
             label="Year"
             value={metadata.published_year?.toString() ?? ""}
             onChange={(v) => setMetadata((p) => ({ ...p, published_year: v ? parseInt(v, 10) : null }))}
             type="number"
+            disabled={extracting}
           />
           <ISBNField
             value={metadata.isbn}
             onChange={(v) => setMetadata((p) => ({ ...p, isbn: v }))}
+            disabled={extracting}
           />
           <CardField
             label="Publisher"
             value={metadata.publisher}
             onChange={(v) => setMetadata((p) => ({ ...p, publisher: v }))}
+            disabled={extracting}
           />
         </div>
 
@@ -221,12 +280,27 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
             <p className={styles.placeholder}>Extracting metadata from your cover…</p>
           )}
           {messages.map((m, i) => (
-            <div key={i} className={`${styles.message} ${styles[m.role]}`}>
-              {m.content}
+            <div key={i}>
+              <div className={`${styles.message} ${styles[m.role]}`}>
+                {m.content}
+              </div>
+              {/* Tools button for messages with executions */}
+              {m.role === "assistant" && m.executions && m.executions.length > 0 && (
+                <button
+                  className={styles.toolsButton}
+                  onClick={() => {
+                    setModalToolExecutions(m.executions || []);
+                    setExpandedToolsIdx(i);
+                  }}
+                >
+                  🔧 {m.executions.length} tool{m.executions.length !== 1 ? "s" : ""} used
+                </button>
+              )}
             </div>
           ))}
           <div ref={messagesEndRef} />
         </div>
+
 
         {error && <p className={styles.chatError}>{error}</p>}
 
@@ -249,6 +323,13 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
           </button>
         </div>
       </section>
+
+      {/* Operations modal */}
+      <ToolsModal
+        isOpen={expandedToolsIdx !== null}
+        onClose={() => setExpandedToolsIdx(null)}
+        executions={modalToolExecutions}
+      />
     </div>
   );
 }
@@ -258,9 +339,10 @@ interface CardFieldProps {
   value: string;
   onChange: (v: string) => void;
   type?: string;
+  disabled?: boolean;
 }
 
-function CardField({ label, value, onChange, type = "text" }: CardFieldProps) {
+function CardField({ label, value, onChange, type = "text", disabled = false }: CardFieldProps) {
   return (
     <div className={styles.cardField}>
       <label className={styles.fieldLabel}>{label}</label>
@@ -270,6 +352,7 @@ function CardField({ label, value, onChange, type = "text" }: CardFieldProps) {
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder="—"
+        disabled={disabled}
       />
     </div>
   );
@@ -278,9 +361,10 @@ function CardField({ label, value, onChange, type = "text" }: CardFieldProps) {
 interface ISBNFieldProps {
   value: string;
   onChange: (v: string) => void;
+  disabled?: boolean;
 }
 
-function ISBNField({ value, onChange }: ISBNFieldProps) {
+function ISBNField({ value, onChange, disabled = false }: ISBNFieldProps) {
   const displayValue = typeof value === "string" ? value.trim() : "";
   const isbnValid = displayValue && displayValue.length > 0 && !displayValue.includes("[");
   const isbnMissing = !displayValue || !isbnValid;
@@ -300,6 +384,7 @@ function ISBNField({ value, onChange }: ISBNFieldProps) {
           value={displayValue}
           onChange={(e) => onChange(e.target.value)}
           placeholder="—"
+          disabled={disabled}
         />
       )}
     </div>

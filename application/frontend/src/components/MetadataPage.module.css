@@ -15,7 +15,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  border-bottom: 1px solid #1e1e1e;
+  border-bottom: 1px solid var(--color-steel);
   background: rgba(0, 0, 0, 0.3);
 }
 
@@ -30,13 +30,13 @@
 
 .bookSpine {
   width: 8px;
-  background: linear-gradient(90deg, #1a1a1a 0%, #222 100%);
-  border-right: 1px solid #0a0a0a;
+  background: linear-gradient(90deg, var(--bg-primary) 0%, var(--bg-secondary) 100%);
+  border-right: 1px solid var(--bg-secondary);
 }
 
 .bookCover {
   flex: 1;
-  background: linear-gradient(135deg, #7c6ff7 0%, #5a4fb5 100%);
+  background: linear-gradient(135deg, var(--color-copper) 0%, rgba(184, 115, 51, 0.7) 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -69,7 +69,7 @@
 .coverTitle {
   font-size: var(--font-sm);
   font-weight: 600;
-  color: #fff;
+  color: var(--color-text-primary);
   line-height: 1.3;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -92,7 +92,7 @@
 .fieldsSection {
   flex-shrink: 0;
   padding: 1.25rem;
-  border-bottom: 1px solid #1e1e1e;
+  border-bottom: 1px solid var(--color-steel);
   max-width: 500px;
   margin: 0 auto;
   width: 100%;
@@ -116,21 +116,21 @@
   align-items: center;
   gap: 0.75rem;
   padding: 0.9rem 1.25rem;
-  border-bottom: 1px solid #1e1e1e;
+  border-bottom: 1px solid var(--color-steel);
   flex-shrink: 0;
 }
 
 .chatTitle {
   font-size: var(--font-sm);
   font-weight: 600;
-  color: #888;
+  color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
 
 .analysing {
   font-size: var(--font-xs);
-  color: #7c6ff7;
+  color: var(--color-copper);
   animation: pulse 1.4s ease-in-out infinite;
 }
 
@@ -149,7 +149,7 @@
 }
 
 .placeholder {
-  color: #444;
+  color: var(--color-text-secondary);
   font-size: var(--font-sm);
   text-align: center;
   margin: auto;
@@ -165,16 +165,16 @@
 }
 
 .user {
-  background: #2e2b4e;
-  color: #c5bfff;
+  background: var(--bg-secondary);
+  color: var(--color-text-primary);
   align-self: flex-end;
   border-bottom-right-radius: 3px;
 }
 
 .assistant {
-  background: #191919;
-  border: 1px solid #242424;
-  color: #d4d4d4;
+  background: var(--bg-primary);
+  border: 1px solid var(--color-steel);
+  color: var(--color-text-primary);
   align-self: flex-start;
   border-bottom-left-radius: 3px;
 }
@@ -185,7 +185,7 @@
   background: rgba(220, 53, 69, 0.1);
   border: 1px solid rgba(220, 53, 69, 0.3);
   border-radius: 8px;
-  color: #f87171;
+  color: var(--color-warning);
   font-size: var(--font-xs);
   flex-shrink: 0;
 }
@@ -194,16 +194,16 @@
   display: flex;
   gap: 0.5rem;
   padding: 0.9rem 1.25rem;
-  border-top: 1px solid #1e1e1e;
+  border-top: 1px solid var(--color-steel);
   flex-shrink: 0;
 }
 
 .chatInput {
   flex: 1;
   background: #141414;
-  border: 1px solid #2a2a2a;
+  border: 1px solid var(--color-steel);
   border-radius: 8px;
-  color: #e8e8e8;
+  color: var(--color-text-primary);
   padding: 0.6rem 0.85rem;
   font-size: var(--font-sm);
   transition: border-color 0.15s;
@@ -211,17 +211,17 @@
 
 .chatInput:focus {
   outline: none;
-  border-color: #7c6ff7;
+  border-color: var(--color-copper);
 }
 
 .chatInput::placeholder {
-  color: #444;
+  color: var(--color-text-secondary);
 }
 
 .sendBtn {
   padding: 0.6rem 1.1rem;
-  background: #7c6ff7;
-  color: #fff;
+  background: var(--color-copper);
+  color: var(--color-text-primary);
   border: none;
   border-radius: 8px;
   font-size: var(--font-sm);
@@ -231,7 +231,7 @@
 }
 
 .sendBtn:hover:not(:disabled) {
-  background: #6058d4;
+  background: #A86829;
 }
 
 .sendBtn:disabled {
@@ -275,7 +275,7 @@
 
 .fieldLabel {
   font-size: var(--font-xs);
-  color: #888;
+  color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-weight: 500;
@@ -283,9 +283,9 @@
 
 .fieldInput {
   background: #141414;
-  border: 1px solid #222;
+  border: 1px solid var(--bg-secondary);
   border-radius: 6px;
-  color: #d4d4d4;
+  color: var(--color-text-primary);
   padding: 0.5rem 0.65rem;
   font-size: var(--font-sm);
   width: 100%;
@@ -294,11 +294,17 @@
 
 .fieldInput:focus {
   outline: none;
-  border-color: #7c6ff7;
+  border-color: var(--color-copper);
 }
 
 .fieldInput::placeholder {
   color: #333;
+}
+
+.fieldInput:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: rgba(20, 20, 20, 0.5);
 }
 
 .isbnMissing {
@@ -306,7 +312,7 @@
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.65rem;
-  background: #0a0a0a;
+  background: var(--bg-secondary);
   border: 1px dashed #333;
   border-radius: 6px;
   color: #666;
@@ -329,12 +335,12 @@
   padding: 0.6rem 0.8rem;
   background: #141414;
   border-radius: 6px;
-  border: 1px solid #222;
+  border: 1px solid var(--bg-secondary);
 }
 
 .confidenceLabel {
   font-size: var(--font-xs);
-  color: #888;
+  color: var(--color-text-muted);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   font-weight: 500;
@@ -348,8 +354,8 @@
 
 .saveBtn {
   padding: 0.75rem 1.5rem;
-  background: #7c6ff7;
-  color: #fff;
+  background: var(--color-copper);
+  color: var(--color-text-primary);
   border: none;
   border-radius: 8px;
   font-size: var(--font-sm);
@@ -360,7 +366,7 @@
 }
 
 .saveBtn:hover:not(:disabled) {
-  background: #6058d4;
+  background: #A86829;
 }
 
 .saveBtn:disabled {
@@ -388,14 +394,14 @@
 }
 
 .savedMeta {
-  color: #888;
+  color: var(--color-text-muted);
   font-size: var(--font-sm);
   margin: 0;
 }
 
 .savedKey {
   background: #141414;
-  border: 1px solid #222;
+  border: 1px solid var(--bg-secondary);
   border-radius: 6px;
   padding: 0.5rem 0.75rem;
   font-size: var(--font-xs);
@@ -407,8 +413,8 @@
 .newBookBtn {
   margin-top: 0.5rem;
   padding: 0.65rem 1.5rem;
-  background: #7c6ff7;
-  color: #fff;
+  background: var(--color-copper);
+  color: var(--color-text-primary);
   border: none;
   border-radius: 8px;
   font-size: var(--font-sm);
@@ -418,5 +424,26 @@
 }
 
 .newBookBtn:hover {
-  background: #6058d4;
+  background: #A86829;
+}
+
+/* ── Tools button (inline with message) ────────── */
+.toolsButton {
+  align-self: flex-start;
+  margin-top: 4px;
+  margin-left: 0;
+  padding: 4px 8px;
+  background: rgba(184, 115, 51, 0.1);
+  color: var(--color-copper);
+  border: 1px solid rgba(184, 115, 51, 0.3);
+  border-radius: 3px;
+  font-size: var(--font-xs);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.toolsButton:hover {
+  background: rgba(184, 115, 51, 0.2);
+  border-color: rgba(184, 115, 51, 0.5);
 }
