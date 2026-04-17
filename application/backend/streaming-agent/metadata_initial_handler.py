@@ -287,7 +287,7 @@ class MetadataInitialHandler:
         prompt = f"Here is the extracted data:\n\n{context}"
 
         # No toolsets - agent receives only context and does categorization
-        toolsets = []
+        toolsets: list = []
 
         # Create tracking record and mark USER_UPLOAD as complete (file already landed via presigned URL)
         try:

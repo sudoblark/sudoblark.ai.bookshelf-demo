@@ -33,7 +33,7 @@ def build_bookshelf_toolset(
         """
         try:
             start = time.time()
-            books = bookshelf_handler._list_all_books()
+            books: List[Dict] = bookshelf_handler._list_all_books()
             elapsed_ms = (time.time() - start) * 1000
 
             if tracker:

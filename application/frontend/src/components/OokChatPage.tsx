@@ -53,8 +53,6 @@ export function OokChatPage() {
 
     try {
       let assistantMessage = "";
-
-      let currentTools: string[] = [];
       let currentExecutions: ToolExecution[] = [];
 
       for await (const event of streamOokChat(sessionId, userMessage)) {
@@ -66,23 +64,10 @@ export function OokChatPage() {
             if (last && last.role === "assistant") {
               return [
                 ...prev.slice(0, -1),
-                { role: "assistant", content: assistantMessage, tools: currentTools, executions: currentExecutions },
+                { role: "assistant", content: assistantMessage, executions: currentExecutions },
               ];
             }
-            return [...prev, { role: "assistant", content: assistantMessage, tools: currentTools, executions: currentExecutions }];
-          });
-        } else if (event.type === "tools_used") {
-          currentTools = event.tools || [];
-          // Update message with new tools list
-          setMessages((prev) => {
-            const last = prev[prev.length - 1];
-            if (last && last.role === "assistant") {
-              return [
-                ...prev.slice(0, -1),
-                { role: "assistant", content: last.content, tools: currentTools, executions: last.executions || [] },
-              ];
-            }
-            return prev;
+            return [...prev, { role: "assistant", content: assistantMessage, executions: currentExecutions }];
           });
         } else if (event.type === "tool_executions") {
           currentExecutions = event.executions || [];

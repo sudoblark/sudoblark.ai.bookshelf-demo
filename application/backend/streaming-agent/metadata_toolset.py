@@ -148,7 +148,10 @@ def build_metadata_toolset(
                     normalized = _normalize_isbn(isbn)
                     # Validate format
                     if re.match(r"^(?:97[89]\d{10}|[0-9]{10}[X0-9])$", normalized):
-                        result = {"isbn": normalized, "pattern_matched": pattern_name}
+                        result: Dict[str, Any] = {
+                            "isbn": normalized,
+                            "pattern_matched": pattern_name,
+                        }
                         elapsed_ms = (time.time() - start) * 1000
                         if tracker:
                             tracker.record(
