@@ -56,10 +56,17 @@ export async function* streamInitialMetadata(
   key: string,
   filename: string
 ): AsyncGenerator<StreamEvent> {
-  const res = await fetch("/api/metadata/initial", {
+  const sessionId = crypto.randomUUID();
+  const res = await fetch("/api/metadata/extract", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ bucket, key, filename }),
+    body: JSON.stringify({
+      session_id: sessionId,
+      message: "Extract metadata from this book cover",
+      bucket,
+      key,
+      filename,
+    }),
   });
   if (!res.ok) throw new Error(`Initial metadata request failed: ${res.statusText}`);
   yield* parseSse(res);
@@ -68,15 +75,13 @@ export async function* streamInitialMetadata(
 export async function* streamRefinedMetadata(
   sessionId: string,
   message: string,
-  currentMetadata: BookMetadata
 ): AsyncGenerator<StreamEvent> {
-  const res = await fetch("/api/metadata/refine", {
+  const res = await fetch("/api/metadata/extract", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       session_id: sessionId,
-      message,
-      current_metadata: currentMetadata,
+      message: message,
     }),
   });
   if (!res.ok) throw new Error(`Refinement request failed: ${res.statusText}`);
@@ -139,4 +144,19 @@ export async function getOpsFile(fileId: string): Promise<OpsDetailResponse> {
   const res = await fetch(`/api/ops/files/${encodeURIComponent(fileId)}`);
   if (!res.ok) throw new Error(`Failed to fetch ops file: ${res.statusText}`);
   return res.json();
+}
+
+// Ook Chat API function
+
+export async function* streamOokChat(
+  sessionId: string,
+  message: string
+): AsyncGenerator<StreamEvent> {
+  const res = await fetch("/api/ook/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId, message }),
+  });
+  if (!res.ok) throw new Error(`Ook chat failed: ${res.statusText}`);
+  yield* parseSse(res);
 }

@@ -19,7 +19,6 @@ export function BookshelfPage({ onNavigateToNewBook }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchField, setSearchField] = useState<"title" | "author">("title");
   const [isSearching, setIsSearching] = useState(false);
 
   // Fetch overview on mount
@@ -61,8 +60,17 @@ export function BookshelfPage({ onNavigateToNewBook }: Props) {
     setIsSearching(true);
     setLoading(true);
     try {
-      const data = await searchBookshelf(searchQuery, searchField);
-      setBooks(data.books);
+      // Search both title and author, deduplicate results
+      const titleResults = await searchBookshelf(searchQuery, "title");
+      const authorResults = await searchBookshelf(searchQuery, "author");
+
+      // Merge and dedupe by book_id
+      const allBooks = [...titleResults.books, ...authorResults.books];
+      const uniqueBooks = Array.from(
+        new Map(allBooks.map(book => [book.book_id, book])).values()
+      );
+
+      setBooks(uniqueBooks);
       setTotalPages(1); // Search doesn't paginate
       setError(null);
     } catch (err) {
@@ -90,16 +98,23 @@ export function BookshelfPage({ onNavigateToNewBook }: Props) {
   if (!loading && overview?.total_books === 0) {
     return (
       <div className={styles.page}>
-        <div className={styles.container}>
-          <div className={styles.icon}>📚</div>
-          <h1 className={styles.title}>Your bookshelf is empty</h1>
-          <p className={styles.subtitle}>
+        <div className={styles.emptyState}>
+          <div className={styles.emptyIcon}>📚</div>
+          <h1 className={styles.emptyTitle}>Your bookshelf is empty</h1>
+          <p className={styles.emptyDescription}>
             Start by uploading your first book cover image to get metadata
             extracted automatically.
           </p>
-          <button className={styles.ctaButton} onClick={onNavigateToNewBook}>
-            Add your first book
-          </button>
+          <div className={styles.emptyCard}>
+            <p className={styles.emptyCardTitle}>Getting started</p>
+            <p className={styles.emptyCardText}>
+              Upload a photo of any book cover and our AI will extract the title, author,
+              and publication details to build your digital bookshelf.
+            </p>
+            <button className={styles.ctaButton} onClick={onNavigateToNewBook}>
+              Add your first book
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -107,83 +122,75 @@ export function BookshelfPage({ onNavigateToNewBook }: Props) {
 
   return (
     <div className={styles.page}>
-      {/* Overview Stats */}
-      <div className={styles.statsRow}>
-        <div className={styles.statCard}>
-          <div className={styles.statLabel}>Total Books</div>
-          <div className={styles.statValue}>{overview?.total_books ?? "—"}</div>
-        </div>
-        <div className={styles.statCard}>
-          <div className={styles.statLabel}>Most Common Author</div>
-          <div className={styles.statValue}>
-            {overview?.most_common_author ?? "—"}
+      {/* Header with Title and Search */}
+      <div className={styles.header}>
+        <div className={styles.headerLeft}>
+          <div className={styles.headerIcon}>📚</div>
+          <div className={styles.headerContent}>
+            <h1 className={styles.headerTitle}>Bookshelf</h1>
+            <p className={styles.headerCount}>
+              {overview?.total_books ?? 0} {overview?.total_books === 1 ? "book" : "books"}
+            </p>
           </div>
-          <div className={styles.statSubtext}>
-            {overview?.most_common_author_count ?? 0} books
+        </div>
+
+        <div className={styles.headerRight}>
+          <div className={styles.searchBar}>
+            <input
+              type="text"
+              className={styles.searchInput}
+              placeholder="Search books..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
+            />
+            <button className={styles.searchButton} onClick={handleSearch}>
+              Search
+            </button>
+            {isSearching && (
+              <button className={styles.clearButton} onClick={handleClearSearch}>
+                Clear
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className={styles.searchBar}>
-        <input
-          type="text"
-          className={styles.searchInput}
-          placeholder="Search books..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-        />
-        <select
-          className={styles.searchField}
-          value={searchField}
-          onChange={(e) => setSearchField(e.target.value as "title" | "author")}
-        >
-          <option value="title">Title</option>
-          <option value="author">Author</option>
-        </select>
-        <button className={styles.searchButton} onClick={handleSearch}>
-          Search
-        </button>
-        {isSearching && (
-          <button className={styles.clearButton} onClick={handleClearSearch}>
-            Clear
-          </button>
+      {/* Content Area */}
+      <div className={styles.content}>
+        {/* Error State */}
+        {error && <div className={styles.error}>{error}</div>}
+
+        {/* Loading State */}
+        {loading && <div className={styles.loading}>Loading books...</div>}
+
+        {/* Book Grid */}
+        {!loading && books.length > 0 && (
+          <div className={styles.bookGrid}>
+            {books.map((book) => (
+              <div key={book.book_id} className={styles.bookCard}>
+                <div className={styles.bookTitle}>{book.title}</div>
+                <div className={styles.bookAuthor}>{book.author}</div>
+                <div className={styles.bookYear}>
+                  {book.published_year ?? "Unknown"}
+                </div>
+                {book.confidence !== null && (
+                  <div className={styles.confidenceBadge}>
+                    {Math.round(book.confidence * 100)}%
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* No Results */}
+        {!loading && books.length === 0 && isSearching && (
+          <div className={styles.noResults}>
+            No books found for "{searchQuery}"
+          </div>
         )}
       </div>
-
-      {/* Error State */}
-      {error && <div className={styles.error}>{error}</div>}
-
-      {/* Loading State */}
-      {loading && <div className={styles.loading}>Loading books...</div>}
-
-      {/* Book Grid */}
-      {!loading && books.length > 0 && (
-        <div className={styles.bookGrid}>
-          {books.map((book) => (
-            <div key={book.book_id} className={styles.bookCard}>
-              <div className={styles.bookTitle}>{book.title}</div>
-              <div className={styles.bookAuthor}>{book.author}</div>
-              <div className={styles.bookYear}>
-                {book.published_year ?? "Unknown"}
-              </div>
-              {book.confidence !== null && (
-                <div className={styles.confidenceBadge}>
-                  {Math.round(book.confidence * 100)}%
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* No Results */}
-      {!loading && books.length === 0 && isSearching && (
-        <div className={styles.noResults}>
-          No books found for "{searchQuery}"
-        </div>
-      )}
 
       {/* Pagination */}
       {!loading && !isSearching && totalPages > 1 && (

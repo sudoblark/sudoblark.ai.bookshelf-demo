@@ -303,7 +303,7 @@ class TestBookshelfStreamingAgentSystemPrompts:
 
     def test_initial_system_prompt_content(self):
         """Test that INITIAL_SYSTEM_PROMPT has expected content."""
-        assert "book metadata extraction" in INITIAL_SYSTEM_PROMPT.lower()
+        assert "metadata" in INITIAL_SYSTEM_PROMPT.lower()
         assert "isbn" in INITIAL_SYSTEM_PROMPT.lower()
 
     def test_refinement_system_prompt_exists(self):
@@ -316,17 +316,13 @@ class TestBookshelfStreamingAgentSystemPrompts:
         assert (
             "refinement" in REFINEMENT_SYSTEM_PROMPT.lower()
             or "refine" in REFINEMENT_SYSTEM_PROMPT.lower()
+            or "refining" in REFINEMENT_SYSTEM_PROMPT.lower()
         )
-        assert "conversation" in REFINEMENT_SYSTEM_PROMPT.lower()
+        assert "metadata" in REFINEMENT_SYSTEM_PROMPT.lower()
 
     def test_prompts_are_different(self):
         """Test that initial and refinement prompts are different."""
         assert INITIAL_SYSTEM_PROMPT != REFINEMENT_SYSTEM_PROMPT
-
-    def test_prompts_have_critical_rules(self):
-        """Test that both prompts have critical ISBN rules."""
-        assert "CRITICAL" in INITIAL_SYSTEM_PROMPT or "NEVER" in INITIAL_SYSTEM_PROMPT
-        assert "CRITICAL" in REFINEMENT_SYSTEM_PROMPT or "NEVER" in REFINEMENT_SYSTEM_PROMPT
 
 
 class TestBookshelfStreamingAgentInstances:

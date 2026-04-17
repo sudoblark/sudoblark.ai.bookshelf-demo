@@ -1,0 +1,114 @@
+/* ── Modal overlay ──────────────────────────── */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal {
+  background: var(--bg-primary);
+  border: 1px solid var(--color-steel);
+  border-radius: 12px;
+  max-width: 600px;
+  width: 90%;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem;
+  border-bottom: 1px solid var(--color-steel);
+  flex-shrink: 0;
+}
+
+.modalTitle {
+  font-size: var(--font-sm);
+  font-weight: 600;
+  color: var(--color-text-primary);
+  margin: 0;
+}
+
+.modalClose {
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: var(--font-lg);
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+
+.modalClose:hover {
+  color: var(--color-text-primary);
+}
+
+.modalContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Tool item ──────────────────────────────── */
+.toolItem {
+  padding: 8px;
+  background: rgba(184, 115, 51, 0.08);
+  border-left: 3px solid var(--color-copper);
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.toolName {
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: var(--color-copper);
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+}
+
+.toolInputs {
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px;
+  border-radius: 2px;
+  overflow-x: auto;
+}
+
+.toolResult {
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+}
+
+.toolTime {
+  font-size: var(--font-xs);
+  color: var(--color-text-muted);
+  font-style: italic;
+}

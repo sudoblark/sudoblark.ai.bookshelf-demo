@@ -120,47 +120,27 @@ class TestPresignedUrlEndpoint:
         assert response.status_code in [200, 400, 500]
 
 
-class TestMetadataInitialEndpoint:
-    """Test POST /api/metadata/initial endpoint."""
+class TestMetadataExtractEndpoint:
+    """Test POST /api/metadata/extract endpoint."""
 
-    def test_metadata_initial_endpoint_exists(self, client):
-        """Test that metadata initial endpoint is registered."""
-        response = client.post("/api/metadata/initial", json={})
+    def test_metadata_extract_endpoint_exists(self, client):
+        """Test that metadata extract endpoint is registered."""
+        response = client.post("/api/metadata/extract", json={})
         # May fail due to missing handler setup, but endpoint exists
         assert response.status_code != 404
 
-    def test_metadata_initial_is_post_method(self, client):
-        """Test that metadata initial is POST method."""
+    def test_metadata_extract_is_post_method(self, client):
+        """Test that metadata extract is POST method."""
         # GET should not be allowed
-        response = client.get("/api/metadata/initial")
+        response = client.get("/api/metadata/extract")
         assert response.status_code in [405, 404, 500]  # Method not allowed or error
 
-    def test_metadata_initial_accepts_json_body(self, client):
-        """Test that metadata initial accepts JSON body."""
-        response = client.post("/api/metadata/initial", json={"bucket": "test", "key": "test.jpg"})
-        # Will fail due to handler not set up, but endpoint processes JSON
-        assert response.status_code in [200, 400, 422, 500]
-
-
-class TestMetadataRefineEndpoint:
-    """Test POST /api/metadata/refine endpoint."""
-
-    def test_metadata_refine_endpoint_exists(self, client):
-        """Test that metadata refine endpoint is registered."""
-        response = client.post("/api/metadata/refine", json={})
-        assert response.status_code != 404
-
-    def test_metadata_refine_is_post_method(self, client):
-        """Test that metadata refine is POST method."""
-        response = client.get("/api/metadata/refine")
-        assert response.status_code in [405, 404, 500]
-
-    def test_metadata_refine_accepts_json_body(self, client):
-        """Test that metadata refine accepts JSON body."""
+    def test_metadata_extract_accepts_json_body(self, client):
+        """Test that metadata extract accepts JSON body."""
         response = client.post(
-            "/api/metadata/refine",
-            json={"session_id": "test-id", "message": "test"},
+            "/api/metadata/extract", json={"session_id": "test", "message": "test"}
         )
+        # Will fail due to handler not set up, but endpoint processes JSON
         assert response.status_code in [200, 400, 422, 500]
 
 
@@ -187,48 +167,48 @@ class TestMetadataAcceptEndpoint:
 
 
 class TestOpsListFilesEndpoint:
-    """Test GET /ops/files endpoint."""
+    """Test GET /api/ops/files endpoint."""
 
     def test_ops_list_files_endpoint_exists(self, client):
         """Test that ops list files endpoint is registered."""
-        response = client.get("/ops/files")
+        response = client.get("/api/ops/files")
         assert response.status_code != 404
 
     def test_ops_list_files_is_get_method(self, client):
         """Test that ops list files is GET method."""
-        response = client.post("/ops/files", json={})
+        response = client.post("/api/ops/files", json={})
         assert response.status_code in [405, 404, 500]
 
     def test_ops_list_files_returns_json(self, client):
         """Test that ops list files returns JSON."""
-        response = client.get("/ops/files")
+        response = client.get("/api/ops/files")
         # Should be JSON (even if error)
         assert response.status_code in [200, 400, 500]
 
 
 class TestOpsGetFileEndpoint:
-    """Test GET /ops/files/{file_id} endpoint."""
+    """Test GET /api/ops/files/{file_id} endpoint."""
 
     def test_ops_get_file_endpoint_exists(self, client):
         """Test that ops get file endpoint is registered."""
-        response = client.get("/ops/files/test-file-id")
+        response = client.get("/api/ops/files/test-file-id")
         assert response.status_code != 404
 
     def test_ops_get_file_is_get_method(self, client):
         """Test that ops get file is GET method."""
-        response = client.post("/ops/files/test-file-id", json={})
+        response = client.post("/api/ops/files/test-file-id", json={})
         assert response.status_code in [405, 404, 500]
 
     def test_ops_get_file_accepts_file_id_param(self, client):
         """Test that ops get file accepts file_id path parameter."""
-        response = client.get("/ops/files/my-file-123")
+        response = client.get("/api/ops/files/my-file-123")
         assert response.status_code in [200, 404, 500]
 
     def test_ops_get_file_with_various_ids(self, client):
         """Test ops get file with various ID formats."""
         test_ids = ["file-1", "uuid-123-456", "simple"]
         for test_id in test_ids:
-            response = client.get(f"/ops/files/{test_id}")
+            response = client.get(f"/api/ops/files/{test_id}")
             # Should not 404 (endpoint exists)
             assert response.status_code != 404
 
@@ -254,11 +234,10 @@ class TestEndpointCORS:
         endpoints = [
             ("/health", "GET"),
             ("/api/upload/presigned", "GET"),
-            ("/api/metadata/initial", "POST"),
-            ("/api/metadata/refine", "POST"),
+            ("/api/metadata/extract", "POST"),
             ("/api/metadata/accept", "POST"),
-            ("/ops/files", "GET"),
-            ("/ops/files/test-id", "GET"),
+            ("/api/ops/files", "GET"),
+            ("/api/ops/files/test-id", "GET"),
         ]
 
         for endpoint, method in endpoints:
@@ -290,8 +269,7 @@ class TestEndpointRouting:
     def test_metadata_routes_under_correct_paths(self, client):
         """Test metadata endpoints are under /api/metadata/."""
         endpoints = [
-            "/api/metadata/initial",
-            "/api/metadata/refine",
+            "/api/metadata/extract",
             "/api/metadata/accept",
         ]
 
@@ -301,10 +279,10 @@ class TestEndpointRouting:
             assert response.status_code != 404
 
     def test_ops_routes_under_correct_paths(self, client):
-        """Test ops endpoints are under /ops/."""
+        """Test ops endpoints are under /api/ops/."""
         endpoints = [
-            "/ops/files",
-            "/ops/files/test-id",
+            "/api/ops/files",
+            "/api/ops/files/test-id",
         ]
 
         for endpoint in endpoints:
@@ -344,7 +322,7 @@ class TestEndpointQueryParams:
 
     def test_query_params_not_required_for_other_endpoints(self, client):
         """Test that other endpoints don't require query params."""
-        response = client.post("/api/metadata/initial")
+        response = client.post("/api/metadata/extract")
         # Should reach endpoint
         assert response.status_code in [200, 400, 422, 500]
 
@@ -369,7 +347,7 @@ class TestEndpointResponseTypes:
 
     def test_ops_endpoints_return_json(self, client):
         """Test that ops endpoints return JSON."""
-        response = client.get("/ops/files")
+        response = client.get("/api/ops/files")
         # Should be JSON or error
         assert response.status_code in [200, 400, 500]
 
@@ -390,7 +368,7 @@ class TestEndpointErrorHandling:
     def test_invalid_json_body_handled(self, client):
         """Test that invalid JSON is handled."""
         response = client.post(
-            "/api/metadata/initial",
+            "/api/metadata/extract",
             data="invalid json",
             headers={"content-type": "application/json"},
         )
