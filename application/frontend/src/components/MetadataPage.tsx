@@ -39,6 +39,7 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
   const [uploadId] = useState<string>(sessionId); // Session ID is upload ID
   const [expandedToolsIdx, setExpandedToolsIdx] = useState<number | null>(null);
   const [modalToolExecutions, setModalToolExecutions] = useState<ToolExecution[]>([]);
+  const [showMetadataModal, setShowMetadataModal] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -202,79 +203,14 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
 
   return (
     <div className={styles.page}>
-      {/* ── Book card (top center) ───────────────────────── */}
-      <div className={styles.bookCardContainer}>
-        <div className={styles.bookCard}>
-          <div className={styles.bookSpine} />
-          <div className={styles.bookCover}>
-            <div className={styles.coverContent}>
-              <div className={styles.coverTitle}>{metadata.title || "Untitled"}</div>
-              <div className={styles.coverAuthor}>{metadata.author || "Unknown Author"}</div>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* ── Header (minimal) ──────────────────────────────── */}
+      <header className={styles.header}>
+        <h1 className={styles.headerTitle}>New Book</h1>
+        {extracting && <span className={styles.analysing}>Analysing cover…</span>}
+      </header>
 
-      {/* ── Metadata fields (top center) ─────────────────── */}
-      <div className={styles.fieldsSection}>
-        <div className={styles.cardFields}>
-          <CardField
-            label="Title"
-            value={metadata.title}
-            onChange={(v) => setMetadata((p) => ({ ...p, title: v }))}
-            disabled={extracting}
-          />
-          <CardField
-            label="Author"
-            value={metadata.author}
-            onChange={(v) => setMetadata((p) => ({ ...p, author: v }))}
-            disabled={extracting}
-          />
-          <CardField
-            label="Year"
-            value={metadata.published_year?.toString() ?? ""}
-            onChange={(v) => setMetadata((p) => ({ ...p, published_year: v ? parseInt(v, 10) : null }))}
-            type="number"
-            disabled={extracting}
-          />
-          <ISBNField
-            value={metadata.isbn}
-            onChange={(v) => setMetadata((p) => ({ ...p, isbn: v }))}
-            disabled={extracting}
-          />
-          <CardField
-            label="Publisher"
-            value={metadata.publisher}
-            onChange={(v) => setMetadata((p) => ({ ...p, publisher: v }))}
-            disabled={extracting}
-          />
-        </div>
-
-        {metadata.confidence !== null && (
-          <div className={styles.confidence}>
-            <span className={styles.confidenceLabel}>Confidence</span>
-            <span className={styles.confidenceValue}>
-              {Math.round((metadata.confidence ?? 0) * 100)}%
-            </span>
-          </div>
-        )}
-
-        <button
-          className={styles.saveBtn}
-          onClick={handleSave}
-          disabled={busy}
-        >
-          Save book
-        </button>
-      </div>
-
-      {/* ── Chat section (bottom) ──────────────────────── */}
+      {/* ── Chat section (main area) ──────────────────────── */}
       <section className={styles.chatSection}>
-        <header className={styles.chatHeader}>
-          <span className={styles.chatTitle}>Refine</span>
-          {extracting && <span className={styles.analysing}>Analysing cover…</span>}
-        </header>
-
         <div className={styles.messages}>
           {messages.length === 0 && extracting && (
             <p className={styles.placeholder}>Extracting metadata from your cover…</p>
@@ -301,28 +237,119 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
           <div ref={messagesEndRef} />
         </div>
 
-
         {error && <p className={styles.chatError}>{error}</p>}
-
-        <div className={styles.inputRow}>
-          <input
-            className={styles.chatInput}
-            type="text"
-            placeholder={busy ? "Waiting…" : "Ask to correct or refine…"}
-            value={userInput}
-            onChange={(e) => setUserInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={busy}
-          />
-          <button
-            className={styles.sendBtn}
-            onClick={handleSend}
-            disabled={busy || !userInput.trim()}
-          >
-            Send
-          </button>
-        </div>
       </section>
+
+      {/* ── Metadata summary footer ────────────────────────── */}
+      <div className={styles.metadataFooter}>
+        <div className={styles.metadataSummary}>
+          {metadata.title && <span className={styles.metadataItem}><strong>Title:</strong> {metadata.title}</span>}
+          {metadata.author && <span className={styles.metadataItem}><strong>Author:</strong> {metadata.author}</span>}
+          {metadata.isbn && <span className={styles.metadataItem}><strong>ISBN:</strong> {metadata.isbn}</span>}
+          {!metadata.title && !metadata.author && !metadata.isbn && (
+            <span className={styles.metadataPlaceholder}>Metadata will appear here</span>
+          )}
+        </div>
+        <button
+          className={styles.viewDetailsBtn}
+          onClick={() => setShowMetadataModal(true)}
+          disabled={busy}
+        >
+          View all fields
+        </button>
+      </div>
+
+      {/* ── Input area (bottom) ────────────────────────────── */}
+      <div className={styles.inputRow}>
+        <input
+          className={styles.chatInput}
+          type="text"
+          placeholder={busy ? "Waiting…" : "Ask to correct or refine…"}
+          value={userInput}
+          onChange={(e) => setUserInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={busy}
+        />
+        <button
+          className={styles.sendBtn}
+          onClick={handleSend}
+          disabled={busy || !userInput.trim()}
+        >
+          Send
+        </button>
+        <button
+          className={styles.saveBtn}
+          onClick={handleSave}
+          disabled={busy}
+          title="Save and proceed"
+        >
+          Save book
+        </button>
+      </div>
+
+      {/* Metadata detail modal */}
+      {showMetadataModal && (
+        <div className={styles.metadataModalOverlay} onClick={() => setShowMetadataModal(false)}>
+          <div className={styles.metadataModal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.metadataModalHeader}>
+              <h2 className={styles.metadataModalTitle}>Book Details</h2>
+              <button
+                className={styles.metadataModalClose}
+                onClick={() => setShowMetadataModal(false)}
+                aria-label="Close"
+              >
+                ✕
+              </button>
+            </div>
+            <div className={styles.metadataModalContent}>
+              <CardField
+                label="Title"
+                value={metadata.title}
+                onChange={(v) => setMetadata((p) => ({ ...p, title: v }))}
+                disabled={extracting}
+              />
+              <CardField
+                label="Author"
+                value={metadata.author}
+                onChange={(v) => setMetadata((p) => ({ ...p, author: v }))}
+                disabled={extracting}
+              />
+              <CardField
+                label="Year"
+                value={metadata.published_year?.toString() ?? ""}
+                onChange={(v) => setMetadata((p) => ({ ...p, published_year: v ? parseInt(v, 10) : null }))}
+                type="number"
+                disabled={extracting}
+              />
+              <ISBNField
+                value={metadata.isbn}
+                onChange={(v) => setMetadata((p) => ({ ...p, isbn: v }))}
+                disabled={extracting}
+              />
+              <CardField
+                label="Publisher"
+                value={metadata.publisher}
+                onChange={(v) => setMetadata((p) => ({ ...p, publisher: v }))}
+                disabled={extracting}
+              />
+              <CardField
+                label="Description"
+                value={metadata.description}
+                onChange={(v) => setMetadata((p) => ({ ...p, description: v }))}
+                disabled={extracting}
+              />
+              {metadata.confidence !== null && (
+                <div className={styles.confidenceDisplay}>
+                  <span className={styles.confidenceLabel}>Confidence</span>
+                  <span className={styles.confidenceValue}>
+                    {Math.round((metadata.confidence ?? 0) * 100)}%
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Operations modal */}
       <ToolsModal
