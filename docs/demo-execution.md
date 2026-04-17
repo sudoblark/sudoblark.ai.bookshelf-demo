@@ -48,12 +48,12 @@ Create `.env` files for both services:
 #### Backend: `application/backend/streaming-agent/.env`
 
 ```bash
-BEDROCK_MODEL_ID=anthropic.claude-3-5-sonnet-20241022-v2:0
+BEDROCK_MODEL_ID=anthropic.claude-3-7-sonnet-20250219-v1:0
 BEDROCK_REGION=eu-west-2
 AWS_DEFAULT_REGION=eu-west-2
-LANDING_BUCKET=bookshelf-demo-landing-dev
-RAW_BUCKET=bookshelf-demo-raw-dev
-TRACKING_TABLE=bookshelf-demo-tracking-dev
+LANDING_BUCKET=aws-sudoblark-development-bookshelf-demo-landing
+RAW_BUCKET=aws-sudoblark-development-bookshelf-demo-raw
+TRACKING_TABLE=aws-sudoblark-development-bookshelf-demo-ingestion-tracking
 CORS_ALLOWED_ORIGINS=http://localhost:5173
 LOG_LEVEL=INFO
 ```
@@ -75,6 +75,7 @@ eval $(aws configure export-credentials --format env)
 Then start the backend (credentials will be passed via environment):
 
 ```bash
+source .env
 cd application/backend/streaming-agent
 docker-compose up --build
 ```

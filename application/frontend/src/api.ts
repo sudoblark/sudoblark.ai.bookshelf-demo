@@ -140,3 +140,18 @@ export async function getOpsFile(fileId: string): Promise<OpsDetailResponse> {
   if (!res.ok) throw new Error(`Failed to fetch ops file: ${res.statusText}`);
   return res.json();
 }
+
+// Ook Chat API function
+
+export async function* streamOokChat(
+  sessionId: string,
+  message: string
+): AsyncGenerator<StreamEvent> {
+  const res = await fetch("/api/ook/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId, message }),
+  });
+  if (!res.ok) throw new Error(`Ook chat failed: ${res.statusText}`);
+  yield* parseSse(res);
+}
