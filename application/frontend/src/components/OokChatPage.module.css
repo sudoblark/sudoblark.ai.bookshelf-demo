@@ -285,17 +285,11 @@
   cursor: not-allowed;
 }
 
-/* Tools display */
-.toolsContainer {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-top: 8px;
-  margin-left: 32px;  /* Align with message, not avatar */
-}
-
+/* Tools button (opens modal) */
 .toolsButton {
   align-self: flex-start;
+  margin-top: 8px;
+  margin-left: 32px;
   padding: 4px 8px;
   background: rgba(184, 115, 51, 0.1);
   color: var(--color-copper);
@@ -310,54 +304,6 @@
 .toolsButton:hover {
   background: rgba(184, 115, 51, 0.2);
   border-color: rgba(184, 115, 51, 0.5);
-}
-
-.toolsList {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--color-steel);
-  border-radius: 3px;
-}
-
-.toolItem {
-  padding: 8px;
-  background: rgba(184, 115, 51, 0.08);
-  border-left: 3px solid var(--color-copper);
-  border-radius: 2px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.toolName {
-  font-size: var(--font-xs);
-  font-weight: 600;
-  color: var(--color-copper);
-  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
-}
-
-.toolInputs {
-  font-size: var(--font-xs);
-  color: var(--color-text-secondary);
-  font-family: 'JetBrains Mono', 'SF Mono', 'Fira Code', monospace;
-  background: rgba(0, 0, 0, 0.2);
-  padding: 4px;
-  border-radius: 2px;
-  overflow-x: auto;
-}
-
-.toolResult {
-  font-size: var(--font-xs);
-  color: var(--color-text-secondary);
-}
-
-.toolTime {
-  font-size: var(--font-xs);
-  color: var(--color-text-muted);
-  font-style: italic;
 }
 
 /* Error display */

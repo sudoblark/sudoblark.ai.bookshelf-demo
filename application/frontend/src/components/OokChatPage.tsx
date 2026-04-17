@@ -1,13 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { streamOokChat } from "../api";
+import { ToolsModal, type ToolExecution } from "./ToolsModal";
 import styles from "./OokChatPage.module.css";
-
-interface ToolExecution {
-  name: string;
-  inputs: string;
-  result_summary: string;
-  execution_time_ms: number;
-}
 
 interface Message {
   role: "user" | "assistant";
@@ -29,6 +23,7 @@ export function OokChatPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedToolsIdx, setExpandedToolsIdx] = useState<number | null>(null);
+  const [modalToolExecutions, setModalToolExecutions] = useState<ToolExecution[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -181,28 +176,17 @@ export function OokChatPage() {
                 {msg.content}
               </div>
             </div>
-            {/* Tools indicator for assistant messages */}
+            {/* Tools button for assistant messages */}
             {msg.role === "assistant" && msg.executions && msg.executions.length > 0 && (
-              <div className={styles.toolsContainer}>
-                <button
-                  className={styles.toolsButton}
-                  onClick={() => setExpandedToolsIdx(expandedToolsIdx === idx ? null : idx)}
-                >
-                  📚 {msg.executions.length} tool{msg.executions.length !== 1 ? "s" : ""} used
-                </button>
-                {expandedToolsIdx === idx && (
-                  <div className={styles.toolsList}>
-                    {msg.executions.map((exec, i) => (
-                      <div key={i} className={styles.toolItem}>
-                        <div className={styles.toolName}>{exec.name}</div>
-                        <div className={styles.toolInputs}>{exec.inputs}</div>
-                        <div className={styles.toolResult}>{exec.result_summary}</div>
-                        <div className={styles.toolTime}>{exec.execution_time_ms.toFixed(1)}ms</div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <button
+                className={styles.toolsButton}
+                onClick={() => {
+                  setModalToolExecutions(msg.executions || []);
+                  setExpandedToolsIdx(idx);
+                }}
+              >
+                📚 {msg.executions.length} tool{msg.executions.length !== 1 ? "s" : ""} used
+              </button>
             )}
           </div>
         ))}
@@ -254,6 +238,13 @@ export function OokChatPage() {
           </div>
         )}
       </div>
+
+      {/* Operations modal */}
+      <ToolsModal
+        isOpen={expandedToolsIdx !== null}
+        onClose={() => setExpandedToolsIdx(null)}
+        executions={modalToolExecutions}
+      />
     </div>
   );
 }

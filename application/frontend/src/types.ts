@@ -15,10 +15,18 @@ export interface PresignedUrlResponse {
   session_id: string;
 }
 
+export interface ToolExecution {
+  name: string;
+  inputs: string;
+  result_summary: string;
+  execution_time_ms: number;
+}
+
 export type StreamEvent =
   | { type: "text_delta"; delta: string }
   | { type: "metadata_update"; field: keyof BookMetadata; value: BookMetadata[keyof BookMetadata] }
   | { type: "upload_id"; upload_id: string }
+  | { type: "tool_executions"; executions: ToolExecution[] }
   | { type: "complete" }
   | { type: "error"; message: string };
 

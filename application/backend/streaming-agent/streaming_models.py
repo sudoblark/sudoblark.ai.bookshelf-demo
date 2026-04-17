@@ -102,3 +102,20 @@ class OokChatResponse(BaseModel):
         default=False,
         description="True if an error occurred during processing",
     )
+
+
+class MetadataExtractionResponse(BaseModel):
+    """Metadata extraction response with conversational message and tool tracking.
+
+    Used as the pydantic-ai ``output_type`` for metadata extraction so the agent
+    uses tools and streams responses. Similar to OokChatResponse but for book cataloging.
+    """
+
+    message: str = Field(
+        default="",
+        description="Conversational response from the extraction agent",
+    )
+    tools_used: List[str] = Field(
+        default_factory=list,
+        description="Names of tools called during extraction (e.g., ['extract_ocr_text', 'lookup_isbn_metadata'])",
+    )

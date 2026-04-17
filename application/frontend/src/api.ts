@@ -56,10 +56,17 @@ export async function* streamInitialMetadata(
   key: string,
   filename: string
 ): AsyncGenerator<StreamEvent> {
-  const res = await fetch("/api/metadata/initial", {
+  const sessionId = crypto.randomUUID();
+  const res = await fetch("/api/metadata/extract", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ bucket, key, filename }),
+    body: JSON.stringify({
+      session_id: sessionId,
+      message: "Extract metadata from this book cover",
+      bucket,
+      key,
+      filename,
+    }),
   });
   if (!res.ok) throw new Error(`Initial metadata request failed: ${res.statusText}`);
   yield* parseSse(res);
@@ -68,15 +75,13 @@ export async function* streamInitialMetadata(
 export async function* streamRefinedMetadata(
   sessionId: string,
   message: string,
-  currentMetadata: BookMetadata
 ): AsyncGenerator<StreamEvent> {
-  const res = await fetch("/api/metadata/refine", {
+  const res = await fetch("/api/metadata/extract", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       session_id: sessionId,
-      message,
-      current_metadata: currentMetadata,
+      message: message,
     }),
   });
   if (!res.ok) throw new Error(`Refinement request failed: ${res.statusText}`);
