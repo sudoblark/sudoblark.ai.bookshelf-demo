@@ -57,6 +57,37 @@ export interface SearchResponse {
   field: string;
 }
 
+export interface RelatedBook {
+  file_id: string;
+  title: string;
+  author: string;
+  similarity: number;
+  s3_key: string;
+}
+
+export interface RelatedBooksResponse {
+  file_id: string;
+  related: RelatedBook[];
+}
+
+export interface GraphNode {
+  id: string;
+  title: string;
+  author: string;
+}
+
+export interface GraphEdge {
+  source: string;
+  target: string;
+  weight: number;
+}
+
+export interface SimilarityGraphResponse {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  threshold: number;
+}
+
 // Ops dashboard types
 
 export interface StageProgress {

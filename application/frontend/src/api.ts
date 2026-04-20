@@ -5,6 +5,8 @@ import {
   BookshelfOverview,
   CatalogueResponse,
   SearchResponse,
+  RelatedBooksResponse,
+  SimilarityGraphResponse,
   OpsListResponse,
   OpsDetailResponse,
 } from "./types";
@@ -129,6 +131,25 @@ export async function searchBookshelf(
     `/api/bookshelf/search?query=${encodeURIComponent(query)}&field=${field}`
   );
   if (!res.ok) throw new Error(`Failed to search: ${res.statusText}`);
+  return res.json();
+}
+
+// Similarity API functions
+
+export async function getRelatedBooks(
+  fileId: string,
+  limit: number = 5
+): Promise<RelatedBooksResponse> {
+  const res = await fetch(
+    `/api/bookshelf/${encodeURIComponent(fileId)}/related?limit=${limit}`
+  );
+  if (!res.ok) throw new Error(`Failed to fetch related books: ${res.statusText}`);
+  return res.json();
+}
+
+export async function getSimilarityGraph(threshold: number = 0.5): Promise<SimilarityGraphResponse> {
+  const res = await fetch(`/api/bookshelf/graph?threshold=${threshold}`);
+  if (!res.ok) throw new Error(`Failed to fetch similarity graph: ${res.statusText}`);
   return res.json();
 }
 
