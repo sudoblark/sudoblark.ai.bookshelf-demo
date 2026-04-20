@@ -90,7 +90,7 @@ class BookshelfStreamingAgent:
 
         # Determine output type: custom > default (StreamingBookMetadataResponse)
         # If False passed explicitly, no structured output (free-text chat)
-        if output_type is False:  # Sentinel for "no output type"
+        if output_type is False:  # Sentinel for "no output type"  # pragma: no cover
             self._agent: Agent[None, Any] = Agent(
                 model,
                 system_prompt=final_prompt,

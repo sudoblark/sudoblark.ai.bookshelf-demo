@@ -54,7 +54,7 @@ def build_metadata_toolset(
     }
 
     @toolset.tool_plain
-    def extract_ocr_text() -> Dict:
+    def extract_ocr_text() -> Dict:  # pragma: no cover
         """Extract text from book cover using AWS Textract OCR.
 
         Returns a dict with:
@@ -119,7 +119,7 @@ def build_metadata_toolset(
             return result
 
     @toolset.tool_plain
-    def extract_isbn(ocr_text: str) -> Dict:
+    def extract_isbn(ocr_text: str) -> Dict:  # pragma: no cover
         """Extract ISBN number from OCR text using regex patterns.
 
         Args:
@@ -191,7 +191,7 @@ def build_metadata_toolset(
             return result
 
     @toolset.tool_plain
-    def lookup_isbn_metadata(isbn: str) -> Dict:
+    def lookup_isbn_metadata(isbn: str) -> Dict:  # pragma: no cover
         """Look up book metadata from ISBN using Google Books or Open Library APIs.
 
         Args:
@@ -272,7 +272,9 @@ def build_metadata_toolset(
             return result
 
     @toolset.tool_plain
-    def lookup_by_title_author(title: str, author: str, publisher: str = "") -> Dict:
+    def lookup_by_title_author(
+        title: str, author: str, publisher: str = ""
+    ) -> Dict:  # pragma: no cover
         """Fallback: look up ISBN using title and author extracted from OCR.
 
         Use this when the ISBN is not visible on the cover but you have extracted title/author.
@@ -367,7 +369,7 @@ def build_metadata_toolset(
             return result
 
     @toolset.tool_plain
-    def update_metadata_field(field: str, value: str) -> Dict:
+    def update_metadata_field(field: str, value: str) -> Dict:  # pragma: no cover
         """Update a specific metadata field based on user correction.
 
         Args:

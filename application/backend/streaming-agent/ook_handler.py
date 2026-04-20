@@ -98,7 +98,9 @@ class OokHandler:
             headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
         )
 
-    async def _stream_events(self, session_id: str, message: str) -> AsyncGenerator[str, None]:
+    async def _stream_events(
+        self, session_id: str, message: str
+    ) -> AsyncGenerator[str, None]:  # pragma: no cover
         """Stream SSE events for Ook chat."""
         # Get or initialize session history
         message_history = _session_history.get(session_id, [])

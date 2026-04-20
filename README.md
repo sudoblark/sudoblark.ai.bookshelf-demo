@@ -15,7 +15,7 @@
   <h3 align="center">Bookshelf Demo</h3>
 
   <p align="center">
-    A cloud-native, event-driven ETL pipeline for extracting book metadata from images using AWS Bedrock!
+    A live demo showing how AI agents plug into existing serverless workflows — and how giving them business context via tools is simpler than you think.
     <br />
     <a href="https://github.com/sudoblark/sudoblark.ai.bookshelf-demo"><strong>Explore the docs »</strong></a>
     <br />
@@ -39,14 +39,7 @@
         <li><a href="#built-with">Built With</a></li>
       </ul>
     </li>
-    <li>
-      <a href="#architecture">Architecture</a>
-      <ul>
-        <li><a href="#data-driven-infrastructure-pattern">Data-Driven Infrastructure Pattern</a></li>
-        <li><a href="#etl-pipeline-flow">ETL Pipeline Flow</a></li>
-        <li><a href="#metadata-schema">Metadata Schema</a></li>
-      </ul>
-    </li>
+    <li><a href="#architecture">Architecture</a></li>
     <li><a href="#getting-started">Getting Started</a></li>
     <li><a href="#testing">Testing</a></li>
     <li><a href="#deployment">Deployment</a></li>
@@ -60,60 +53,53 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-> **📢 Workshop Demo Repository**
+> **📢 Sudoblark Workshop Repository**
 >
-> This project is designed as a **hands-on workshop demonstration** for learning modern AWS serverless patterns and AI integration.
-> Whether you're attending a live workshop or exploring on your own, this repo provides a complete, fully-functional example you can deploy and experiment with.
+> This repository is the **live demo used in Sudoblark's AI engineering workshops and conference talks**. It is designed to be explored alongside a presenter — the code, architecture decisions, and documentation are all written with that context in mind.
+>
+> **Found this independently?** If you arrived here from the [AI Vision Inference blog series](https://sudoblark.com/blog/series/ai-vision-inference/), you're in the right place — the series walks through the concepts this demo illustrates. If you've stumbled across it another way, everything is deployable and self-contained, but it'll make most sense as a companion to the workshop or series.
 
 > **⚠️ Infrastructure Configuration**
 >
-> This repository is pre-configured to deploy to **Sudoblark's AWS infrastructure**. If you want to deploy to your own AWS account, you'll need to modify the Terraform configuration files to match your environment (account names, bucket names, state backend, etc.).
+> This repository is pre-configured to deploy to **Sudoblark's AWS infrastructure**. To deploy to your own AWS account, you'll need to modify the Terraform configuration files (account names, bucket names, state backend, etc.).
 
-The Bookshelf Demo showcases a complete, full-stack application for extracting book metadata from images using AWS and AI. Upload a book cover via the web interface, refine the extracted metadata through a conversational loop, and save confirmed books to your collection.
+A lot of AI integration demos exist in isolation — a model, a prompt, a response. This one doesn't. It shows an agent embedded in a real serverless architecture: uploading files, querying storage, tracking pipeline state. The book cataloguing domain is intentionally mundane; the point is to show the seams where AI fits into systems you'd actually build, not to impress with the use case.
 
-**What You'll Learn:**
+### What the demo shows
 
-| Topic | What the demo teaches |
-|---|---|
-| **Streaming AI Integration** | How to build real-time user experiences with Server-Sent Events, pydantic-ai agent streaming, and stateful conversation sessions |
-| **Presigned URLs & Browser Uploads** | Securely uploading files directly from the browser to S3 without routing through your API — reducing latency and costs |
-| **Full-Stack Web Development** | React frontend with Vite, FastAPI backend with async handlers, and integrating managed AI services into a seamless UX |
-| **Infrastructure as Code** | Data-driven Terraform patterns that keep resource definitions as simple data structures — easy to replicate, extend, or port |
-| **Production Engineering** | Type-safe async handlers, comprehensive testing with pytest, CI/CD automation, and modern development workflows |
+| Feature | In this demo | The general pattern |
+|---|---|---|
+| **Book upload via presigned S3 URL** | Upload a book cover image directly from the browser to S3 | File ingestion without routing through your API — a standard serverless pattern and a natural handoff point into agent workflows |
+| **AI metadata extraction** | An agent extracts title, author, and ISBN from a cover image using OCR, ISBN lookup, and metadata search tools | An agent given a focused toolset to complete a well-scoped task; transparent about what it called and why |
+| **Bookshelf dashboard** | Browse and search the books you've catalogued | The read path of a data pipeline surfaced in a UI — confirming that what went in came out correctly |
+| **Ops dashboard** | Track every upload through its pipeline stages, including failures and abandoned sessions | Observability for agent-driven workflows; making the pipeline's state visible rather than trusting it blindly |
+| **Ook Chat** | Ask questions about your book collection in natural language | An agent reusing the same primitive from extraction, now handed broader domain tools — showing that business context is just another toolset |
 
-**Cloud equivalence — the same pattern, different providers:**
+**Not on AWS?** The demo runs on AWS, but every pattern it demonstrates has a direct equivalent on GCP and Azure. The services are different; the architecture is the same.
 
 | Concept | AWS (this demo) | GCP | Azure |
 |---|---|---|---|
 | Object storage | S3 | Cloud Storage | Blob Storage |
-| Container orchestration | ECS Fargate | Cloud Run | Container Instances |
-| API Gateway | API Gateway | Cloud Endpoints | API Management |
+| Container hosting (streaming API) | ECS Fargate¹ | Cloud Run | Container Instances |
 | Managed AI model | Bedrock (Claude) | Vertex AI | Azure OpenAI |
 | NoSQL database | DynamoDB | Firestore | Cosmos DB |
 | IaC | Terraform | Terraform | Terraform |
 
-**Perfect for:** Full-stack developers and cloud architects who want to understand modern AI-powered web applications with streaming interactions, demonstrated end-to-end on AWS.
+_¹ In this demo the streaming API runs locally via Docker to avoid hosting costs. ECS Fargate is the production equivalent._
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Repository Structure: Mono-repo vs Micro-repos
 
-This repository is a **mono-repo for demo convenience**. In production, each application component would live in its own repository with its own CI pipeline and release cadence — so a hotfix to the API never requires redeploying the ETL pipeline, and a frontend release never blocks on backend changes.
+Everything lives in one repository for convenience — a single clone, a single `terraform apply`, and a single test run gets the full system running. In a real production setup, each component would have its own repository, pipeline, and release cadence.
 
-In a micro-repo setup, the repository to functionality mapping would be as follows:
-
-| Production repo | Maps to | Purpose |
+| This repo | Component | What it would be in production |
 |---|---|---|
-| `bookshelf.backend.openapi-lambdas` | `modules/data/lambdas.tf` (future) | Static REST endpoints (presigned URLs, accept, bookshelf queries) via Lambda |
-| `bookshelf.backend.streaming-container` | `application/backend/streaming-agent/` | Streaming metadata extraction service (ECS Fargate or container) |
-| `bookshelf.backend.shared-components` | `application/backend/common/` | Shared utilities (BookshelfTracker, response helpers, etc.) as versioned PyPI package |
-| `bookshelf.frontend.portal` | `application/frontend/` | React UI consuming the APIs |
+| `application/backend/streaming-agent/` | Streaming API | In production, a separately deployed container service — streaming requires persistent connections, not Lambda |
+| `application/backend/common/` | Shared utilities | A versioned internal package imported by other services |
+| `application/frontend/` | React UI | A separately deployed frontend, likely on a CDN |
 
-**Note on Terraform:** The infrastructure in `modules/` and `infrastructure/` is intentionally left as a single coupled state in this demo. In production, each service would own its Terraform, but splitting state introduces cross-service references that add complexity without teaching value here.
-
-**Production split rationale:** Static endpoints (presigned URL generation, accept confirmation) stay on Lambda for cost efficiency, whilst streaming metadata extraction requires a persistent container (ECS Fargate). Shared utilities are versioned and imported by both services.
-
-> **💡 Why a mono-repo here?** A single clone, a single `terraform apply`, and a single test run is enough to get the full system running. That removes friction for a demo or workshop while keeping the component boundaries clear enough to reason about the production shape.
+The Terraform in `modules/` and `infrastructure/` is similarly coupled into one state for simplicity. In production each service would manage its own infrastructure, but splitting that state here would add complexity without adding anything to the workshop.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -130,126 +116,23 @@ In a micro-repo setup, the repository to functionality mapping would be as follo
 <!-- ARCHITECTURE -->
 ## Architecture
 
-The system uses a **streaming API architecture** with a React frontend and FastAPI backend:
-
-```mermaid
-graph TB
-    subgraph "Browser"
-        A[React UI]
-        B[Upload Component]
-        C[Metadata Refinement UI]
-    end
-
-    subgraph "Development Environment"
-        D[Vite Dev Server<br/>Port 5173]
-        E[FastAPI Streaming Agent<br/>Port 8000]
-    end
-
-    subgraph "AWS Cloud"
-        subgraph "Storage"
-            F[S3: Landing Bucket<br/>Presigned URLs]
-            G[S3: Raw Bucket<br/>Hive-partitioned JSON]
-        end
-
-        subgraph "Tracking"
-            H[DynamoDB:<br/>Ingestion Tracking Table]
-        end
-
-        subgraph "AI Services"
-            I[Bedrock:<br/>Claude Streaming]
-        end
-    end
-
-    A -->|dev server| D
-    B -->|presigned URL request| E
-    E -->|generate presigned URL| F
-    B -->|PUT file directly| F
-    C -->|POST /api/metadata/initial<br/>SSE streaming| E
-    E -->|vision analysis| I
-    I -->|stream tokens| E
-    E -->|update tracking| H
-    C -->|POST /api/metadata/refine<br/>SSE streaming| E
-    E -->|continue conversation| I
-    C -->|POST /api/metadata/accept| E
-    E -->|write JSON| G
-    E -->|update tracking| H
-
-    classDef browser fill:#61DAFB,stroke:#232F3E,color:#000
-    classDef devserver fill:#646695,stroke:#232F3E,color:#fff
-    classDef storage fill:#569A31,stroke:#232F3E,color:#fff
-    classDef compute fill:#FF6600,stroke:#232F3E,color:#fff
-    classDef ai fill:#8C4FFF,stroke:#232F3E,color:#fff
-
-    class A,B,C browser
-    class D devserver
-    class F,G storage
-    class E compute
-    class I ai
-```
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-### Data-Driven Infrastructure Pattern
-
-This project demonstrates Sudoblark's **three-layer Terraform architecture**:
-
-1. **Data Layer** (`modules/data/`): Infrastructure defined as simple data structures
-2. **Infrastructure Modules**: Reusable Terraform modules (referenced from external repositories)
-3. **Instantiation Layer** (`infrastructure/aws-sudoblark-development/`): Wires data to modules
-
-**Benefits:**
-- Add new resources by updating data structures, not writing Terraform
-- Consistent naming and tagging across all resources
-- Cross-reference resolution handled automatically
-- Easy to test and validate before deployment
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-### Application Flow
-
-**Step-by-step interaction:**
-
-1. **Upload**: User selects book cover image in React UI and clicks upload
-2. **Presigned URL**: Frontend requests presigned S3 PUT URL from backend
-3. **Direct Upload**: Browser uploads file directly to S3 Landing bucket (no API gateway)
-4. **Initial Analysis**: Frontend calls `POST /api/metadata/initial` with file location
-
-   Backend pipeline:
-   - OCR extraction via AWS Textract
-   - ISBN regex matching from OCR text
-   - ISBN metadata lookup (Google Books → Open Library fallback)
-   - Agent categorizes extracted data + performs fallback title/author lookup if needed
-   - Streams metadata updates as SSE
-
-5. **Streaming Extraction**: Frontend receives metadata updates in real-time as Server-Sent Events (SSE)
-6. **User Refinement**: User sees initial metadata and can ask follow-up questions (multi-turn)
-7. **Refinement Stream**: Frontend calls `POST /api/metadata/refine` for each question
-8. **Accept**: User confirms metadata by clicking "Accept"
-9. **Persist**: Backend writes accepted metadata as JSON to Raw bucket with Hive-style partitioning
-10. **Track**: Ingestion-tracking table updated with file status throughout
-
-<p align="right">(<a href="#readme-top">back to top</a>)</p>
+React frontend, FastAPI streaming backend, S3 for storage, DynamoDB for tracking, Bedrock for the model, Textract for OCR. The infrastructure follows Sudoblark's three-layer Terraform pattern — the [blog post](https://sudoblark.com/blog/three-tier-terraform-data-pattern/) covers how that works.
 
 ### API Endpoints
 
-The streaming agent exposes the following HTTP endpoints:
+| Endpoint | Method | Purpose |
+|---|---|---|
+| `/health` | GET | Health check |
+| `/api/upload/presigned` | GET | Generate presigned S3 PUT URL for direct browser upload |
+| `/api/metadata/extract` | POST | Extract metadata from a cover image, or continue a refinement conversation |
+| `/api/metadata/accept` | POST | Save confirmed metadata to S3 |
+| `/api/ops/files` | GET | List all uploads with pipeline stage status |
+| `/api/ops/files/{file_id}` | GET | Get stage detail for a single upload |
+| `/api/bookshelf/overview` | GET | Collection statistics |
+| `/api/bookshelf/catalogue` | GET | Paginated book list |
+| `/api/bookshelf/search` | GET | Search by title or author |
+| `/api/ook/chat` | POST | Ook Chat — streaming conversational agent |
 
-| Endpoint | Method | Purpose | Response |
-|---|---|---|---|
-| `/health` | GET | Container health check | `{"status": "ok"}` |
-| `/api/upload/presigned` | GET | Generate presigned S3 PUT URL | `{"url": "...", "session_id": "..."}` |
-| `/api/metadata/initial` | POST | Extract metadata from uploaded image | Server-Sent Events (streaming tokens) |
-| `/api/metadata/refine` | POST | Multi-turn refinement conversation | Server-Sent Events (streaming tokens) |
-| `/api/metadata/accept` | POST | Save confirmed metadata to S3 | `{"status": "accepted", "saved_key": "...", "upload_id": "..."}` |
-| `/api/ops/files` | GET | List all uploaded files with status | `{"files": [...], "count": N}` |
-| `/api/ops/files/{file_id}` | GET | Get details for a single upload | `{"file": {...}}` |
-| `/api/bookshelf/overview` | GET | Get bookshelf statistics | `{"total_books": N, "most_common_author": str, "most_common_author_count": N}` |
-| `/api/bookshelf/catalogue` | GET | Get paginated list of books | `{"books": [...], "page": N, "page_size": N, "total_books": N, "total_pages": N}` |
-| `/api/bookshelf/search` | GET | Search books by title or author | `{"books": [...], "total_results": N, "query": str, "field": str}` |
-
-### Metadata Schema
-
-Book metadata is extracted using the pydantic-ai streaming API with Claude as the foundation model. Each accepted record is written to S3 as JSON with Hive-style partitioning (`author={author}/published_year={year}/{uuid}.json`) along with metadata provenance fields (filename, upload_id, extraction timestamp).
 ## Getting Started
 
 **⚠️ All setup, installation, and local development instructions are in [docs/demo-execution.md](docs/demo-execution.md)**
@@ -277,11 +160,11 @@ This project follows Sudoblark's Python quality standards with comprehensive tes
 # Run all tests with coverage
 pytest --cov=application/backend --cov-report=html --cov-report=term-missing
 
-# Run specific test file
-pytest tests/test_tracker.py -v
+# Run a specific test file
+pytest tests/backend/streaming-agent/test_metadata_handlers.py -v
 
-# Run with mocked AWS services
-pytest tests/test_file_router.py -v
+# Run with verbose output
+pytest tests/ -v
 ```
 
 ### Test Coverage Requirements
@@ -289,16 +172,6 @@ pytest tests/test_file_router.py -v
 - **Minimum Coverage:** 80%
 - **Current Coverage:** Check CI/CD badge at top of README
 - **Coverage Report:** Generated in `htmlcov/index.html` after running tests
-
-### Test Structure
-
-```
-tests/
-├── conftest.py                   # Pytest fixtures and configuration
-├── test_common.py                # Tests for shared common utilities
-├── test_tracker.py               # Tests for ingestion tracking utility
-└── test_ops.py                   # Tests for ops dashboard endpoints (in streaming API)
-```
 
 ### Linting and Security
 
@@ -345,34 +218,14 @@ For manual deployment and verification steps, see [docs/demo-execution.md](docs/
 
 ## Current Limitations
 
-This is a **workshop demo** showcasing real AWS patterns. The following features are either in progress or planned:
+Everything in the demo works. Some things are deliberately simplified compared to a production system — either to keep the demo self-contained, or because the complexity would obscure the concepts being illustrated.
 
-| Feature | Status | Notes |
+| Area | Demo approach | Production equivalent |
 |---|---|---|
-| **Authentication / Authorization** | 🚫 Not started | All endpoints are public. Cognito integration planned. |
-| **Metadata Extraction** | ✅ Complete | OCR via Textract, ISBN lookup via Google Books/Open Library, agent categorization, fallback enrichment. |
-| **Bookshelf Display** | ✅ Complete | Overview stats, paginated grid, search by title/author. Uses S3 direct queries (production: migrate to DynamoDB per ADR-0001). |
-| **Ops Dashboard** | ✅ Complete | Real-time tracking of upload pipeline stages, status visibility, error details. |
-| **Ook Chat** | 🚧 Stub only | Frontend page exists, backend streaming not yet implemented. |
-| **Embeddings & Similarity** | 🚫 Not started | Can compute book similarity via Bedrock Titan embeddings. |
-| **Persistence across restarts** | ⚠️ Partial | Session state is in-process only; DynamoDB tracking persists. |
-| **Production deployment** | 🚧 In progress | Terraform for ECS Fargate / App Runner not yet implemented. |
-
-**What works:**
-- ✅ File upload via presigned URLs (direct browser → S3)
-- ✅ Streaming metadata extraction (OCR + ISBN lookup + agent categorization)
-- ✅ Multi-turn conversation refinement (streaming tokens)
-- ✅ Metadata acceptance and S3 storage (Hive-partitioned JSON)
-- ✅ Ingestion tracking with audit trail (DynamoDB)
-- ✅ Bookshelf display (overview, pagination, search)
-- ✅ Ops dashboard with pipeline visibility
-- ✅ Local development (docker-compose or uvicorn)
-
-**Next priority features:**
-1. Ook chat interface (full streaming chat implementation)
-2. Cognito authentication and user scoping
-3. Embeddings and similarity search
-4. Production deployment infrastructure (ECS Fargate + ALB)
+| **Bookshelf queries** | S3 bucket scan on every request | DynamoDB reads (see ADR-0001) — fine at demo scale, expensive at production scale |
+| **Session state** | In-process only — lost on restart | Persistent store (Redis, DynamoDB) |
+| **Streaming backend** | Local Docker | ECS Fargate — streaming requires persistent connections, not Lambda |
+| **Authentication** | None — all endpoints public | Cognito with user scoping — adds cost and complexity with no demo value |
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
@@ -402,8 +255,6 @@ Distributed under the MIT License. See `LICENSE.txt` for more information.
 <!-- ACKNOWLEDGMENTS -->
 ## Acknowledgments
 
-This project was built using industry-leading tools and services:
-
 * [AWS Bedrock](https://aws.amazon.com/bedrock/) - Claude foundation models
 * [Terraform](https://www.terraform.io/) - Infrastructure as Code
 * [GitHub Actions](https://github.com/features/actions) - CI/CD automation
@@ -411,25 +262,17 @@ This project was built using industry-leading tools and services:
 * [Best-README-Template](https://github.com/othneildrew/Best-README-Template) - README structure
 * [Shields.io](https://shields.io/) - README badges
 
-**Architecture Patterns:**
-This project demonstrates Sudoblark's professional development practices including data-driven infrastructure patterns, comprehensive testing, and modern DevOps workflows.
-
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 <!-- MARKDOWN LINKS & IMAGES -->
-[contributors-shield]: https://img.shields.io/github/contributors/sudoblark/sudoblark.ai.bookshelf-demo.svg?style=for-the-badge
-[contributors-url]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/sudoblark/sudoblark.ai.bookshelf-demo.svg?style=for-the-badge
-[forks-url]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/network/members
-[stars-shield]: https://img.shields.io/github/stars/sudoblark/sudoblark.ai.bookshelf-demo.svg?style=for-the-badge
-[stars-url]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/stargazers
 [issues-shield]: https://img.shields.io/github/issues/sudoblark/sudoblark.ai.bookshelf-demo.svg?style=for-the-badge
 [issues-url]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/issues
 [license-shield]: https://img.shields.io/github/license/sudoblark/sudoblark.ai.bookshelf-demo.svg?style=for-the-badge
 [license-url]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/blob/main/LICENSE.txt
 [linkedin-shield]: https://img.shields.io/badge/-LinkedIn-black.svg?style=for-the-badge&logo=linkedin&colorB=555
 [linkedin-url]: https://linkedin.com/company/sudoblark
-[product-screenshot]: images/screenshot.png
+[ci-shield]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/actions/workflows/pull-request.yaml/badge.svg?style=for-the-badge
+[ci-url]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/actions/workflows/pull-request.yaml
 
 <!-- Technology Badges -->
 [Python-badge]: https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white
@@ -440,15 +283,3 @@ This project demonstrates Sudoblark's professional development practices includi
 [Terraform-url]: https://www.terraform.io/
 [GitHub-Actions-badge]: https://img.shields.io/badge/GitHub_Actions-2088FF?style=for-the-badge&logo=github-actions&logoColor=white
 [GitHub-Actions-url]: https://github.com/features/actions
-[Bedrock-badge]: https://img.shields.io/badge/AWS_Bedrock-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white
-[Bedrock-url]: https://aws.amazon.com/bedrock/
-[Lambda-badge]: https://img.shields.io/badge/AWS_Lambda-FF9900?style=for-the-badge&logo=aws-lambda&logoColor=white
-[Lambda-url]: https://aws.amazon.com/lambda/
-[S3-badge]: https://img.shields.io/badge/AWS_S3-569A31?style=for-the-badge&logo=amazon-s3&logoColor=white
-[S3-url]: https://aws.amazon.com/s3/
-[Athena-badge]: https://img.shields.io/badge/AWS_Athena-232F3E?style=for-the-badge&logo=amazon-aws&logoColor=white
-[Athena-url]: https://aws.amazon.com/athena/
-[Glue-badge]: https://img.shields.io/badge/AWS_Glue-FF9900?style=for-the-badge&logo=amazon-aws&logoColor=white
-[Glue-url]: https://aws.amazon.com/glue/
-[ci-shield]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/actions/workflows/pull-request.yaml/badge.svg?style=for-the-badge
-[ci-url]: https://github.com/sudoblark/sudoblark.ai.bookshelf-demo/actions/workflows/pull-request.yaml

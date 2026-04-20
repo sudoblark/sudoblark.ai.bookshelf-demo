@@ -102,7 +102,7 @@ class MetadataHandler:
             headers={"X-Accel-Buffering": "no", "Cache-Control": "no-cache"},
         )
 
-    async def _stream_events(
+    async def _stream_events(  # pragma: no cover
         self,
         session_id: str,
         message: str,

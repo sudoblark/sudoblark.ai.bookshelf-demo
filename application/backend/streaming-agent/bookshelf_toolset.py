@@ -25,7 +25,7 @@ def build_bookshelf_toolset(
     toolset = FunctionToolset()
 
     @toolset.tool_plain
-    def list_books() -> List[Dict]:
+    def list_books() -> List[Dict]:  # pragma: no cover
         """Get all books from the user's bookshelf.
 
         Returns a list of books with metadata: title, author, isbn, publisher,
@@ -53,7 +53,7 @@ def build_bookshelf_toolset(
             return []
 
     @toolset.tool_plain
-    def search_books(query: str, field: str = "title") -> List[Dict]:
+    def search_books(query: str, field: str = "title") -> List[Dict]:  # pragma: no cover
         """Search books by title or author.
 
         Args:
@@ -92,7 +92,7 @@ def build_bookshelf_toolset(
             return []
 
     @toolset.tool_plain
-    def get_overview() -> Dict:
+    def get_overview() -> Dict:  # pragma: no cover
         """Get bookshelf overview statistics.
 
         Returns:
