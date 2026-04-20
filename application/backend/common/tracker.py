@@ -43,6 +43,7 @@ class UploadStage(str, Enum):
     ROUTING = "routing"
     AV_SCAN = "av_scan"
     ENRICHMENT = "enrichment"
+    EMBEDDING = "embedding"
 
 
 class StageStatus(str, Enum):
