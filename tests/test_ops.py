@@ -3,7 +3,6 @@
 import importlib
 import json
 import sys
-from decimal import Decimal
 from unittest.mock import MagicMock
 
 import boto3
@@ -67,32 +66,24 @@ def _seed(
     dynamodb_resource,
     upload_id,
     user_id=USER_ID,
-    status="SUCCESS",
-    stage_processing_time=None,
+    stage="analysed",
 ):
     table = dynamodb_resource.Table(TABLE_NAME)
-    stage_entry = {
-        "stage_name": "av_scan",
-        "status": "success",
-        "start_time": "2026-03-31T10:00:00+00:00",
-        "end_time": "2026-03-31T10:00:02+00:00",
-        "processing_time": stage_processing_time or Decimal("2.345"),
-        "source": {
-            "bucket": "landing",
-            "key": f"uploads/{user_id}/{upload_id}/cover.jpg",
-        },
-        "destination": {
-            "bucket": "raw",
-            "key": f"uploads/{user_id}/{upload_id}/cover.jpg",
-        },
-        "error_message": None,
-    }
     table.put_item(
         Item={
             "upload_id": upload_id,
             "user_id": user_id,
-            "current_status": status,
-            "stage_progress": [stage_entry],
+            "stage": stage,
+            "stages": {
+                "analysed": {
+                    "startedAt": "2026-03-31T10:00:00+00:00",
+                    "endedAt": "2026-03-31T10:00:02+00:00",
+                    "sourceBucket": "landing",
+                    "sourceKey": f"uploads/{user_id}/{upload_id}/cover.jpg",
+                    "destinationBucket": "raw",
+                    "destinationKey": f"uploads/{user_id}/{upload_id}/cover.jpg",
+                },
+            },
             "created_at": "2026-03-31T10:00:00+00:00",
             "updated_at": "2026-03-31T10:00:02+00:00",
         }
@@ -135,7 +126,7 @@ class TestListFiles:
         resp = await ops_handler.handle_list(_mock_request())
         record = json.loads(resp.body.decode())["files"][0]
         assert "upload_id" in record
-        assert "current_status" in record
+        assert "stage" in record
         assert "created_at" in record
 
     @pytest.mark.asyncio
@@ -157,7 +148,7 @@ class TestGetFileById:
         assert resp.status_code == 200
         body = json.loads(resp.body.decode())
         assert body["file"]["upload_id"] == UPLOAD_ID_A
-        assert body["file"]["current_status"] == "SUCCESS"
+        assert body["file"]["stage"] == "analysed"
 
     @pytest.mark.asyncio
     async def test_returns_404_when_not_found(self, ops_handler):
@@ -167,12 +158,11 @@ class TestGetFileById:
         assert "error" in body
 
     @pytest.mark.asyncio
-    async def test_stage_progress_included(self, ops_handler, dynamodb_resource):
+    async def test_stages_included(self, ops_handler, dynamodb_resource):
         _seed(dynamodb_resource, UPLOAD_ID_A)
         resp = await ops_handler.handle_get(_mock_request(), UPLOAD_ID_A)
-        stages = json.loads(resp.body.decode())["file"]["stage_progress"]
-        assert len(stages) == 1
-        assert stages[0]["stage_name"] == "av_scan"
+        stages = json.loads(resp.body.decode())["file"]["stages"]
+        assert "analysed" in stages
 
     @pytest.mark.asyncio
     async def test_cors_header_present(self, ops_handler, dynamodb_resource):
@@ -182,26 +172,25 @@ class TestGetFileById:
 
 
 # ---------------------------------------------------------------------------
-# TestDecimalSerialisation
+# TestStagesSerialisation
 # ---------------------------------------------------------------------------
 
 
-class TestDecimalSerialisation:
+class TestStagesSerialisation:
     @pytest.mark.asyncio
-    async def test_processing_time_decimal_serialises_in_list(self, ops_handler, dynamodb_resource):
-        _seed(dynamodb_resource, UPLOAD_ID_A, stage_processing_time=Decimal("2.345"))
+    async def test_stages_dict_serialises_in_list(self, ops_handler, dynamodb_resource):
+        _seed(dynamodb_resource, UPLOAD_ID_A)
         resp = await ops_handler.handle_list(_mock_request())
-        # Must not raise — body should be valid JSON with processing_time as a string
         body = json.loads(resp.body.decode())
-        stage = body["files"][0]["stage_progress"][0]
-        assert stage["processing_time"] == "2.345"
+        record = body["files"][0]
+        assert isinstance(record["stages"], dict)
+        assert "analysed" in record["stages"]
 
     @pytest.mark.asyncio
-    async def test_processing_time_decimal_serialises_in_detail(
-        self, ops_handler, dynamodb_resource
-    ):
-        _seed(dynamodb_resource, UPLOAD_ID_A, stage_processing_time=Decimal("1.001"))
+    async def test_stages_dict_serialises_in_detail(self, ops_handler, dynamodb_resource):
+        _seed(dynamodb_resource, UPLOAD_ID_A)
         resp = await ops_handler.handle_get(_mock_request(), UPLOAD_ID_A)
         body = json.loads(resp.body.decode())
-        stage = body["file"]["stage_progress"][0]
-        assert stage["processing_time"] == "1.001"
+        stages = body["file"]["stages"]
+        assert isinstance(stages, dict)
+        assert stages["analysed"]["destinationBucket"] == "raw"

@@ -1,9 +1,24 @@
 """Ingestion-tracking DynamoDB helper for the bookshelf demo pipeline.
 
 ``BookshelfTracker``
-    Provides a consistent API for all pipeline Lambdas to maintain an ordered
+    Provides a consistent API for all pipeline components to maintain an
     audit trail of each file's progress through the pipeline in the DynamoDB
     ingestion-tracking table.
+
+    Schema
+    ------
+    Each record has the following top-level fields:
+
+    upload_id   : str  — partition key, UUID
+    user_id     : str
+    stage       : str  — name of the last completed stage (e.g. "analysed",
+                         "embedding") or "failed" when a stage fails
+    stages      : dict — keyed by stage name; each value contains:
+                         startedAt, endedAt, sourceBucket, sourceKey,
+                         destinationBucket (optional), destinationKey (optional),
+                         error (optional)
+    created_at  : str  — ISO-8601 timestamp
+    updated_at  : str  — ISO-8601 timestamp
 
     Methods:
         create_record  — call when a file first lands in S3
@@ -21,12 +36,11 @@ Usage::
     )
 
     tracker.create_record(user_id, upload_id)
-    tracker.start_stage(upload_id, UploadStage.ROUTING, bucket, key)
-    tracker.complete_stage(user_id, upload_id, UploadStage.ROUTING, dest_bucket, dest_key)
+    tracker.start_stage(upload_id, UploadStage.ANALYSED, bucket, key)
+    tracker.complete_stage(user_id, upload_id, UploadStage.ANALYSED, dest_bucket, dest_key)
 """
 
 from datetime import datetime, timezone
-from decimal import Decimal
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
@@ -34,33 +48,13 @@ import boto3
 
 
 class UploadStage(str, Enum):
-    """Ordered pipeline stages for a single file upload.
-
-    Extend this enum as new pipeline stages are added.
-    """
+    """Ordered pipeline stages for a single file upload."""
 
     USER_UPLOAD = "user_upload"
     ROUTING = "routing"
     AV_SCAN = "av_scan"
-    ENRICHMENT = "enrichment"
+    ANALYSED = "analysed"
     EMBEDDING = "embedding"
-
-
-class StageStatus(str, Enum):
-    """Status of a single pipeline stage entry."""
-
-    IN_PROGRESS = "in_progress"
-    SUCCESS = "success"
-    FAILED = "failed"
-
-
-class UploadStatus(str, Enum):
-    """Top-level upload status, denormalised for cheap GSI queries."""
-
-    QUEUED = "QUEUED"
-    IN_PROGRESS = "IN_PROGRESS"
-    SUCCESS = "SUCCESS"
-    FAILED = "FAILED"
 
 
 def _now_iso() -> str:
@@ -99,8 +93,8 @@ class BookshelfTracker:
             Item={
                 "upload_id": upload_id,
                 "user_id": user_id,
-                "current_status": UploadStatus.QUEUED.value,
-                "stage_progress": [],
+                "stage": "queued",
+                "stages": {},
                 "created_at": now,
                 "updated_at": now,
             }
@@ -113,9 +107,7 @@ class BookshelfTracker:
         source_bucket: str,
         source_key: str,
     ) -> None:
-        """Append an in-progress stage entry and mark the upload as IN_PROGRESS.
-
-        Uses DynamoDB ``list_append`` so no prior read is required.
+        """Record the start of a processing stage.
 
         Args:
             upload_id: UUID identifying this upload batch (partition key).
@@ -123,28 +115,25 @@ class BookshelfTracker:
             source_bucket: Bucket the file is being read from.
             source_key: Key the file is being read from.
         """
+        now = _now_iso()
         stage_entry = {
-            "stage_name": stage.value,
-            "status": StageStatus.IN_PROGRESS.value,
-            "start_time": _now_iso(),
-            "end_time": None,
-            "processing_time": None,
-            "source": {"bucket": source_bucket, "key": source_key},
-            "destination": None,
-            "error_message": None,
+            "startedAt": now,
+            "endedAt": None,
+            "sourceBucket": source_bucket,
+            "sourceKey": source_key,
+            "destinationBucket": None,
+            "destinationKey": None,
         }
         self._table.update_item(
             Key={"upload_id": upload_id},
-            UpdateExpression=(
-                "SET stage_progress = list_append("
-                "if_not_exists(stage_progress, :empty), :entry"
-                "), current_status = :status, updated_at = :now"
-            ),
+            UpdateExpression=("SET #stages.#stage_name = :entry, updated_at = :now"),
+            ExpressionAttributeNames={
+                "#stages": "stages",
+                "#stage_name": stage.value,
+            },
             ExpressionAttributeValues={
-                ":empty": [],
-                ":entry": [stage_entry],
-                ":status": UploadStatus.IN_PROGRESS.value,
-                ":now": _now_iso(),
+                ":entry": stage_entry,
+                ":now": now,
             },
         )
 
@@ -156,7 +145,7 @@ class BookshelfTracker:
         dest_bucket: str,
         dest_key: str,
     ) -> None:
-        """Mark the most recent in-progress entry for this stage as succeeded.
+        """Mark a stage as successfully completed.
 
         Args:
             user_id: Cognito user sub.
@@ -165,14 +154,33 @@ class BookshelfTracker:
             dest_bucket: Bucket the file was written to.
             dest_key: Key the file was written to.
         """
-        self._update_stage(
-            upload_id=upload_id,
-            stage=stage,
-            status=StageStatus.SUCCESS,
-            dest_bucket=dest_bucket,
-            dest_key=dest_key,
-            error_message=None,
-            upload_status=UploadStatus.SUCCESS,
+        now = _now_iso()
+        # Read the existing stage entry to preserve startedAt / source fields
+        record = self._table.get_item(Key={"upload_id": upload_id}).get("Item", {})
+        existing = (record.get("stages") or {}).get(stage.value) or {}
+        updated_entry = {
+            "startedAt": existing.get("startedAt", now),
+            "endedAt": now,
+            "sourceBucket": existing.get("sourceBucket"),
+            "sourceKey": existing.get("sourceKey"),
+            "destinationBucket": dest_bucket,
+            "destinationKey": dest_key,
+        }
+        self._table.update_item(
+            Key={"upload_id": upload_id},
+            UpdateExpression=(
+                "SET #stages.#stage_name = :entry, #stage = :stage_name, updated_at = :now"
+            ),
+            ExpressionAttributeNames={
+                "#stages": "stages",
+                "#stage_name": stage.value,
+                "#stage": "stage",
+            },
+            ExpressionAttributeValues={
+                ":entry": updated_entry,
+                ":stage_name": stage.value,
+                ":now": now,
+            },
         )
 
     def fail_stage(
@@ -182,7 +190,7 @@ class BookshelfTracker:
         stage: UploadStage,
         error_message: str,
     ) -> None:
-        """Mark the most recent in-progress entry for this stage as failed.
+        """Mark a stage as failed.
 
         Args:
             user_id: Cognito user sub.
@@ -190,14 +198,33 @@ class BookshelfTracker:
             stage: The pipeline stage that failed.
             error_message: Human-readable failure reason.
         """
-        self._update_stage(
-            upload_id=upload_id,
-            stage=stage,
-            status=StageStatus.FAILED,
-            dest_bucket=None,
-            dest_key=None,
-            error_message=error_message,
-            upload_status=UploadStatus.FAILED,
+        now = _now_iso()
+        record = self._table.get_item(Key={"upload_id": upload_id}).get("Item", {})
+        existing = (record.get("stages") or {}).get(stage.value) or {}
+        failed_entry = {
+            "startedAt": existing.get("startedAt", now),
+            "endedAt": now,
+            "sourceBucket": existing.get("sourceBucket"),
+            "sourceKey": existing.get("sourceKey"),
+            "destinationBucket": None,
+            "destinationKey": None,
+            "error": error_message,
+        }
+        self._table.update_item(
+            Key={"upload_id": upload_id},
+            UpdateExpression=(
+                "SET #stages.#stage_name = :entry, #stage = :failed, updated_at = :now"
+            ),
+            ExpressionAttributeNames={
+                "#stages": "stages",
+                "#stage_name": stage.value,
+                "#stage": "stage",
+            },
+            ExpressionAttributeValues={
+                ":entry": failed_entry,
+                ":failed": "failed",
+                ":now": now,
+            },
         )
 
     def list_all(self, limit: int = 100) -> List[dict]:
@@ -225,66 +252,3 @@ class BookshelfTracker:
         response = self._table.get_item(Key={"upload_id": upload_id})
         item: Optional[Dict[Any, Any]] = response.get("Item")
         return item
-
-    # ------------------------------------------------------------------
-    # Internal helpers
-    # ------------------------------------------------------------------
-
-    def _find_stage_index(self, stage_progress: list, stage: UploadStage) -> int:
-        """Return the index of the most recent in-progress entry for *stage*.
-
-        Raises:
-            ValueError: if no in-progress entry for the stage exists.
-        """
-        for idx in reversed(range(len(stage_progress))):
-            entry = stage_progress[idx]
-            if (
-                entry.get("stage_name") == stage.value
-                and entry.get("status") == StageStatus.IN_PROGRESS.value
-            ):
-                return idx
-        raise ValueError(f"No in-progress entry found for stage '{stage.value}'")
-
-    def _update_stage(
-        self,
-        upload_id: str,
-        stage: UploadStage,
-        status: StageStatus,
-        dest_bucket: Optional[str],
-        dest_key: Optional[str],
-        error_message: Optional[str],
-        upload_status: UploadStatus,
-    ) -> None:
-        key = {"upload_id": upload_id}
-        item = self._table.get_item(Key=key).get("Item", {})
-        stage_progress = list(item.get("stage_progress", []))
-        idx = self._find_stage_index(stage_progress, stage)
-        entry = dict(stage_progress[idx])
-
-        end_time = _now_iso()
-        try:
-            start = datetime.fromisoformat(entry["start_time"])
-            end = datetime.fromisoformat(end_time)
-            processing_time = Decimal(str(round((end - start).total_seconds(), 3)))
-        except (KeyError, ValueError):
-            processing_time = None
-
-        entry["status"] = status.value
-        entry["end_time"] = end_time
-        entry["processing_time"] = processing_time
-        if dest_bucket is not None and dest_key is not None:
-            entry["destination"] = {"bucket": dest_bucket, "key": dest_key}
-        if error_message is not None:
-            entry["error_message"] = error_message
-
-        self._table.update_item(
-            Key=key,
-            UpdateExpression=(
-                f"SET stage_progress[{idx}] = :entry, current_status = :status, updated_at = :now"
-            ),
-            ExpressionAttributeValues={
-                ":entry": entry,
-                ":status": upload_status.value,
-                ":now": end_time,
-            },
-        )

@@ -44,12 +44,13 @@ POST /api/ook/chat
 
 Environment variables
 ---------------------
-BEDROCK_MODEL_ID       Bedrock model ID (required)
-BEDROCK_REGION         AWS region for Bedrock calls (default: eu-west-2)
-LANDING_BUCKET         S3 bucket name for uploads (required)
-RAW_BUCKET             S3 bucket name for accepted metadata JSON (required)
-TRACKING_TABLE         DynamoDB table name for ingestion tracking (required)
-CORS_ALLOWED_ORIGINS   Comma-separated allowed CORS origins (default: http://localhost:5173)
+BEDROCK_MODEL_ID              Bedrock model ID (required by metadata handler)
+BEDROCK_REGION                AWS region for Bedrock calls (default: eu-west-2)
+LANDING_BUCKET                S3 bucket name for uploads (required)
+RAW_BUCKET                    S3 bucket name for accepted metadata JSON (required)
+TRACKING_TABLE                DynamoDB table name for ingestion tracking (required)
+ENRICHMENT_STATE_MACHINE_ARN  ARN of the enrichment Step Functions state machine (optional)
+CORS_ALLOWED_ORIGINS          Comma-separated allowed CORS origins (default: http://localhost:5173)
 """
 
 import logging
@@ -83,13 +84,10 @@ app.add_middleware(
 )
 
 _dynamodb = boto3.resource("dynamodb")
-_bedrock = boto3.client(
-    "bedrock-runtime", region_name=os.environ.get("BEDROCK_REGION", "eu-west-2")
-)
 
 _presigned = PresignedUrlHandler()
 _metadata = MetadataHandler()
-_accept = AcceptHandler(dynamodb_resource=_dynamodb, bedrock_client=_bedrock)
+_accept = AcceptHandler(dynamodb_resource=_dynamodb)
 _ops = OpsHandler()
 _bookshelf = BookshelfHandler(dynamodb_resource=_dynamodb)
 _ook = OokHandler()

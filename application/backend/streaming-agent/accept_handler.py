@@ -23,7 +23,7 @@ import logging
 import os
 import re
 import uuid
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 import boto3
 from common.tracker import BookshelfTracker, UploadStage
@@ -45,33 +45,29 @@ class AcceptHandler:
         self,
         s3_client: Any = None,
         dynamodb_resource: Any = None,
-        bedrock_client: Any = None,
+        sfn_client: Any = None,
     ) -> None:
         self._s3 = s3_client or boto3.client("s3")
-        self._bedrock = bedrock_client or boto3.client(
-            "bedrock-runtime", region_name=os.environ.get("BEDROCK_REGION", "eu-west-2")
-        )
-        self._embedding_model_id = os.environ.get(
-            "EMBEDDING_MODEL_ID", "amazon.titan-embed-text-v1"
-        )
+        self._sfn = sfn_client or boto3.client("stepfunctions")
+        self._enrichment_state_machine_arn: str = os.environ.get("ENRICHMENT_STATE_MACHINE_ARN", "")
         self._raw_bucket: str = os.environ["RAW_BUCKET"]
         self._tracker = BookshelfTracker(
             dynamodb_resource=dynamodb_resource,
             table_name=os.environ.get("TRACKING_TABLE", ""),
         )
 
-    def _generate_embedding(self, text: str) -> Optional[List[float]]:
+    def _trigger_enrichment(self, upload_id: str) -> None:
+        """Fire the enrichment state machine for the given upload_id (non-fatal)."""
+        if not self._enrichment_state_machine_arn:
+            return
         try:
-            response = self._bedrock.invoke_model(
-                modelId=self._embedding_model_id,
-                body=json.dumps({"inputText": text}),
-                contentType="application/json",
-                accept="application/json",
+            self._sfn.start_execution(
+                stateMachineArn=self._enrichment_state_machine_arn,
+                input=json.dumps({"upload_id": upload_id}),
             )
-            return json.loads(response["body"].read())["embedding"]
+            logger.info("Triggered enrichment state machine for upload_id=%s", upload_id)
         except Exception:
-            logger.warning("Failed to generate embedding: %s...", text[:50])
-            return None
+            logger.warning("Failed to trigger enrichment state machine for upload_id=%s", upload_id)
 
     async def handle(self, request: Request) -> JSONResponse:
         """Write metadata JSON to the raw bucket and return the saved key."""
@@ -113,56 +109,39 @@ class AcceptHandler:
             )
         except Exception:
             logger.exception("Failed to write metadata to s3://%s/%s", self._raw_bucket, key)
-            # Mark ENRICHMENT as failed
+            # Mark ANALYSED as failed
             if upload_id:
                 try:
                     self._tracker.fail_stage(
                         user_id=user_id,
                         upload_id=upload_id,
-                        stage=UploadStage.ENRICHMENT,
+                        stage=UploadStage.ANALYSED,
                         error_message="Failed to save metadata to S3",
                     )
                 except Exception:
                     logger.exception(
-                        "Failed to mark ENRICHMENT stage as failed for upload_id=%s", upload_id
+                        "Failed to mark ANALYSED stage as failed for upload_id=%s", upload_id
                     )
             raise HTTPException(status_code=500, detail="Failed to save metadata")
 
-        # Mark the ENRICHMENT stage as complete in DynamoDB after successful S3 write
+        # Mark the ANALYSED stage as complete in DynamoDB after successful S3 write
         if upload_id:
             try:
                 self._tracker.complete_stage(
                     user_id=user_id,
                     upload_id=upload_id,
-                    stage=UploadStage.ENRICHMENT,
+                    stage=UploadStage.ANALYSED,
                     dest_bucket=self._raw_bucket,
                     dest_key=key,
                 )
             except Exception:
                 logger.exception(
-                    "Failed to mark ENRICHMENT stage as complete for upload_id=%s", upload_id
+                    "Failed to mark ANALYSED stage as complete for upload_id=%s", upload_id
                 )
 
         logger.info("Saved metadata to s3://%s/%s", self._raw_bucket, key)
 
-        embedding_text = str(
-            metadata.get("description")
-            or f"{metadata.get('title', '')} by {metadata.get('author', '')}"
-        )
-        embedding = self._generate_embedding(embedding_text)
-        if embedding is not None:
-            embedding_key = key.replace(".json", ".embedding.json")
-            try:
-                self._s3.put_object(
-                    Bucket=self._raw_bucket,
-                    Key=embedding_key,
-                    Body=json.dumps({"upload_id": upload_id, "embedding": embedding}).encode(
-                        "utf-8"
-                    ),
-                    ContentType="application/json",
-                )
-                logger.info("Saved embedding to s3://%s/%s", self._raw_bucket, embedding_key)
-            except Exception:
-                logger.warning("Failed to save embedding for upload_id=%s", upload_id)
+        if upload_id:
+            self._trigger_enrichment(upload_id)
 
         return JSONResponse({"status": "accepted", "saved_key": key, "upload_id": upload_id})

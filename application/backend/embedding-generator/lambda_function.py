@@ -5,7 +5,7 @@ Invoked by the embedding Step Functions state machine with:
 
 Steps
 -----
-1. Read the tracking record to find the ENRICHMENT destination S3 key.
+1. Read the tracking record to find the ANALYSED stage destination S3 key.
 2. Fetch the metadata JSON from S3.
 3. Call Bedrock Titan to generate a text embedding.
 4. Write the embedding as ``<metadata_key>.embedding.json`` in the raw bucket.
@@ -29,7 +29,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 import boto3
-from common.tracker import BookshelfTracker, StageStatus, UploadStage
+from common.tracker import BookshelfTracker, UploadStage
 
 logger = logging.getLogger(__name__)
 logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
@@ -46,15 +46,10 @@ def _get_clients() -> tuple:
 
 
 def _find_metadata_key(record: dict) -> Optional[str]:
-    """Return the S3 key from the most recent successful ENRICHMENT stage."""
-    for stage in reversed(record.get("stage_progress", [])):
-        if (
-            stage.get("stage_name") == UploadStage.ENRICHMENT.value
-            and stage.get("status") == StageStatus.SUCCESS.value
-        ):
-            dest = stage.get("destination") or {}
-            return dest.get("key")
-    return None
+    """Return the S3 key from the completed ANALYSED stage."""
+    stages = record.get("stages") or {}
+    analysed = stages.get(UploadStage.ANALYSED.value) or {}
+    return analysed.get("destinationKey")
 
 
 def _generate_embedding(
@@ -106,7 +101,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
 
     metadata_key = _find_metadata_key(record)
     if not metadata_key:
-        raise ValueError(f"No successful ENRICHMENT stage found for upload_id={upload_id}")
+        raise ValueError(f"No completed ANALYSED stage found for upload_id={upload_id}")
 
     # Fetch the metadata JSON to build embedding text
     response = s3.get_object(Bucket=raw_bucket, Key=metadata_key)

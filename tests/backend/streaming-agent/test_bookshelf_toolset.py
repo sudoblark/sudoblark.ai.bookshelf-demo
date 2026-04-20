@@ -108,14 +108,17 @@ def aws_with_embeddings(aws_credentials, monkeypatch):
             table.put_item(
                 Item={
                     "upload_id": book["upload_id"],
-                    "current_status": "SUCCESS",
-                    "stage_progress": [
-                        {
-                            "stage_name": "enrichment",
-                            "status": "success",
-                            "destination": {"bucket": RAW_BUCKET, "key": key},
+                    "stage": "analysed",
+                    "stages": {
+                        "analysed": {
+                            "startedAt": "2024-01-01T00:00:00+00:00",
+                            "endedAt": "2024-01-01T00:00:01+00:00",
+                            "sourceBucket": RAW_BUCKET,
+                            "sourceKey": key,
+                            "destinationBucket": RAW_BUCKET,
+                            "destinationKey": key,
                         }
-                    ],
+                    },
                 }
             )
 

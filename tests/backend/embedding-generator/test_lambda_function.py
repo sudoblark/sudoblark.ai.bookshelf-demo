@@ -66,16 +66,17 @@ def aws_with_book(aws_credentials, monkeypatch):
         table.put_item(
             Item={
                 "upload_id": "book-001",
-                "current_status": "SUCCESS",
-                "stage_progress": [
-                    {
-                        "stage_name": "enrichment",
-                        "status": "success",
-                        "start_time": "2024-01-01T00:00:00+00:00",
-                        "end_time": "2024-01-01T00:00:01+00:00",
-                        "destination": {"bucket": RAW_BUCKET, "key": key},
+                "stage": "analysed",
+                "stages": {
+                    "analysed": {
+                        "startedAt": "2024-01-01T00:00:00+00:00",
+                        "endedAt": "2024-01-01T00:00:01+00:00",
+                        "sourceBucket": RAW_BUCKET,
+                        "sourceKey": key,
+                        "destinationBucket": RAW_BUCKET,
+                        "destinationKey": key,
                     }
-                ],
+                },
             }
         )
 
@@ -124,8 +125,7 @@ class TestHandlerSuccess:
         monkeypatch.setattr(mod, "_get_clients", lambda: (s3, _make_bedrock_client(), dynamodb))
         mod.handler({"upload_id": "book-001"}, None)
         record = table.get_item(Key={"upload_id": "book-001"})["Item"]
-        stage_names = [s["stage_name"] for s in record["stage_progress"]]
-        assert "embedding" in stage_names
+        assert "embedding" in record["stages"]
 
     def test_embedding_stage_status_success(self, aws_with_book, monkeypatch):
         import importlib
@@ -135,8 +135,7 @@ class TestHandlerSuccess:
         monkeypatch.setattr(mod, "_get_clients", lambda: (s3, _make_bedrock_client(), dynamodb))
         mod.handler({"upload_id": "book-001"}, None)
         record = table.get_item(Key={"upload_id": "book-001"})["Item"]
-        embedding_stages = [s for s in record["stage_progress"] if s["stage_name"] == "embedding"]
-        assert embedding_stages[-1]["status"] == "success"
+        assert record["stage"] == "embedding"
 
     def test_uses_description_for_embedding_text(self, aws_with_book, monkeypatch):
         import importlib
@@ -197,8 +196,8 @@ class TestHandlerErrors:
         with pytest.raises(ValueError, match="No tracking record"):
             mod.handler({"upload_id": "nonexistent"}, None)
 
-    def test_no_enrichment_stage_raises(self, aws_credentials, monkeypatch):
-        """A tracking record with no ENRICHMENT stage should raise."""
+    def test_no_analysed_stage_raises(self, aws_credentials, monkeypatch):
+        """A tracking record with no ANALYSED stage should raise."""
         import importlib
 
         monkeypatch.setenv("RAW_BUCKET", RAW_BUCKET)
@@ -216,12 +215,10 @@ class TestHandlerErrors:
                 AttributeDefinitions=[{"AttributeName": "upload_id", "AttributeType": "S"}],
                 BillingMode="PAY_PER_REQUEST",
             )
-            table.put_item(
-                Item={"upload_id": "book-001", "current_status": "SUCCESS", "stage_progress": []}
-            )
+            table.put_item(Item={"upload_id": "book-001", "stage": "queued", "stages": {}})
             mod = importlib.import_module("lambda_function")
             monkeypatch.setattr(mod, "_get_clients", lambda: (s3, _make_bedrock_client(), dynamodb))
-            with pytest.raises(ValueError, match="No successful ENRICHMENT stage"):
+            with pytest.raises(ValueError, match="No completed ANALYSED stage"):
                 mod.handler({"upload_id": "book-001"}, None)
 
     def test_bedrock_failure_raises_and_records_failed_stage(self, aws_with_book, monkeypatch):
@@ -235,5 +232,5 @@ class TestHandlerErrors:
         with pytest.raises(RuntimeError, match="Embedding generation failed"):
             mod.handler({"upload_id": "book-001"}, None)
         record = table.get_item(Key={"upload_id": "book-001"})["Item"]
-        embedding_stages = [s for s in record["stage_progress"] if s["stage_name"] == "embedding"]
-        assert embedding_stages[-1]["status"] == "failed"
+        assert record["stage"] == "failed"
+        assert "error" in record["stages"]["embedding"]

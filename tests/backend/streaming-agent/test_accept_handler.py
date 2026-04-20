@@ -472,57 +472,67 @@ class TestAcceptHandlerMetadataHandling:
         assert body["status"] == "accepted"
 
 
-class TestEmbeddingGeneration:
-    """Test Bedrock Titan embedding generation during metadata accept."""
+class TestStateMachineTrigger:
+    """Test enrichment state machine trigger during metadata accept."""
 
     @pytest.fixture
-    def mock_bedrock_client(self):
-        """Mock Bedrock client returning a 1024-dim embedding."""
-        mock = MagicMock()
-        mock.invoke_model.return_value = {
-            "body": MagicMock(read=lambda: json.dumps({"embedding": [0.1] * 1024}).encode())
-        }
-        return mock
+    def mock_sfn_client(self):
+        return MagicMock()
 
     @pytest.fixture
-    def accept_handler_with_bedrock(self, monkeypatch, mock_s3_client, mock_bedrock_client):
+    def accept_handler_with_sfn(self, monkeypatch, mock_s3_client, mock_sfn_client):
         monkeypatch.setenv("RAW_BUCKET", "test-raw-bucket")
-        return AcceptHandler(s3_client=mock_s3_client, bedrock_client=mock_bedrock_client)
+        monkeypatch.setenv(
+            "ENRICHMENT_STATE_MACHINE_ARN", "arn:aws:states:eu-west-2:123:stateMachine:test"
+        )
+        return AcceptHandler(s3_client=mock_s3_client, sfn_client=mock_sfn_client)
 
     @pytest.mark.asyncio
-    async def test_embedding_stored_on_accept(
-        self,
-        accept_handler_with_bedrock,
-        mock_request,
-        sample_request_body,
-        mock_s3_client,
+    async def test_state_machine_triggered_on_accept(
+        self, accept_handler_with_sfn, mock_request, sample_request_body, mock_sfn_client
     ):
-        """Embedding is written to S3 alongside the metadata after accept."""
+        """State machine is invoked after successful S3 write."""
 
         async def json_mock():
             return sample_request_body
 
         mock_request.json = json_mock
-        await accept_handler_with_bedrock.handle(mock_request)
+        resp = await accept_handler_with_sfn.handle(mock_request)
 
-        assert mock_s3_client.put_object.call_count == 2
-        embedding_call = mock_s3_client.put_object.call_args_list[1][1]
-        assert embedding_call["Key"].endswith(".embedding.json")
+        assert resp.status_code == 200
+        mock_sfn_client.start_execution.assert_called_once()
+        call_input = json.loads(mock_sfn_client.start_execution.call_args[1]["input"])
+        assert "upload_id" in call_input
 
     @pytest.mark.asyncio
-    async def test_embedding_failure_does_not_fail_accept(
-        self,
-        monkeypatch,
-        mock_s3_client,
-        mock_request,
-        sample_request_body,
+    async def test_state_machine_receives_correct_upload_id(
+        self, accept_handler_with_sfn, mock_request, sample_request_body, mock_sfn_client
     ):
-        """A Bedrock failure must not prevent the accept from succeeding."""
-        failing_bedrock = MagicMock()
-        failing_bedrock.invoke_model.side_effect = Exception("Bedrock error")
+        """The upload_id passed to the state machine matches the response."""
+
+        async def json_mock():
+            return sample_request_body
+
+        mock_request.json = json_mock
+        resp = await accept_handler_with_sfn.handle(mock_request)
+
+        response_upload_id = json.loads(resp.body.decode())["upload_id"]
+        call_input = json.loads(mock_sfn_client.start_execution.call_args[1]["input"])
+        assert call_input["upload_id"] == response_upload_id
+
+    @pytest.mark.asyncio
+    async def test_state_machine_failure_does_not_fail_accept(
+        self, monkeypatch, mock_s3_client, mock_request, sample_request_body
+    ):
+        """A Step Functions failure must not prevent the accept from succeeding."""
+        failing_sfn = MagicMock()
+        failing_sfn.start_execution.side_effect = Exception("SFN unavailable")
 
         monkeypatch.setenv("RAW_BUCKET", "test-raw-bucket")
-        handler = AcceptHandler(s3_client=mock_s3_client, bedrock_client=failing_bedrock)
+        monkeypatch.setenv(
+            "ENRICHMENT_STATE_MACHINE_ARN", "arn:aws:states:eu-west-2:123:stateMachine:test"
+        )
+        handler = AcceptHandler(s3_client=mock_s3_client, sfn_client=failing_sfn)
 
         async def json_mock():
             return sample_request_body
@@ -531,46 +541,21 @@ class TestEmbeddingGeneration:
         resp = await handler.handle(mock_request)
 
         assert resp.status_code == 200
-        assert mock_s3_client.put_object.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_embedding_uses_description_field(
-        self,
-        accept_handler_with_bedrock,
-        mock_request,
-        sample_request_body,
-        mock_bedrock_client,
+    async def test_state_machine_not_triggered_when_arn_absent(
+        self, monkeypatch, mock_s3_client, mock_request, sample_request_body
     ):
-        """The book description is used as the embedding input text."""
+        """No SFN call is made when ENRICHMENT_STATE_MACHINE_ARN is not set."""
+        mock_sfn = MagicMock()
+        monkeypatch.setenv("RAW_BUCKET", "test-raw-bucket")
+        monkeypatch.delenv("ENRICHMENT_STATE_MACHINE_ARN", raising=False)
+        handler = AcceptHandler(s3_client=mock_s3_client, sfn_client=mock_sfn)
 
         async def json_mock():
             return sample_request_body
 
         mock_request.json = json_mock
-        await accept_handler_with_bedrock.handle(mock_request)
+        await handler.handle(mock_request)
 
-        invoke_call = mock_bedrock_client.invoke_model.call_args[1]
-        body = json.loads(invoke_call["body"])
-        assert sample_request_body["metadata"]["description"] in body["inputText"]
-
-    @pytest.mark.asyncio
-    async def test_embedding_falls_back_to_title_author(
-        self,
-        accept_handler_with_bedrock,
-        mock_request,
-        sample_request_body,
-        mock_bedrock_client,
-    ):
-        """When description is absent, title + author are used as fallback."""
-        sample_request_body["metadata"]["description"] = None
-
-        async def json_mock():
-            return sample_request_body
-
-        mock_request.json = json_mock
-        await accept_handler_with_bedrock.handle(mock_request)
-
-        invoke_call = mock_bedrock_client.invoke_model.call_args[1]
-        body = json.loads(invoke_call["body"])
-        assert sample_request_body["metadata"]["title"] in body["inputText"]
-        assert sample_request_body["metadata"]["author"] in body["inputText"]
+        mock_sfn.start_execution.assert_not_called()

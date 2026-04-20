@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Optional
 
 import boto3
 import numpy as np
-from common.tracker import BookshelfTracker, StageStatus, UploadStage, UploadStatus
+from common.tracker import BookshelfTracker, UploadStage
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
@@ -92,10 +92,10 @@ class BookshelfHandler:
         return books
 
     def _list_all_embeddings(self) -> Dict[str, List[float]]:
-        """Fetch embeddings for all successfully enriched uploads via the tracking table.
+        """Fetch embeddings for all analysed uploads via the tracking table.
 
-        Uses the tracker to find completed ENRICHMENT records, derives the
-        embedding S3 key from the stored metadata key, and fetches each object
+        Uses the tracker to find records with a completed ANALYSED stage, derives
+        the embedding S3 key from the stored metadata key, and fetches each object
         directly — no bucket scan needed.
         """
         embeddings: Dict[str, List[float]] = {}
@@ -106,22 +106,14 @@ class BookshelfHandler:
             return embeddings
 
         for record in records:
-            if record.get("current_status") != UploadStatus.SUCCESS.value:
-                continue
             upload_id = record.get("upload_id", "")
             if not upload_id:
                 continue
 
-            # Find the ENRICHMENT success stage entry to get the metadata S3 key.
-            metadata_key: Optional[str] = None
-            for stage in reversed(record.get("stage_progress", [])):
-                if (
-                    stage.get("stage_name") == UploadStage.ENRICHMENT.value
-                    and stage.get("status") == StageStatus.SUCCESS.value
-                ):
-                    dest = stage.get("destination") or {}
-                    metadata_key = dest.get("key")
-                    break
+            # Look up the ANALYSED stage entry to get the metadata S3 key.
+            stages = record.get("stages") or {}
+            analysed = stages.get(UploadStage.ANALYSED.value) or {}
+            metadata_key = analysed.get("destinationKey")
 
             if not metadata_key:
                 continue
