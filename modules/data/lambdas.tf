@@ -40,5 +40,50 @@
 
 locals {
   # Define Lambda functions
-  lambdas = []
+  lambdas = [
+    {
+      name          = "embedding-generator"
+      description   = "Generates Titan text embeddings for accepted book metadata"
+      zip_file_path = "./lambda-packages/embedding-generator.zip"
+      handler       = "lambda_function.handler"
+      timeout       = 60
+      memory_size   = 512
+      environment_variables = {
+        TRACKING_TABLE     = lower("${var.account}-${var.project}-${var.application}-ingestion-tracking")
+        RAW_BUCKET         = lower("${var.account}-${var.project}-${var.application}-raw")
+        EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v1"
+        BEDROCK_REGION     = "eu-west-2"
+        LOG_LEVEL          = "INFO"
+      }
+      iam_policy_statements = [
+        {
+          sid     = "BedrockInvokeModel"
+          effect  = "Allow"
+          actions = ["bedrock:InvokeModel"]
+          resources = [
+            "arn:aws:bedrock:eu-west-2::foundation-model/amazon.titan-embed-text-v1"
+          ]
+        },
+        {
+          sid     = "S3ReadWriteRaw"
+          effect  = "Allow"
+          actions = ["s3:GetObject", "s3:PutObject"]
+          resources = [
+            "arn:aws:s3:::${lower("${var.account}-${var.project}-${var.application}-raw")}/*"
+          ]
+        },
+        {
+          sid    = "DynamoDBTracking"
+          effect = "Allow"
+          actions = [
+            "dynamodb:GetItem",
+            "dynamodb:UpdateItem",
+          ]
+          resources = [
+            "arn:aws:dynamodb:*:*:table/${lower("${var.account}-${var.project}-${var.application}-ingestion-tracking")}"
+          ]
+        },
+      ]
+    },
+  ]
 }

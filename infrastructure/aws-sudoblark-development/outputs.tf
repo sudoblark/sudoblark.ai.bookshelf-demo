@@ -22,3 +22,8 @@ output "athena_workgroup_names" {
   description = "Map of Athena workgroup short names to full workgroup names"
   value       = module.athena.workgroup_names
 }
+
+output "state_machine_arns" {
+  description = "Map of state machine short names to ARNs"
+  value       = module.step_functions.state_machine_arns
+}
