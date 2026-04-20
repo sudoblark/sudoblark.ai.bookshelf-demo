@@ -103,6 +103,31 @@ class TestListAllBooks:
         books = empty_handler._list_all_books()
         assert books == []
 
+    def test_embedding_files_excluded_from_list(self, aws_credentials, monkeypatch):
+        """Verify .embedding.json files are not returned as books."""
+        monkeypatch.setenv("RAW_BUCKET", RAW_BUCKET)
+        with mock_aws():
+            client = boto3.client("s3", region_name="eu-west-2")
+            client.create_bucket(
+                Bucket=RAW_BUCKET,
+                CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
+            )
+            client.put_object(
+                Bucket=RAW_BUCKET,
+                Key="author=Test/published_year=2020/book-001.json",
+                Body=json.dumps({"title": "Test Book", "upload_id": "book-001"}).encode(),
+            )
+            client.put_object(
+                Bucket=RAW_BUCKET,
+                Key="author=Test/published_year=2020/book-001.embedding.json",
+                Body=json.dumps({"upload_id": "book-001", "embedding": [0.1] * 4}).encode(),
+            )
+            mod = importlib.import_module("bookshelf_handler")
+            handler = mod.BookshelfHandler(s3_client=client)
+            books = handler._list_all_books()
+            assert len(books) == 1
+            assert books[0]["title"] == "Test Book"
+
     def test_non_json_files_are_skipped(self, aws_credentials, monkeypatch):
         monkeypatch.setenv("RAW_BUCKET", RAW_BUCKET)
         with mock_aws():
