@@ -54,6 +54,7 @@ class UploadStage(str, Enum):
     ROUTING = "routing"
     AV_SCAN = "av_scan"
     ANALYSED = "analysed"
+    PROCESSED = "processed"
     EMBEDDING = "embedding"
 
 
