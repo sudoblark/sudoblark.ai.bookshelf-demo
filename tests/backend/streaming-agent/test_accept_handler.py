@@ -470,3 +470,107 @@ class TestAcceptHandlerMetadataHandling:
         # Verify it serialized successfully
         body = json.loads(resp.body.decode())
         assert body["status"] == "accepted"
+
+
+class TestEmbeddingGeneration:
+    """Test Bedrock Titan embedding generation during metadata accept."""
+
+    @pytest.fixture
+    def mock_bedrock_client(self):
+        """Mock Bedrock client returning a 1024-dim embedding."""
+        mock = MagicMock()
+        mock.invoke_model.return_value = {
+            "body": MagicMock(read=lambda: json.dumps({"embedding": [0.1] * 1024}).encode())
+        }
+        return mock
+
+    @pytest.fixture
+    def accept_handler_with_bedrock(self, monkeypatch, mock_s3_client, mock_bedrock_client):
+        monkeypatch.setenv("RAW_BUCKET", "test-raw-bucket")
+        return AcceptHandler(s3_client=mock_s3_client, bedrock_client=mock_bedrock_client)
+
+    @pytest.mark.asyncio
+    async def test_embedding_stored_on_accept(
+        self,
+        accept_handler_with_bedrock,
+        mock_request,
+        sample_request_body,
+        mock_s3_client,
+    ):
+        """Embedding is written to S3 alongside the metadata after accept."""
+
+        async def json_mock():
+            return sample_request_body
+
+        mock_request.json = json_mock
+        await accept_handler_with_bedrock.handle(mock_request)
+
+        assert mock_s3_client.put_object.call_count == 2
+        embedding_call = mock_s3_client.put_object.call_args_list[1][1]
+        assert embedding_call["Key"].endswith(".embedding.json")
+
+    @pytest.mark.asyncio
+    async def test_embedding_failure_does_not_fail_accept(
+        self,
+        monkeypatch,
+        mock_s3_client,
+        mock_request,
+        sample_request_body,
+    ):
+        """A Bedrock failure must not prevent the accept from succeeding."""
+        failing_bedrock = MagicMock()
+        failing_bedrock.invoke_model.side_effect = Exception("Bedrock error")
+
+        monkeypatch.setenv("RAW_BUCKET", "test-raw-bucket")
+        handler = AcceptHandler(s3_client=mock_s3_client, bedrock_client=failing_bedrock)
+
+        async def json_mock():
+            return sample_request_body
+
+        mock_request.json = json_mock
+        resp = await handler.handle(mock_request)
+
+        assert resp.status_code == 200
+        assert mock_s3_client.put_object.call_count == 1
+
+    @pytest.mark.asyncio
+    async def test_embedding_uses_description_field(
+        self,
+        accept_handler_with_bedrock,
+        mock_request,
+        sample_request_body,
+        mock_bedrock_client,
+    ):
+        """The book description is used as the embedding input text."""
+
+        async def json_mock():
+            return sample_request_body
+
+        mock_request.json = json_mock
+        await accept_handler_with_bedrock.handle(mock_request)
+
+        invoke_call = mock_bedrock_client.invoke_model.call_args[1]
+        body = json.loads(invoke_call["body"])
+        assert sample_request_body["metadata"]["description"] in body["inputText"]
+
+    @pytest.mark.asyncio
+    async def test_embedding_falls_back_to_title_author(
+        self,
+        accept_handler_with_bedrock,
+        mock_request,
+        sample_request_body,
+        mock_bedrock_client,
+    ):
+        """When description is absent, title + author are used as fallback."""
+        sample_request_body["metadata"]["description"] = None
+
+        async def json_mock():
+            return sample_request_body
+
+        mock_request.json = json_mock
+        await accept_handler_with_bedrock.handle(mock_request)
+
+        invoke_call = mock_bedrock_client.invoke_model.call_args[1]
+        body = json.loads(invoke_call["body"])
+        assert sample_request_body["metadata"]["title"] in body["inputText"]
+        assert sample_request_body["metadata"]["author"] in body["inputText"]
