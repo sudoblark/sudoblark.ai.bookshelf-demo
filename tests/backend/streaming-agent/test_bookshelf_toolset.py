@@ -9,6 +9,14 @@ import boto3
 import pytest
 from moto import mock_aws
 
+TRACKING_TABLE = "test-tracking"
+
+EMBEDDINGS = {
+    "book-001": [1.0, 0.0, 0.0, 0.0],
+    "book-002": [0.99, 0.14, 0.0, 0.0],
+    "book-003": [0.0, 0.0, 1.0, 0.0],
+}
+
 # Setup path for imports
 sys.path.insert(
     0,
@@ -61,6 +69,57 @@ def s3_client_with_books(aws_credentials, monkeypatch):
             client.put_object(Bucket=RAW_BUCKET, Key=key, Body=json.dumps(book).encode("utf-8"))
 
         yield client
+
+
+@pytest.fixture
+def aws_with_embeddings(aws_credentials, monkeypatch):
+    """S3 + DynamoDB seeded with books, embeddings, and tracking records."""
+    monkeypatch.setenv("RAW_BUCKET", RAW_BUCKET)
+    monkeypatch.setenv("TRACKING_TABLE", TRACKING_TABLE)
+
+    with mock_aws():
+        s3 = boto3.client("s3", region_name="eu-west-2")
+        s3.create_bucket(
+            Bucket=RAW_BUCKET,
+            CreateBucketConfiguration={"LocationConstraint": "eu-west-2"},
+        )
+        dynamodb = boto3.resource("dynamodb", region_name="eu-west-2")
+        table = dynamodb.create_table(
+            TableName=TRACKING_TABLE,
+            KeySchema=[{"AttributeName": "upload_id", "KeyType": "HASH"}],
+            AttributeDefinitions=[{"AttributeName": "upload_id", "AttributeType": "S"}],
+            BillingMode="PAY_PER_REQUEST",
+        )
+
+        for book in SAMPLE_BOOKS:
+            author = book["author"].replace(" ", "_")
+            key = (
+                f"author={author}/published_year={book['published_year']}/{book['upload_id']}.json"
+            )
+            s3.put_object(Bucket=RAW_BUCKET, Key=key, Body=json.dumps(book).encode("utf-8"))
+            emb_key = key.replace(".json", ".embedding.json")
+            s3.put_object(
+                Bucket=RAW_BUCKET,
+                Key=emb_key,
+                Body=json.dumps(
+                    {"upload_id": book["upload_id"], "embedding": EMBEDDINGS[book["upload_id"]]}
+                ).encode("utf-8"),
+            )
+            table.put_item(
+                Item={
+                    "upload_id": book["upload_id"],
+                    "current_status": "SUCCESS",
+                    "stage_progress": [
+                        {
+                            "stage_name": "enrichment",
+                            "status": "success",
+                            "destination": {"bucket": RAW_BUCKET, "key": key},
+                        }
+                    ],
+                }
+            )
+
+        yield s3, dynamodb
 
 
 @pytest.fixture
@@ -205,3 +264,83 @@ class TestBookshelfToolsetWithTracker:
         executions = tracker.get_executions()
         assert len(executions) == 1
         assert "Brandon Sanderson" in executions[0].result_summary
+
+
+class TestSimilarityToolsRegistered:
+    """Verify get_similar_books and get_similarity_graph are in the toolset."""
+
+    def test_toolset_includes_get_similar_books(self, aws_with_embeddings, monkeypatch):
+        s3, dynamodb = aws_with_embeddings
+        monkeypatch.setenv("RAW_BUCKET", RAW_BUCKET)
+        bookshelf_mod = importlib.import_module("bookshelf_handler")
+        toolset_mod = importlib.import_module("bookshelf_toolset")
+        handler = bookshelf_mod.BookshelfHandler(s3_client=s3, dynamodb_resource=dynamodb)
+        toolset = toolset_mod.build_bookshelf_toolset(handler)
+        assert "get_similar_books" in toolset.tools
+
+    def test_toolset_includes_get_similarity_graph(self, aws_with_embeddings, monkeypatch):
+        s3, dynamodb = aws_with_embeddings
+        monkeypatch.setenv("RAW_BUCKET", RAW_BUCKET)
+        bookshelf_mod = importlib.import_module("bookshelf_handler")
+        toolset_mod = importlib.import_module("bookshelf_toolset")
+        handler = bookshelf_mod.BookshelfHandler(s3_client=s3, dynamodb_resource=dynamodb)
+        toolset = toolset_mod.build_bookshelf_toolset(handler)
+        assert "get_similarity_graph" in toolset.tools
+
+
+class TestSimilarityHandlerMethods:
+    """Test _compute_related and _compute_graph via handler directly."""
+
+    def test_compute_related_returns_ranked_results(self, aws_with_embeddings, monkeypatch):
+        s3, dynamodb = aws_with_embeddings
+        monkeypatch.setenv("RAW_BUCKET", RAW_BUCKET)
+        bookshelf_mod = importlib.import_module("bookshelf_handler")
+        handler = bookshelf_mod.BookshelfHandler(s3_client=s3, dynamodb_resource=dynamodb)
+        results = handler._compute_related("book-001", 5)
+        assert isinstance(results, list)
+        assert all("similarity" in r for r in results)
+        assert "book-001" not in [r["file_id"] for r in results]
+
+    def test_compute_related_unknown_id_returns_empty(self, aws_with_embeddings, monkeypatch):
+        s3, dynamodb = aws_with_embeddings
+        monkeypatch.setenv("RAW_BUCKET", RAW_BUCKET)
+        bookshelf_mod = importlib.import_module("bookshelf_handler")
+        handler = bookshelf_mod.BookshelfHandler(s3_client=s3, dynamodb_resource=dynamodb)
+        results = handler._compute_related("nonexistent", 5)
+        assert results == []
+
+    def test_compute_graph_returns_nodes_and_edges(self, aws_with_embeddings, monkeypatch):
+        s3, dynamodb = aws_with_embeddings
+        monkeypatch.setenv("RAW_BUCKET", RAW_BUCKET)
+        bookshelf_mod = importlib.import_module("bookshelf_handler")
+        handler = bookshelf_mod.BookshelfHandler(s3_client=s3, dynamodb_resource=dynamodb)
+        graph = handler._compute_graph(0.0)
+        assert "nodes" in graph
+        assert "edges" in graph
+        assert len(graph["nodes"]) == 3
+
+    def test_tracker_records_get_similar_books(self, aws_with_embeddings, monkeypatch):
+        s3, dynamodb = aws_with_embeddings
+        monkeypatch.setenv("RAW_BUCKET", RAW_BUCKET)
+        bookshelf_mod = importlib.import_module("bookshelf_handler")
+        tracker_mod = importlib.import_module("tool_tracker")
+        handler = bookshelf_mod.BookshelfHandler(s3_client=s3, dynamodb_resource=dynamodb)
+        tracker = tracker_mod.ToolTracker()
+        results = handler._compute_related("book-001", 5)
+        tracker.record("get_similar_books", 'book_id="book-001", limit=5', results, 10.0)
+        executions = tracker.get_executions()
+        assert len(executions) == 1
+        assert "similar" in executions[0].result_summary
+
+    def test_tracker_records_get_similarity_graph(self, aws_with_embeddings, monkeypatch):
+        s3, dynamodb = aws_with_embeddings
+        monkeypatch.setenv("RAW_BUCKET", RAW_BUCKET)
+        bookshelf_mod = importlib.import_module("bookshelf_handler")
+        tracker_mod = importlib.import_module("tool_tracker")
+        handler = bookshelf_mod.BookshelfHandler(s3_client=s3, dynamodb_resource=dynamodb)
+        tracker = tracker_mod.ToolTracker()
+        graph = handler._compute_graph(0.0)
+        tracker.record("get_similarity_graph", "threshold=0.0", graph, 15.0)
+        executions = tracker.get_executions()
+        assert len(executions) == 1
+        assert "nodes" in executions[0].result_summary

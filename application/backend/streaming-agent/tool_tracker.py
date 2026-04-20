@@ -91,6 +91,16 @@ class ToolTracker:
                 if isinstance(r, dict)
                 else "Overview completed"
             ),
+            "get_similar_books": lambda r: (
+                f"Found {len(r)} similar book{'s' if len(r) != 1 else ''}"
+                if isinstance(r, list)
+                else "Similarity search completed"
+            ),
+            "get_similarity_graph": lambda r: (
+                f"{len(r.get('nodes', []))} nodes, {len(r.get('edges', []))} edges"
+                if isinstance(r, dict)
+                else "Graph computed"
+            ),
         }
 
         summarizer = summarizers.get(tool_name)
