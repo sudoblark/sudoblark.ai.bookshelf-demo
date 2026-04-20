@@ -110,24 +110,30 @@ def aws_with_book(aws_credentials, monkeypatch):
 class TestHandlerSuccess:
     """Test successful embedding generation."""
 
-    def test_returns_upload_id(self, aws_with_book, monkeypatch):
+    def test_returns_upload_id(self, aws_with_book):
         s3, dynamodb, _ = aws_with_book
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, _make_bedrock_client(), dynamodb))
+        mod._processor = mod.VectorGeneratorProcessor(
+            s3_client=s3, dynamodb_resource=dynamodb, bedrock_client=_make_bedrock_client()
+        )
         result = mod.handler({"upload_id": "book-001"}, None)
         assert result["upload_id"] == "book-001"
 
-    def test_returns_embedding_key(self, aws_with_book, monkeypatch):
+    def test_returns_embedding_key(self, aws_with_book):
         s3, dynamodb, _ = aws_with_book
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, _make_bedrock_client(), dynamodb))
+        mod._processor = mod.VectorGeneratorProcessor(
+            s3_client=s3, dynamodb_resource=dynamodb, bedrock_client=_make_bedrock_client()
+        )
         result = mod.handler({"upload_id": "book-001"}, None)
         assert result["embedding_key"].endswith(".embedding.json")
 
-    def test_embedding_file_written_to_processed_bucket(self, aws_with_book, monkeypatch):
+    def test_embedding_file_written_to_processed_bucket(self, aws_with_book):
         s3, dynamodb, _ = aws_with_book
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, _make_bedrock_client(), dynamodb))
+        mod._processor = mod.VectorGeneratorProcessor(
+            s3_client=s3, dynamodb_resource=dynamodb, bedrock_client=_make_bedrock_client()
+        )
         mod.handler({"upload_id": "book-001"}, None)
         embedding_key = BOOK_KEY.replace(".json", ".embedding.json")
         obj = s3.get_object(Bucket=PROCESSED_BUCKET, Key=embedding_key)
@@ -135,48 +141,58 @@ class TestHandlerSuccess:
         assert data["upload_id"] == "book-001"
         assert len(data["embedding"]) == len(SAMPLE_EMBEDDING)
 
-    def test_embedding_stage_recorded(self, aws_with_book, monkeypatch):
+    def test_embedding_stage_recorded(self, aws_with_book):
         s3, dynamodb, table = aws_with_book
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, _make_bedrock_client(), dynamodb))
+        mod._processor = mod.VectorGeneratorProcessor(
+            s3_client=s3, dynamodb_resource=dynamodb, bedrock_client=_make_bedrock_client()
+        )
         mod.handler({"upload_id": "book-001"}, None)
         record = table.get_item(Key={"upload_id": "book-001"})["Item"]
         assert "embedding" in record["stages"]
 
-    def test_embedding_stage_status_success(self, aws_with_book, monkeypatch):
+    def test_embedding_stage_status_success(self, aws_with_book):
         s3, dynamodb, table = aws_with_book
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, _make_bedrock_client(), dynamodb))
+        mod._processor = mod.VectorGeneratorProcessor(
+            s3_client=s3, dynamodb_resource=dynamodb, bedrock_client=_make_bedrock_client()
+        )
         mod.handler({"upload_id": "book-001"}, None)
         record = table.get_item(Key={"upload_id": "book-001"})["Item"]
         assert record["stage"] == "embedding"
 
-    def test_uses_description_for_embedding_text(self, aws_with_book, monkeypatch):
+    def test_uses_description_for_embedding_text(self, aws_with_book):
         s3, dynamodb, _ = aws_with_book
         bedrock = _make_bedrock_client()
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, bedrock, dynamodb))
+        mod._processor = mod.VectorGeneratorProcessor(
+            s3_client=s3, dynamodb_resource=dynamodb, bedrock_client=bedrock
+        )
         mod.handler({"upload_id": "book-001"}, None)
         call_body = json.loads(bedrock.invoke_model.call_args[1]["body"])
         assert "Om manifests as a tortoise" in call_body["inputText"]
 
-    def test_falls_back_to_title_author_when_no_description(self, aws_with_book, monkeypatch):
+    def test_falls_back_to_title_author_when_no_description(self, aws_with_book):
         s3, dynamodb, _ = aws_with_book
         no_desc = {**SAMPLE_METADATA, "description": None}
         s3.put_object(Bucket=PROCESSED_BUCKET, Key=BOOK_KEY, Body=json.dumps(no_desc).encode())
         bedrock = _make_bedrock_client()
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, bedrock, dynamodb))
+        mod._processor = mod.VectorGeneratorProcessor(
+            s3_client=s3, dynamodb_resource=dynamodb, bedrock_client=bedrock
+        )
         mod.handler({"upload_id": "book-001"}, None)
         call_body = json.loads(bedrock.invoke_model.call_args[1]["body"])
         assert "Small Gods" in call_body["inputText"]
         assert "Terry Pratchett" in call_body["inputText"]
 
-    def test_is_idempotent(self, aws_with_book, monkeypatch):
+    def test_is_idempotent(self, aws_with_book):
         """Running twice overwrites the embedding without error."""
         s3, dynamodb, _ = aws_with_book
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, _make_bedrock_client(), dynamodb))
+        mod._processor = mod.VectorGeneratorProcessor(
+            s3_client=s3, dynamodb_resource=dynamodb, bedrock_client=_make_bedrock_client()
+        )
         mod.handler({"upload_id": "book-001"}, None)
         result = mod.handler({"upload_id": "book-001"}, None)
         assert result["upload_id"] == "book-001"
@@ -185,15 +201,21 @@ class TestHandlerSuccess:
 class TestHandlerErrors:
     """Test error handling."""
 
-    def test_missing_upload_id_raises(self, aws_credentials):
+    def test_missing_upload_id_raises(self, aws_with_book):
+        s3, dynamodb, _ = aws_with_book
         mod = _load_module()
+        mod._processor = mod.VectorGeneratorProcessor(
+            s3_client=s3, dynamodb_resource=dynamodb, bedrock_client=_make_bedrock_client()
+        )
         with pytest.raises(ValueError, match="upload_id is required"):
             mod.handler({}, None)
 
-    def test_unknown_upload_id_raises(self, aws_with_book, monkeypatch):
+    def test_unknown_upload_id_raises(self, aws_with_book):
         s3, dynamodb, _ = aws_with_book
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, _make_bedrock_client(), dynamodb))
+        mod._processor = mod.VectorGeneratorProcessor(
+            s3_client=s3, dynamodb_resource=dynamodb, bedrock_client=_make_bedrock_client()
+        )
         with pytest.raises(ValueError, match="No tracking record"):
             mod.handler({"upload_id": "nonexistent"}, None)
 
@@ -216,16 +238,22 @@ class TestHandlerErrors:
             )
             table.put_item(Item={"upload_id": "book-001", "stage": "analysed", "stages": {}})
             mod = _load_module()
-            monkeypatch.setattr(mod, "_get_clients", lambda: (s3, _make_bedrock_client(), dynamodb))
+            mod._processor = mod.VectorGeneratorProcessor(
+                s3_client=s3,
+                dynamodb_resource=dynamodb,
+                bedrock_client=_make_bedrock_client(),
+            )
             with pytest.raises(ValueError, match="No completed PROCESSED stage"):
                 mod.handler({"upload_id": "book-001"}, None)
 
-    def test_bedrock_failure_raises_and_records_failed_stage(self, aws_with_book, monkeypatch):
+    def test_bedrock_failure_raises_and_records_failed_stage(self, aws_with_book):
         s3, dynamodb, table = aws_with_book
         failing_bedrock = MagicMock()
         failing_bedrock.invoke_model.side_effect = Exception("Bedrock unavailable")
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, failing_bedrock, dynamodb))
+        mod._processor = mod.VectorGeneratorProcessor(
+            s3_client=s3, dynamodb_resource=dynamodb, bedrock_client=failing_bedrock
+        )
         with pytest.raises(RuntimeError, match="Embedding generation failed"):
             mod.handler({"upload_id": "book-001"}, None)
         record = table.get_item(Key={"upload_id": "book-001"})["Item"]

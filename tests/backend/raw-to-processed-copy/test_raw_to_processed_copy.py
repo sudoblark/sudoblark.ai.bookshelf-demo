@@ -93,58 +93,58 @@ def aws_with_book(aws_credentials, monkeypatch):
 class TestHandlerSuccess:
     """Test successful copy from raw to processed."""
 
-    def test_returns_upload_id(self, aws_with_book, monkeypatch):
+    def test_returns_upload_id(self, aws_with_book):
         s3, dynamodb, _ = aws_with_book
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, dynamodb))
+        mod._processor = mod.RawToProcessedCopyProcessor(s3_client=s3, dynamodb_resource=dynamodb)
         result = mod.handler({"upload_id": "book-001"}, None)
         assert result["upload_id"] == "book-001"
 
-    def test_returns_processed_key(self, aws_with_book, monkeypatch):
+    def test_returns_processed_key(self, aws_with_book):
         s3, dynamodb, _ = aws_with_book
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, dynamodb))
+        mod._processor = mod.RawToProcessedCopyProcessor(s3_client=s3, dynamodb_resource=dynamodb)
         result = mod.handler({"upload_id": "book-001"}, None)
         assert result["processed_key"] == BOOK_KEY
 
-    def test_file_written_to_processed_bucket(self, aws_with_book, monkeypatch):
+    def test_file_written_to_processed_bucket(self, aws_with_book):
         s3, dynamodb, _ = aws_with_book
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, dynamodb))
+        mod._processor = mod.RawToProcessedCopyProcessor(s3_client=s3, dynamodb_resource=dynamodb)
         mod.handler({"upload_id": "book-001"}, None)
         obj = s3.get_object(Bucket=PROCESSED_BUCKET, Key=BOOK_KEY)
         data = json.loads(obj["Body"].read())
         assert data["upload_id"] == "book-001"
 
-    def test_processed_stage_recorded(self, aws_with_book, monkeypatch):
+    def test_processed_stage_recorded(self, aws_with_book):
         s3, dynamodb, table = aws_with_book
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, dynamodb))
+        mod._processor = mod.RawToProcessedCopyProcessor(s3_client=s3, dynamodb_resource=dynamodb)
         mod.handler({"upload_id": "book-001"}, None)
         record = table.get_item(Key={"upload_id": "book-001"})["Item"]
         assert "processed" in record["stages"]
 
-    def test_stage_field_set_to_processed(self, aws_with_book, monkeypatch):
+    def test_stage_field_set_to_processed(self, aws_with_book):
         s3, dynamodb, table = aws_with_book
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, dynamodb))
+        mod._processor = mod.RawToProcessedCopyProcessor(s3_client=s3, dynamodb_resource=dynamodb)
         mod.handler({"upload_id": "book-001"}, None)
         record = table.get_item(Key={"upload_id": "book-001"})["Item"]
         assert record["stage"] == "processed"
 
-    def test_processed_stage_has_destination_key(self, aws_with_book, monkeypatch):
+    def test_processed_stage_has_destination_key(self, aws_with_book):
         s3, dynamodb, table = aws_with_book
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, dynamodb))
+        mod._processor = mod.RawToProcessedCopyProcessor(s3_client=s3, dynamodb_resource=dynamodb)
         mod.handler({"upload_id": "book-001"}, None)
         record = table.get_item(Key={"upload_id": "book-001"})["Item"]
         assert record["stages"]["processed"]["destinationKey"] == BOOK_KEY
 
-    def test_is_idempotent(self, aws_with_book, monkeypatch):
+    def test_is_idempotent(self, aws_with_book):
         """Running twice overwrites the processed file without error."""
         s3, dynamodb, _ = aws_with_book
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, dynamodb))
+        mod._processor = mod.RawToProcessedCopyProcessor(s3_client=s3, dynamodb_resource=dynamodb)
         mod.handler({"upload_id": "book-001"}, None)
         result = mod.handler({"upload_id": "book-001"}, None)
         assert result["upload_id"] == "book-001"
@@ -153,15 +153,17 @@ class TestHandlerSuccess:
 class TestHandlerErrors:
     """Test error handling."""
 
-    def test_missing_upload_id_raises(self, aws_credentials):
+    def test_missing_upload_id_raises(self, aws_with_book):
+        s3, dynamodb, _ = aws_with_book
         mod = _load_module()
+        mod._processor = mod.RawToProcessedCopyProcessor(s3_client=s3, dynamodb_resource=dynamodb)
         with pytest.raises(ValueError, match="upload_id is required"):
             mod.handler({}, None)
 
-    def test_unknown_upload_id_raises(self, aws_with_book, monkeypatch):
+    def test_unknown_upload_id_raises(self, aws_with_book):
         s3, dynamodb, _ = aws_with_book
         mod = _load_module()
-        monkeypatch.setattr(mod, "_get_clients", lambda: (s3, dynamodb))
+        mod._processor = mod.RawToProcessedCopyProcessor(s3_client=s3, dynamodb_resource=dynamodb)
         with pytest.raises(ValueError, match="No tracking record"):
             mod.handler({"upload_id": "nonexistent"}, None)
 
@@ -185,6 +187,8 @@ class TestHandlerErrors:
             )
             table.put_item(Item={"upload_id": "book-001", "stage": "queued", "stages": {}})
             mod = _load_module()
-            monkeypatch.setattr(mod, "_get_clients", lambda: (s3, dynamodb))
+            mod._processor = mod.RawToProcessedCopyProcessor(
+                s3_client=s3, dynamodb_resource=dynamodb
+            )
             with pytest.raises(ValueError, match="No completed ANALYSED stage"):
                 mod.handler({"upload_id": "book-001"}, None)

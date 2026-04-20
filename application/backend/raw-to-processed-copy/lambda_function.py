@@ -20,89 +20,70 @@ TRACKING_TABLE   DynamoDB table name for the ingestion tracker.
 LOG_LEVEL        Python log level (default: INFO).
 """
 
-import logging
 import os
 from typing import Any, Dict, Optional
 
 import boto3
-from common.tracker import BookshelfTracker, UploadStage
-
-logger = logging.getLogger(__name__)
-logger.setLevel(os.environ.get("LOG_LEVEL", "INFO"))
+from common.handler import BaseStepFunctionsProcessor
+from common.tracker import UploadStage
 
 
-def _get_clients() -> tuple:
-    s3 = boto3.client("s3")
-    dynamodb = boto3.resource("dynamodb")
-    return s3, dynamodb
+class RawToProcessedCopyProcessor(BaseStepFunctionsProcessor):
+    def __init__(self, s3_client=None, dynamodb_resource=None):
+        super().__init__(s3_client=s3_client, dynamodb_resource=dynamodb_resource)
+        self._raw_bucket: str = os.environ["RAW_BUCKET"]
+        self._processed_bucket: str = os.environ["PROCESSED_BUCKET"]
+
+    def _find_raw_key(self, record: dict) -> Optional[str]:
+        stages = record.get("stages") or {}
+        analysed = stages.get(UploadStage.ANALYSED.value) or {}
+        return analysed.get("destinationKey")
+
+    def process(self, upload_id: str, record: dict) -> Dict[str, Any]:
+        raw_key = self._find_raw_key(record)
+        if not raw_key:
+            raise ValueError(f"No completed ANALYSED stage found for upload_id={upload_id}")
+
+        self.tracker.start_stage(
+            upload_id=upload_id,
+            stage=UploadStage.PROCESSED,
+            source_bucket=self._raw_bucket,
+            source_key=raw_key,
+        )
+
+        response = self.s3_client.get_object(Bucket=self._raw_bucket, Key=raw_key)
+        body = response["Body"].read()
+
+        self.s3_client.put_object(
+            Bucket=self._processed_bucket,
+            Key=raw_key,
+            Body=body,
+            ContentType="application/json",
+        )
+        self.logger.info(
+            "Copied metadata s3://%s/%s → s3://%s/%s",
+            self._raw_bucket,
+            raw_key,
+            self._processed_bucket,
+            raw_key,
+        )
+
+        self.tracker.complete_stage(
+            user_id="system",
+            upload_id=upload_id,
+            stage=UploadStage.PROCESSED,
+            dest_bucket=self._processed_bucket,
+            dest_key=raw_key,
+        )
+
+        return {"upload_id": upload_id, "processed_key": raw_key}
 
 
-def _find_raw_key(record: dict) -> Optional[str]:
-    """Return the S3 key from the completed ANALYSED stage."""
-    stages = record.get("stages") or {}
-    analysed = stages.get(UploadStage.ANALYSED.value) or {}
-    return analysed.get("destinationKey")
+_processor = RawToProcessedCopyProcessor(
+    s3_client=boto3.client("s3"),
+    dynamodb_resource=boto3.resource("dynamodb"),
+)
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    """Step Functions entry point.
-
-    Args:
-        event: Must contain ``upload_id`` (str).
-        context: Lambda context (unused).
-
-    Returns:
-        Dict with ``upload_id`` and ``processed_key`` on success.
-
-    Raises:
-        ValueError: If upload_id is missing, no tracking record found, or no ANALYSED stage.
-    """
-    upload_id: str = event.get("upload_id", "")
-    if not upload_id:
-        raise ValueError("upload_id is required in event payload")
-
-    raw_bucket: str = os.environ["RAW_BUCKET"]
-    processed_bucket: str = os.environ["PROCESSED_BUCKET"]
-    tracking_table: str = os.environ["TRACKING_TABLE"]
-
-    s3, dynamodb = _get_clients()
-    tracker = BookshelfTracker(dynamodb_resource=dynamodb, table_name=tracking_table)
-
-    record = tracker.get_by_id(upload_id)
-    if not record:
-        raise ValueError(f"No tracking record found for upload_id={upload_id}")
-
-    raw_key = _find_raw_key(record)
-    if not raw_key:
-        raise ValueError(f"No completed ANALYSED stage found for upload_id={upload_id}")
-
-    tracker.start_stage(
-        upload_id=upload_id,
-        stage=UploadStage.PROCESSED,
-        source_bucket=raw_bucket,
-        source_key=raw_key,
-    )
-
-    # Copy metadata JSON from raw to processed at the same key path
-    response = s3.get_object(Bucket=raw_bucket, Key=raw_key)
-    body = response["Body"].read()
-
-    s3.put_object(
-        Bucket=processed_bucket,
-        Key=raw_key,
-        Body=body,
-        ContentType="application/json",
-    )
-    logger.info(
-        "Copied metadata s3://%s/%s → s3://%s/%s", raw_bucket, raw_key, processed_bucket, raw_key
-    )
-
-    tracker.complete_stage(
-        user_id="system",
-        upload_id=upload_id,
-        stage=UploadStage.PROCESSED,
-        dest_bucket=processed_bucket,
-        dest_key=raw_key,
-    )
-
-    return {"upload_id": upload_id, "processed_key": raw_key}
+    return _processor(event, context)
