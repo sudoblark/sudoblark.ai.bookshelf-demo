@@ -83,12 +83,15 @@ app.add_middleware(
 )
 
 _dynamodb = boto3.resource("dynamodb")
+_bedrock = boto3.client(
+    "bedrock-runtime", region_name=os.environ.get("BEDROCK_REGION", "eu-west-2")
+)
 
 _presigned = PresignedUrlHandler()
 _metadata = MetadataHandler()
-_accept = AcceptHandler(dynamodb_resource=_dynamodb)
+_accept = AcceptHandler(dynamodb_resource=_dynamodb, bedrock_client=_bedrock)
 _ops = OpsHandler()
-_bookshelf = BookshelfHandler()
+_bookshelf = BookshelfHandler(dynamodb_resource=_dynamodb)
 _ook = OokHandler()
 
 
@@ -135,6 +138,16 @@ async def bookshelf_catalogue(request: Request) -> JSONResponse:
 @app.get("/api/bookshelf/search")
 async def bookshelf_search(request: Request) -> JSONResponse:
     return await _bookshelf.handle_search(request)
+
+
+@app.get("/api/bookshelf/graph")
+async def bookshelf_graph(request: Request) -> JSONResponse:
+    return await _bookshelf.handle_similarity_graph(request)
+
+
+@app.get("/api/bookshelf/{file_id}/related")
+async def bookshelf_related(request: Request, file_id: str) -> JSONResponse:
+    return await _bookshelf.handle_related(request, file_id)
 
 
 @app.post("/api/ook/chat")
