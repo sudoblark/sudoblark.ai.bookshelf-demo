@@ -1,0 +1,90 @@
+.page {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+.header {
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 2px solid var(--color-steel);
+  background: linear-gradient(to right, rgba(184, 115, 51, 0.03), transparent);
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: var(--font-lg);
+  font-weight: 700;
+  color: var(--color-copper);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: var(--font-xs);
+  color: var(--color-text-muted);
+  margin: 4px 0 0 0;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-steel);
+  flex-shrink: 0;
+}
+
+.sliderLabel {
+  font-size: var(--font-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+}
+
+.sliderLabel strong {
+  color: var(--color-copper);
+}
+
+.slider {
+  width: 200px;
+  accent-color: var(--color-copper);
+  cursor: pointer;
+}
+
+.graphArea {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  padding: var(--spacing-lg);
+}
+
+.svg {
+  max-width: 100%;
+  max-height: 100%;
+  width: 500px;
+  height: 500px;
+}
+
+.nodeLabel {
+  font-size: 11px;
+  fill: var(--color-text-primary);
+  font-family: inherit;
+}
+
+.nodeAuthor {
+  font-size: 10px;
+  fill: var(--color-text-muted);
+  font-family: inherit;
+}
+
+.status {
+  color: var(--color-text-muted);
+  font-size: var(--font-sm);
+}
+
+.statusError {
+  color: var(--color-warning);
+  font-size: var(--font-sm);
+}

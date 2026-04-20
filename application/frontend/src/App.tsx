@@ -4,9 +4,10 @@ import { MetadataPage } from "./components/MetadataPage";
 import { OokChatPage } from "./components/OokChatPage";
 import { OpsPage } from "./components/OpsPage";
 import { Shell } from "./components/Shell";
+import { SimilarityGraph } from "./components/SimilarityGraph";
 import { UploadPage } from "./components/UploadPage";
 
-type TabId = "bookshelf" | "new-book" | "ook-chat" | "ops";
+type TabId = "bookshelf" | "new-book" | "ook-chat" | "ops" | "graph";
 
 interface UploadContext {
   sessionId: string;
@@ -60,6 +61,8 @@ export default function App() {
         return <OokChatPage />;
       case "ops":
         return <OpsPage onNavigateToNewBook={handleNavigateToNewBook} />;
+      case "graph":
+        return <SimilarityGraph />;
     }
   }
 
