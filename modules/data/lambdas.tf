@@ -42,15 +42,58 @@ locals {
   # Define Lambda functions
   lambdas = [
     {
-      name          = "embedding-generator"
-      description   = "Generates Titan text embeddings for accepted book metadata"
-      zip_file_path = "./lambda-packages/embedding-generator.zip"
+      name          = "raw-to-processed-copy"
+      description   = "Copies accepted metadata JSON from raw bucket to processed bucket"
+      zip_file_path = "./lambda-packages/raw-to-processed-copy.zip"
+      handler       = "lambda_function.handler"
+      timeout       = 30
+      memory_size   = 256
+      environment_variables = {
+        TRACKING_TABLE   = lower("${var.account}-${var.project}-${var.application}-ingestion-tracking")
+        RAW_BUCKET       = lower("${var.account}-${var.project}-${var.application}-raw")
+        PROCESSED_BUCKET = lower("${var.account}-${var.project}-${var.application}-processed")
+        LOG_LEVEL        = "INFO"
+      }
+      iam_policy_statements = [
+        {
+          sid     = "S3ReadRaw"
+          effect  = "Allow"
+          actions = ["s3:GetObject"]
+          resources = [
+            "arn:aws:s3:::${lower("${var.account}-${var.project}-${var.application}-raw")}/*"
+          ]
+        },
+        {
+          sid     = "S3WriteProcessed"
+          effect  = "Allow"
+          actions = ["s3:PutObject"]
+          resources = [
+            "arn:aws:s3:::${lower("${var.account}-${var.project}-${var.application}-processed")}/*"
+          ]
+        },
+        {
+          sid    = "DynamoDBTracking"
+          effect = "Allow"
+          actions = [
+            "dynamodb:GetItem",
+            "dynamodb:UpdateItem",
+          ]
+          resources = [
+            "arn:aws:dynamodb:*:*:table/${lower("${var.account}-${var.project}-${var.application}-ingestion-tracking")}"
+          ]
+        },
+      ]
+    },
+    {
+      name          = "vector-generator"
+      description   = "Generates Bedrock Titan text embeddings for processed book metadata"
+      zip_file_path = "./lambda-packages/vector-generator.zip"
       handler       = "lambda_function.handler"
       timeout       = 60
       memory_size   = 512
       environment_variables = {
         TRACKING_TABLE     = lower("${var.account}-${var.project}-${var.application}-ingestion-tracking")
-        RAW_BUCKET         = lower("${var.account}-${var.project}-${var.application}-raw")
+        PROCESSED_BUCKET   = lower("${var.account}-${var.project}-${var.application}-processed")
         EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v1"
         BEDROCK_REGION     = "eu-west-2"
         LOG_LEVEL          = "INFO"
@@ -65,11 +108,11 @@ locals {
           ]
         },
         {
-          sid     = "S3ReadWriteRaw"
+          sid     = "S3ReadWriteProcessed"
           effect  = "Allow"
           actions = ["s3:GetObject", "s3:PutObject"]
           resources = [
-            "arn:aws:s3:::${lower("${var.account}-${var.project}-${var.application}-raw")}/*"
+            "arn:aws:s3:::${lower("${var.account}-${var.project}-${var.application}-processed")}/*"
           ]
         },
         {
