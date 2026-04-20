@@ -1,7 +1,7 @@
 """Handler for bookshelf display endpoints.
 
-Queries the S3 raw bucket (Hive-partitioned JSON) to serve bookshelf data.
-See docs/adr/0001-bookshelf-storage-s3-query.md for architectural rationale.
+Queries the DynamoDB tracking table as the single source of truth for book records.
+See docs/adr/0005-upload-pipeline-stages.md for architectural rationale.
 
 Endpoints
 ---------
@@ -56,47 +56,68 @@ class BookshelfHandler:
     ) -> None:
         self._s3 = s3_client or boto3.client("s3")
         self._raw_bucket = os.environ["RAW_BUCKET"]
+        self._processed_bucket = os.environ.get("PROCESSED_BUCKET", "")
         self._tracker = BookshelfTracker(
             dynamodb_resource=dynamodb_resource,
             table_name=os.environ.get("TRACKING_TABLE", ""),
         )
 
     def _list_all_books(self) -> List[Dict]:
-        """Query S3 raw bucket and parse all book JSON files.
+        """Return all books with a completed analysed stage, using DynamoDB as source of truth.
+
+        Fetches tracking records with an analysed stage entry, then reads the
+        metadata JSON from S3. Prefers the processed bucket key if available,
+        falls back to the raw bucket key for records that have not yet been copied.
 
         Returns:
             List of book dicts, each with 'book_id' and 's3_key' added.
         """
         books = []
         try:
-            paginator = self._s3.get_paginator("list_objects_v2")
-            for page in paginator.paginate(Bucket=self._raw_bucket):
-                for obj in page.get("Contents", []):
-                    key = obj["Key"]
-                    if key.endswith(".json") and not key.endswith(".embedding.json"):
-                        try:
-                            response = self._s3.get_object(Bucket=self._raw_bucket, Key=key)
-                            data = json.loads(response["Body"].read())
-                            # Add book_id and s3_key for response
-                            data["s3_key"] = key
-                            data["book_id"] = data.get(
-                                "upload_id", key.split("/")[-1].replace(".json", "")
-                            )
-                            books.append(data)
-                        except Exception as e:
-                            logger.warning("Failed to parse S3 object %s: %s", key, e)
+            records = self._tracker.list_all()
         except Exception as e:
-            logger.exception("Error listing books from S3: %s", e)
+            logger.exception("Error reading tracking table for books: %s", e)
             raise
+
+        for record in records:
+            upload_id = record.get("upload_id", "")
+            if not upload_id:
+                continue
+
+            stages = record.get("stages") or {}
+            analysed = stages.get(UploadStage.ANALYSED.value) or {}
+            if not analysed:
+                continue
+
+            # Prefer processed key; fall back to raw if not yet copied
+            processed = stages.get(UploadStage.PROCESSED.value) or {}
+            if processed.get("destinationKey") and self._processed_bucket:
+                bucket = self._processed_bucket
+                key = processed["destinationKey"]
+            else:
+                bucket = analysed.get("destinationBucket") or self._raw_bucket
+                key = analysed.get("destinationKey", "")
+
+            if not key:
+                continue
+
+            try:
+                response = self._s3.get_object(Bucket=bucket, Key=key)
+                data = json.loads(response["Body"].read())
+                data["s3_key"] = key
+                data["book_id"] = data.get("upload_id", upload_id)
+                books.append(data)
+            except Exception as e:
+                logger.warning("Failed to fetch book metadata %s/%s: %s", bucket, key, e)
 
         return books
 
     def _list_all_embeddings(self) -> Dict[str, List[float]]:
-        """Fetch embeddings for all analysed uploads via the tracking table.
+        """Fetch embeddings for all uploads with a completed embedding stage.
 
-        Uses the tracker to find records with a completed ANALYSED stage, derives
-        the embedding S3 key from the stored metadata key, and fetches each object
-        directly — no bucket scan needed.
+        Uses the tracker to find records with a completed EMBEDDING stage, then
+        fetches each embedding file directly using the stored destinationBucket
+        and destinationKey — no bucket scan needed.
         """
         embeddings: Dict[str, List[float]] = {}
         try:
@@ -110,22 +131,21 @@ class BookshelfHandler:
             if not upload_id:
                 continue
 
-            # Look up the ANALYSED stage entry to get the metadata S3 key.
             stages = record.get("stages") or {}
-            analysed = stages.get(UploadStage.ANALYSED.value) or {}
-            metadata_key = analysed.get("destinationKey")
+            embedding_stage = stages.get(UploadStage.EMBEDDING.value) or {}
+            embedding_key = embedding_stage.get("destinationKey")
+            embedding_bucket = embedding_stage.get("destinationBucket") or self._processed_bucket
 
-            if not metadata_key:
+            if not embedding_key:
                 continue
 
-            embedding_key = metadata_key.replace(".json", ".embedding.json")
             try:
-                response = self._s3.get_object(Bucket=self._raw_bucket, Key=embedding_key)
+                response = self._s3.get_object(Bucket=embedding_bucket, Key=embedding_key)
                 data = json.loads(response["Body"].read())
                 if "embedding" in data:
                     embeddings[upload_id] = data["embedding"]
             except Exception as e:
-                logger.debug("No embedding at %s: %s", embedding_key, e)
+                logger.debug("No embedding at %s/%s: %s", embedding_bucket, embedding_key, e)
 
         return embeddings
 

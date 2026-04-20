@@ -16,27 +16,27 @@ sys.path.insert(
 )
 
 RAW_BUCKET = "test-raw-related"
-TRACKING_TABLE = "test-tracking"
+TRACKING_TABLE = "test-tracking-related"
 
 # Three books: book-001 and book-002 share a near-identical vector; book-003 is orthogonal.
 SAMPLE_BOOKS = [
     {
         "upload_id": "book-001",
-        "title": "The Way of Kings",
-        "author": "Brandon Sanderson",
-        "published_year": 2010,
+        "title": "Guards! Guards!",
+        "author": "Terry Pratchett",
+        "published_year": 1989,
     },
     {
         "upload_id": "book-002",
-        "title": "Words of Radiance",
-        "author": "Brandon Sanderson",
-        "published_year": 2014,
+        "title": "Men at Arms",
+        "author": "Terry Pratchett",
+        "published_year": 1993,
     },
     {
         "upload_id": "book-003",
-        "title": "The Name of the Wind",
-        "author": "Patrick Rothfuss",
-        "published_year": 2007,
+        "title": "American Gods",
+        "author": "Neil Gaiman",
+        "published_year": 2001,
     },
 ]
 
@@ -83,9 +83,9 @@ def aws_with_books_and_embeddings(aws_credentials, monkeypatch):
 
         for book in SAMPLE_BOOKS:
             key = _book_key(book)
-            s3.put_object(Bucket=RAW_BUCKET, Key=key, Body=json.dumps(book).encode())
-
             emb_key = key.replace(".json", ".embedding.json")
+
+            s3.put_object(Bucket=RAW_BUCKET, Key=key, Body=json.dumps(book).encode())
             s3.put_object(
                 Bucket=RAW_BUCKET,
                 Key=emb_key,
@@ -94,11 +94,11 @@ def aws_with_books_and_embeddings(aws_credentials, monkeypatch):
                 ).encode(),
             )
 
-            # Seed a tracking record with a completed ANALYSED stage.
+            # Seed tracking record with analysed + embedding stages.
             table.put_item(
                 Item={
                     "upload_id": book["upload_id"],
-                    "stage": "analysed",
+                    "stage": "embedding",
                     "stages": {
                         "analysed": {
                             "startedAt": "2024-01-01T00:00:00+00:00",
@@ -107,7 +107,15 @@ def aws_with_books_and_embeddings(aws_credentials, monkeypatch):
                             "sourceKey": key,
                             "destinationBucket": RAW_BUCKET,
                             "destinationKey": key,
-                        }
+                        },
+                        "embedding": {
+                            "startedAt": "2024-01-01T00:00:02+00:00",
+                            "endedAt": "2024-01-01T00:00:03+00:00",
+                            "sourceBucket": RAW_BUCKET,
+                            "sourceKey": key,
+                            "destinationBucket": RAW_BUCKET,
+                            "destinationKey": emb_key,
+                        },
                     },
                 }
             )
@@ -181,8 +189,10 @@ class TestHandleRelated:
         assert data["related"] == []
 
     @pytest.mark.asyncio
-    async def test_book_without_embedding_returns_empty_list(self, aws_credentials, monkeypatch):
-        """A book tracked as SUCCESS but with no embedding key in S3 returns empty related."""
+    async def test_book_without_embedding_stage_returns_empty_list(
+        self, aws_credentials, monkeypatch
+    ):
+        """A book tracked as analysed but with no embedding stage returns empty related."""
         monkeypatch.setenv("RAW_BUCKET", RAW_BUCKET)
         monkeypatch.setenv("TRACKING_TABLE", TRACKING_TABLE)
         with mock_aws():
@@ -202,6 +212,7 @@ class TestHandleRelated:
                 AttributeDefinitions=[{"AttributeName": "upload_id", "AttributeType": "S"}],
                 BillingMode="PAY_PER_REQUEST",
             )
+            # Analysed stage only — no embedding stage
             table.put_item(
                 Item={
                     "upload_id": book["upload_id"],
@@ -228,7 +239,7 @@ class TestHandleRelated:
 
     @pytest.mark.asyncio
     async def test_no_other_embeddings_returns_empty_list(self, aws_credentials, monkeypatch):
-        """When only the target has an embedding, related is empty."""
+        """When only the target has an embedding stage, related is empty."""
         monkeypatch.setenv("RAW_BUCKET", RAW_BUCKET)
         monkeypatch.setenv("TRACKING_TABLE", TRACKING_TABLE)
         with mock_aws():
@@ -239,8 +250,8 @@ class TestHandleRelated:
             )
             book = SAMPLE_BOOKS[0]
             key = _book_key(book)
-            s3.put_object(Bucket=RAW_BUCKET, Key=key, Body=json.dumps(book).encode())
             emb_key = key.replace(".json", ".embedding.json")
+            s3.put_object(Bucket=RAW_BUCKET, Key=key, Body=json.dumps(book).encode())
             s3.put_object(
                 Bucket=RAW_BUCKET,
                 Key=emb_key,
@@ -257,7 +268,7 @@ class TestHandleRelated:
             table.put_item(
                 Item={
                     "upload_id": "book-001",
-                    "stage": "analysed",
+                    "stage": "embedding",
                     "stages": {
                         "analysed": {
                             "startedAt": "2024-01-01T00:00:00+00:00",
@@ -266,7 +277,15 @@ class TestHandleRelated:
                             "sourceKey": key,
                             "destinationBucket": RAW_BUCKET,
                             "destinationKey": key,
-                        }
+                        },
+                        "embedding": {
+                            "startedAt": "2024-01-01T00:00:02+00:00",
+                            "endedAt": "2024-01-01T00:00:03+00:00",
+                            "sourceBucket": RAW_BUCKET,
+                            "sourceKey": key,
+                            "destinationBucket": RAW_BUCKET,
+                            "destinationKey": emb_key,
+                        },
                     },
                 }
             )

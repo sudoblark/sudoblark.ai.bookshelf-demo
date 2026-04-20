@@ -1,14 +1,14 @@
-"""Lambda handler for embedding generation.
+"""Lambda handler for generating Bedrock Titan text embeddings.
 
-Invoked by the embedding Step Functions state machine with:
+Invoked by the enrichment Step Functions state machine with:
     {"upload_id": "<uuid>"}
 
 Steps
 -----
-1. Read the tracking record to find the ANALYSED stage destination S3 key.
-2. Fetch the metadata JSON from S3.
+1. Read the tracking record to find the PROCESSED stage destination S3 key.
+2. Fetch the metadata JSON from the processed bucket.
 3. Call Bedrock Titan to generate a text embedding.
-4. Write the embedding as ``<metadata_key>.embedding.json`` in the raw bucket.
+4. Write the embedding as ``<metadata_key>.embedding.json`` in the processed bucket.
 5. Record an EMBEDDING stage entry in the tracking table (start + complete).
 
 The handler is idempotent — re-running for the same upload_id will overwrite
@@ -16,11 +16,11 @@ the existing embedding file.
 
 Environment variables
 ---------------------
-RAW_BUCKET             S3 bucket holding metadata and embedding JSON files.
-TRACKING_TABLE         DynamoDB table name for the ingestion tracker.
-EMBEDDING_MODEL_ID     Bedrock model ID (default: amazon.titan-embed-text-v1).
-BEDROCK_REGION         AWS region for Bedrock calls (default: eu-west-2).
-LOG_LEVEL              Python log level (default: INFO).
+PROCESSED_BUCKET   S3 bucket holding processed metadata and embedding JSON files.
+TRACKING_TABLE     DynamoDB table name for the ingestion tracker.
+EMBEDDING_MODEL_ID Bedrock model ID (default: amazon.titan-embed-text-v1).
+BEDROCK_REGION     AWS region for Bedrock calls (default: eu-west-2).
+LOG_LEVEL          Python log level (default: INFO).
 """
 
 import json
@@ -45,11 +45,11 @@ def _get_clients() -> tuple:
     return s3, bedrock, dynamodb
 
 
-def _find_metadata_key(record: dict) -> Optional[str]:
-    """Return the S3 key from the completed ANALYSED stage."""
+def _find_processed_key(record: dict) -> Optional[str]:
+    """Return the S3 key from the completed PROCESSED stage."""
     stages = record.get("stages") or {}
-    analysed = stages.get(UploadStage.ANALYSED.value) or {}
-    return analysed.get("destinationKey")
+    processed = stages.get(UploadStage.PROCESSED.value) or {}
+    return processed.get("destinationKey")
 
 
 def _generate_embedding(
@@ -88,7 +88,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     if not upload_id:
         raise ValueError("upload_id is required in event payload")
 
-    raw_bucket: str = os.environ["RAW_BUCKET"]
+    processed_bucket: str = os.environ["PROCESSED_BUCKET"]
     tracking_table: str = os.environ["TRACKING_TABLE"]
     model_id: str = os.environ.get("EMBEDDING_MODEL_ID", "amazon.titan-embed-text-v1")
 
@@ -99,12 +99,12 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     if not record:
         raise ValueError(f"No tracking record found for upload_id={upload_id}")
 
-    metadata_key = _find_metadata_key(record)
-    if not metadata_key:
-        raise ValueError(f"No completed ANALYSED stage found for upload_id={upload_id}")
+    processed_key = _find_processed_key(record)
+    if not processed_key:
+        raise ValueError(f"No completed PROCESSED stage found for upload_id={upload_id}")
 
     # Fetch the metadata JSON to build embedding text
-    response = s3.get_object(Bucket=raw_bucket, Key=metadata_key)
+    response = s3.get_object(Bucket=processed_bucket, Key=processed_key)
     metadata = json.loads(response["Body"].read())
 
     embedding_text = str(
@@ -116,8 +116,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
     tracker.start_stage(
         upload_id=upload_id,
         stage=UploadStage.EMBEDDING,
-        source_bucket=raw_bucket,
-        source_key=metadata_key,
+        source_bucket=processed_bucket,
+        source_key=processed_key,
     )
 
     embedding = _generate_embedding(bedrock, model_id, embedding_text)
@@ -130,20 +130,20 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         )
         raise RuntimeError(f"Embedding generation failed for upload_id={upload_id}")
 
-    embedding_key = metadata_key.replace(".json", ".embedding.json")
+    embedding_key = processed_key.replace(".json", ".embedding.json")
     s3.put_object(
-        Bucket=raw_bucket,
+        Bucket=processed_bucket,
         Key=embedding_key,
         Body=json.dumps({"upload_id": upload_id, "embedding": embedding}).encode("utf-8"),
         ContentType="application/json",
     )
-    logger.info("Saved embedding to s3://%s/%s", raw_bucket, embedding_key)
+    logger.info("Saved embedding to s3://%s/%s", processed_bucket, embedding_key)
 
     tracker.complete_stage(
         user_id="system",
         upload_id=upload_id,
         stage=UploadStage.EMBEDDING,
-        dest_bucket=raw_bucket,
+        dest_bucket=processed_bucket,
         dest_key=embedding_key,
     )
 

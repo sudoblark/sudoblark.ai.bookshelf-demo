@@ -80,6 +80,10 @@ jobs:
             path: application/backend/common
           - lambda: streaming-agent
             path: application/backend/streaming-agent
+          - lambda: raw-to-processed-copy
+            path: application/backend/raw-to-processed-copy
+          - lambda: vector-generator
+            path: application/backend/vector-generator
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -133,10 +137,16 @@ jobs:
         include:
           - lambda: common
             path: application/backend/common
-            test_files: tests/test_common.py tests/test_tracker.py
+            test_files: tests/backend/common/
           - lambda: streaming-agent
             path: application/backend/streaming-agent
             test_files: tests/backend/streaming-agent/
+          - lambda: raw-to-processed-copy
+            path: application/backend/raw-to-processed-copy
+            test_files: tests/backend/raw-to-processed-copy/
+          - lambda: vector-generator
+            path: application/backend/vector-generator
+            test_files: tests/backend/vector-generator/
     steps:
       - name: Checkout
         uses: actions/checkout@v4
