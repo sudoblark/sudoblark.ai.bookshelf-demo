@@ -327,3 +327,72 @@
   font-size: var(--font-sm);
   white-space: nowrap;
 }
+
+/* ---- Related Books Panel ---- */
+.relatedButton {
+  width: 100%;
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-steel);
+  color: var(--color-text-primary);
+  border: none;
+  border-radius: 4px;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.relatedButton:hover {
+  background: #5a6578;
+}
+
+.relatedSection {
+  margin-top: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  background: rgba(184, 115, 51, 0.05);
+  border-radius: 4px;
+  border: 1px solid var(--color-steel);
+}
+
+.relatedLoading,
+.relatedEmpty {
+  text-align: center;
+  font-size: var(--font-xs);
+  color: var(--color-text-muted);
+  padding: var(--spacing-xs);
+}
+
+.relatedList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.relatedItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--spacing-xs);
+  background: var(--bg-secondary);
+  border-radius: 2px;
+  border-left: 2px solid var(--color-copper);
+}
+
+.relatedTitle {
+  font-size: var(--font-xs);
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+
+.relatedAuthor {
+  font-size: var(--font-xs);
+  color: var(--color-text-muted);
+}
+
+.relatedScore {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-copper);
+  margin-top: 2px;
+}

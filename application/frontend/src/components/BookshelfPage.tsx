@@ -3,8 +3,9 @@ import {
   getBookshelfOverview,
   getBookshelfCatalogue,
   searchBookshelf,
+  getRelatedBooks,
 } from "../api";
-import { Book, BookshelfOverview, CatalogueResponse, SearchResponse } from "../types";
+import { Book, BookshelfOverview, CatalogueResponse, RelatedBook, SearchResponse } from "../types";
 import styles from "./BookshelfPage.module.css";
 
 interface Props {
@@ -20,6 +21,9 @@ export function BookshelfPage({ onNavigateToNewBook }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const [expandedBookId, setExpandedBookId] = useState<string | null>(null);
+  const [relatedBooks, setRelatedBooks] = useState<Record<string, RelatedBook[]>>({});
+  const [loadingRelated, setLoadingRelated] = useState<string | null>(null);
 
   // Fetch overview on mount
   useEffect(() => {
@@ -77,6 +81,24 @@ export function BookshelfPage({ onNavigateToNewBook }: Props) {
       setError(err instanceof Error ? err.message : "Search failed");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleToggleRelated(bookId: string) {
+    if (expandedBookId === bookId) {
+      setExpandedBookId(null);
+      return;
+    }
+    setExpandedBookId(bookId);
+    if (relatedBooks[bookId] !== undefined) return;
+    setLoadingRelated(bookId);
+    try {
+      const data = await getRelatedBooks(bookId);
+      setRelatedBooks((prev) => ({ ...prev, [bookId]: data.related }));
+    } catch {
+      setRelatedBooks((prev) => ({ ...prev, [bookId]: [] }));
+    } finally {
+      setLoadingRelated(null);
     }
   }
 
@@ -177,6 +199,31 @@ export function BookshelfPage({ onNavigateToNewBook }: Props) {
                 {book.confidence !== null && (
                   <div className={styles.confidenceBadge}>
                     {Math.round(book.confidence * 100)}%
+                  </div>
+                )}
+                <button
+                  className={styles.relatedButton}
+                  onClick={() => handleToggleRelated(book.book_id)}
+                >
+                  {expandedBookId === book.book_id ? "Hide Related" : "Related"}
+                </button>
+                {expandedBookId === book.book_id && (
+                  <div className={styles.relatedSection}>
+                    {loadingRelated === book.book_id ? (
+                      <div className={styles.relatedLoading}>Loading...</div>
+                    ) : (relatedBooks[book.book_id] ?? []).length > 0 ? (
+                      <div className={styles.relatedList}>
+                        {(relatedBooks[book.book_id] ?? []).map((r) => (
+                          <div key={r.file_id} className={styles.relatedItem}>
+                            <span className={styles.relatedTitle}>{r.title}</span>
+                            <span className={styles.relatedAuthor}>{r.author}</span>
+                            <span className={styles.relatedScore}>{Math.round(r.similarity * 100)}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className={styles.relatedEmpty}>No related books found</div>
+                    )}
                   </div>
                 )}
               </div>

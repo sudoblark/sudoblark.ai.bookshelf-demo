@@ -288,9 +288,6 @@ class BookshelfHandler:
         """GET /bookshelf/{file_id}/related — Return top-N similar books."""
         try:
             limit = min(int(request.query_params.get("limit", 5)), 20)
-            all_embeddings = self._list_all_embeddings()
-            if file_id not in all_embeddings:
-                return _error(f"No embedding found for file_id={file_id}")
             related = self._compute_related(file_id, limit)
             return _ok({"file_id": file_id, "related": related})
         except Exception as exc:

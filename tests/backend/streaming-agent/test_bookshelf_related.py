@@ -171,13 +171,15 @@ class TestHandleRelated:
             assert -1.0 <= book["similarity"] <= 1.0
 
     @pytest.mark.asyncio
-    async def test_unknown_file_id_returns_error(self, handler):
+    async def test_unknown_file_id_returns_empty_list(self, handler):
         resp = await handler.handle_related(_make_request(), "book-999")
-        assert resp.status_code == 500
+        assert resp.status_code == 200
+        data = json.loads(resp.body)
+        assert data["related"] == []
 
     @pytest.mark.asyncio
-    async def test_book_without_embedding_returns_error(self, aws_credentials, monkeypatch):
-        """A book tracked as SUCCESS but with no embedding key in S3 returns an error."""
+    async def test_book_without_embedding_returns_empty_list(self, aws_credentials, monkeypatch):
+        """A book tracked as SUCCESS but with no embedding key in S3 returns empty related."""
         monkeypatch.setenv("RAW_BUCKET", RAW_BUCKET)
         monkeypatch.setenv("TRACKING_TABLE", TRACKING_TABLE)
         with mock_aws():
@@ -214,7 +216,9 @@ class TestHandleRelated:
             mod = importlib.import_module("bookshelf_handler")
             h = mod.BookshelfHandler(s3_client=s3, dynamodb_resource=dynamodb)
             resp = await h.handle_related(_make_request(), "book-001")
-            assert resp.status_code == 500
+            assert resp.status_code == 200
+            data = json.loads(resp.body)
+            assert data["related"] == []
 
     @pytest.mark.asyncio
     async def test_no_other_embeddings_returns_empty_list(self, aws_credentials, monkeypatch):
