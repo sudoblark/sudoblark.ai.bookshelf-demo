@@ -209,6 +209,9 @@ dev_scratchpad/*
 lambda-packages/*.zip
 lambda-packages/**/*.zip
 
+# Symlink used for local Terraform runs
+infrastructure/aws-sudoblark-development/lambda-packages
+
 # Book cover image ZIPs for demo/testing
 *.zip
 books.zip
