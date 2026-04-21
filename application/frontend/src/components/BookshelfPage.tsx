@@ -10,9 +10,10 @@ import styles from "./BookshelfPage.module.css";
 
 interface Props {
   onNavigateToNewBook: () => void;
+  onViewGraph?: (bookId: string) => void;
 }
 
-export function BookshelfPage({ onNavigateToNewBook }: Props) {
+export function BookshelfPage({ onNavigateToNewBook, onViewGraph }: Props) {
   const [overview, setOverview] = useState<BookshelfOverview | null>(null);
   const [books, setBooks] = useState<Book[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -201,12 +202,22 @@ export function BookshelfPage({ onNavigateToNewBook }: Props) {
                     {Math.round(book.confidence * 100)}%
                   </div>
                 )}
-                <button
-                  className={styles.relatedButton}
-                  onClick={() => handleToggleRelated(book.book_id)}
-                >
-                  {expandedBookId === book.book_id ? "Hide Related" : "Related"}
-                </button>
+                <div className={styles.cardActions}>
+                  <button
+                    className={styles.relatedButton}
+                    onClick={() => handleToggleRelated(book.book_id)}
+                  >
+                    {expandedBookId === book.book_id ? "Hide Related" : "Related"}
+                  </button>
+                  {onViewGraph && (
+                    <button
+                      className={styles.graphButton}
+                      onClick={() => onViewGraph(book.book_id)}
+                    >
+                      Graph
+                    </button>
+                  )}
+                </div>
                 {expandedBookId === book.book_id && (
                   <div className={styles.relatedSection}>
                     {loadingRelated === book.book_id ? (

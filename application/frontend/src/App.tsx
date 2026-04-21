@@ -19,6 +19,7 @@ interface UploadContext {
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>("bookshelf");
   const [uploadCtx, setUploadCtx] = useState<UploadContext | null>(null);
+  const [graphFocusId, setGraphFocusId] = useState<string | null>(null);
 
   function handleUploadComplete(sessionId: string, bucket: string, key: string, filename: string) {
     setUploadCtx({ sessionId, bucket, key, filename });
@@ -44,7 +45,12 @@ export default function App() {
   function renderContent() {
     switch (activeTab) {
       case "bookshelf":
-        return <BookshelfPage onNavigateToNewBook={handleNavigateToNewBook} />;
+        return (
+          <BookshelfPage
+            onNavigateToNewBook={handleNavigateToNewBook}
+            onViewGraph={(bookId) => { setGraphFocusId(bookId); setActiveTab("graph"); }}
+          />
+        );
       case "new-book":
         return uploadCtx ? (
           <MetadataPage
@@ -62,7 +68,7 @@ export default function App() {
       case "ops":
         return <OpsPage onNavigateToNewBook={handleNavigateToNewBook} />;
       case "graph":
-        return <SimilarityGraph />;
+        return <SimilarityGraph focusBookId={graphFocusId} onClearFocus={() => setGraphFocusId(null)} />;
     }
   }
 

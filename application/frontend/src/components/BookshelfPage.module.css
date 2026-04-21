@@ -329,9 +329,14 @@
 }
 
 /* ---- Related Books Panel ---- */
-.relatedButton {
-  width: 100%;
+.cardActions {
+  display: flex;
+  gap: var(--spacing-xs);
   margin-top: var(--spacing-sm);
+}
+
+.relatedButton {
+  flex: 1;
   padding: var(--spacing-xs) var(--spacing-sm);
   background: var(--color-steel);
   color: var(--color-text-primary);
@@ -345,6 +350,24 @@
 
 .relatedButton:hover {
   background: #5a6578;
+}
+
+.graphButton {
+  flex: 1;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: transparent;
+  color: var(--color-copper);
+  border: 1px solid var(--color-copper);
+  border-radius: 4px;
+  font-size: var(--font-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.graphButton:hover {
+  background: var(--color-copper);
+  color: var(--bg-primary);
 }
 
 .relatedSection {
