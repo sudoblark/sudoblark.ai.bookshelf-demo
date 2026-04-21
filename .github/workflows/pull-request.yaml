@@ -253,6 +253,9 @@ jobs:
           role-to-assume: arn:aws:iam::741139166799:role/service-accounts/aws-sudoblark-management-github-cicd-role
           aws-region: eu-west-2
 
+      - name: Build Lambda packages
+        run: ./scripts/build_lambdas.sh
+
       - name: terraform plan
         uses: dflook/terraform-plan@v2
         env:
