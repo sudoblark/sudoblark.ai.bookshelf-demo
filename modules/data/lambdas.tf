@@ -95,7 +95,7 @@ locals {
         TRACKING_TABLE     = lower("${var.account}-${var.project}-${var.application}-ingestion-tracking")
         PROCESSED_BUCKET   = lower("${var.account}-${var.project}-${var.application}-processed")
         EMBEDDING_MODEL_ID = "amazon.titan-embed-text-v1"
-        BEDROCK_REGION     = "eu-west-2"
+        BEDROCK_REGION     = "us-east-1"
         LOG_LEVEL          = "INFO"
       }
       iam_policy_statements = [
@@ -104,7 +104,7 @@ locals {
           effect  = "Allow"
           actions = ["bedrock:InvokeModel"]
           resources = [
-            "arn:aws:bedrock:eu-west-2::foundation-model/amazon.titan-embed-text-v1"
+            "arn:aws:bedrock:us-east-1::foundation-model/amazon.titan-embed-text-v1"
           ]
         },
         {

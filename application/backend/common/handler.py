@@ -52,7 +52,6 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, List
 
 import boto3
-from aws_lambda_powertools.utilities.data_classes import S3Event
 from common.data_lake import BookshelfDataLake
 from common.response import build_response
 from common.s3 import validate_key
@@ -95,6 +94,8 @@ class BaseDataProcessor(ABC):
 
     def __call__(self, event: Dict[str, Any], context: Any) -> Dict[str, Any]:
         """Handle an S3 event by processing each record and returning a batch response."""
+        from aws_lambda_powertools.utilities.data_classes import S3Event
+
         s3_event = S3Event(event)
         self.logger.info("Received S3 event for processing")
 

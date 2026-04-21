@@ -57,7 +57,7 @@ class VectorGeneratorProcessor(BaseStepFunctionsProcessor):
             )
             return json.loads(response["body"].read())["embedding"]
         except Exception:
-            self.logger.warning("Failed to generate embedding for text: %s...", text[:50])
+            self.logger.exception("Failed to generate embedding for text: %s...", text[:50])
             return None
 
     def process(self, upload_id: str, record: dict) -> Dict[str, Any]:
