@@ -25,7 +25,7 @@ LOG_LEVEL          Python log level (default: INFO).
 
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 import boto3
 from common.handler import BaseStepFunctionsProcessor
@@ -55,7 +55,7 @@ class VectorGeneratorProcessor(BaseStepFunctionsProcessor):
                 contentType="application/json",
                 accept="application/json",
             )
-            return json.loads(response["body"].read())["embedding"]
+            return cast(List[float], json.loads(response["body"].read())["embedding"])
         except Exception:
             self.logger.exception("Failed to generate embedding for text: %s...", text[:50])
             return None
@@ -117,4 +117,4 @@ _processor = VectorGeneratorProcessor(
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    return _processor(event, context)
+    return cast(Dict[str, Any], _processor(event, context))

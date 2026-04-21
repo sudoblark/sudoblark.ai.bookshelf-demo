@@ -21,7 +21,7 @@ LOG_LEVEL        Python log level (default: INFO).
 """
 
 import os
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 import boto3
 from common.handler import BaseStepFunctionsProcessor
@@ -86,4 +86,4 @@ _processor = RawToProcessedCopyProcessor(
 
 
 def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-    return _processor(event, context)
+    return cast(Dict[str, Any], _processor(event, context))
