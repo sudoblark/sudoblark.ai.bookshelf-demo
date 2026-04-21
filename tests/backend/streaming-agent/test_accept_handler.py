@@ -470,3 +470,92 @@ class TestAcceptHandlerMetadataHandling:
         # Verify it serialized successfully
         body = json.loads(resp.body.decode())
         assert body["status"] == "accepted"
+
+
+class TestStateMachineTrigger:
+    """Test enrichment state machine trigger during metadata accept."""
+
+    @pytest.fixture
+    def mock_sfn_client(self):
+        return MagicMock()
+
+    @pytest.fixture
+    def accept_handler_with_sfn(self, monkeypatch, mock_s3_client, mock_sfn_client):
+        monkeypatch.setenv("RAW_BUCKET", "test-raw-bucket")
+        monkeypatch.setenv(
+            "ENRICHMENT_STATE_MACHINE_ARN", "arn:aws:states:eu-west-2:123:stateMachine:test"
+        )
+        return AcceptHandler(s3_client=mock_s3_client, sfn_client=mock_sfn_client)
+
+    @pytest.mark.asyncio
+    async def test_state_machine_triggered_on_accept(
+        self, accept_handler_with_sfn, mock_request, sample_request_body, mock_sfn_client
+    ):
+        """State machine is invoked after successful S3 write."""
+
+        async def json_mock():
+            return sample_request_body
+
+        mock_request.json = json_mock
+        resp = await accept_handler_with_sfn.handle(mock_request)
+
+        assert resp.status_code == 200
+        mock_sfn_client.start_execution.assert_called_once()
+        call_input = json.loads(mock_sfn_client.start_execution.call_args[1]["input"])
+        assert "upload_id" in call_input
+
+    @pytest.mark.asyncio
+    async def test_state_machine_receives_correct_upload_id(
+        self, accept_handler_with_sfn, mock_request, sample_request_body, mock_sfn_client
+    ):
+        """The upload_id passed to the state machine matches the response."""
+
+        async def json_mock():
+            return sample_request_body
+
+        mock_request.json = json_mock
+        resp = await accept_handler_with_sfn.handle(mock_request)
+
+        response_upload_id = json.loads(resp.body.decode())["upload_id"]
+        call_input = json.loads(mock_sfn_client.start_execution.call_args[1]["input"])
+        assert call_input["upload_id"] == response_upload_id
+
+    @pytest.mark.asyncio
+    async def test_state_machine_failure_does_not_fail_accept(
+        self, monkeypatch, mock_s3_client, mock_request, sample_request_body
+    ):
+        """A Step Functions failure must not prevent the accept from succeeding."""
+        failing_sfn = MagicMock()
+        failing_sfn.start_execution.side_effect = Exception("SFN unavailable")
+
+        monkeypatch.setenv("RAW_BUCKET", "test-raw-bucket")
+        monkeypatch.setenv(
+            "ENRICHMENT_STATE_MACHINE_ARN", "arn:aws:states:eu-west-2:123:stateMachine:test"
+        )
+        handler = AcceptHandler(s3_client=mock_s3_client, sfn_client=failing_sfn)
+
+        async def json_mock():
+            return sample_request_body
+
+        mock_request.json = json_mock
+        resp = await handler.handle(mock_request)
+
+        assert resp.status_code == 200
+
+    @pytest.mark.asyncio
+    async def test_state_machine_not_triggered_when_arn_absent(
+        self, monkeypatch, mock_s3_client, mock_request, sample_request_body
+    ):
+        """No SFN call is made when ENRICHMENT_STATE_MACHINE_ARN is not set."""
+        mock_sfn = MagicMock()
+        monkeypatch.setenv("RAW_BUCKET", "test-raw-bucket")
+        monkeypatch.delenv("ENRICHMENT_STATE_MACHINE_ARN", raising=False)
+        handler = AcceptHandler(s3_client=mock_s3_client, sfn_client=mock_sfn)
+
+        async def json_mock():
+            return sample_request_body
+
+        mock_request.json = json_mock
+        await handler.handle(mock_request)
+
+        mock_sfn.start_execution.assert_not_called()

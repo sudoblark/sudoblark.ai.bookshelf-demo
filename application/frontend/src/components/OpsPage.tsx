@@ -7,7 +7,7 @@ interface Props {
   onNavigateToNewBook: () => void;
 }
 
-type StatusFilter = "ALL" | "IN_PROGRESS" | "SUCCESS" | "FAILED";
+type StatusFilter = "ALL" | "ACTIVE" | "FAILED";
 
 export function OpsPage({ onNavigateToNewBook }: Props) {
   const [files, setFiles] = useState<UploadFile[]>([]);
@@ -40,25 +40,24 @@ export function OpsPage({ onNavigateToNewBook }: Props) {
     }
   }
 
-  function getStatusColor(status: string): string {
-    switch (status) {
-      case "SUCCESS":
-        return styles.statusSuccess;
-      case "FAILED":
-        return styles.statusFailed;
-      case "IN_PROGRESS":
-        return styles.statusInProgress;
-      case "QUEUED":
-        return styles.statusQueued;
-      default:
-        return "";
-    }
+  function getStageColor(stage: string): string {
+    if (stage === "failed") return styles.statusFailed;
+    if (stage === "queued") return styles.statusQueued;
+    return styles.statusSuccess;
   }
 
   function getFilteredFiles(): UploadFile[] {
-    let filtered = statusFilter === "ALL" ? files : files.filter((file) => file.current_status === statusFilter);
-    // Sort by created_at descending (newest first)
-    return filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    let filtered: UploadFile[];
+    if (statusFilter === "FAILED") {
+      filtered = files.filter((f) => f.stage === "failed");
+    } else if (statusFilter === "ACTIVE") {
+      filtered = files.filter((f) => f.stage !== "failed");
+    } else {
+      filtered = files;
+    }
+    return filtered.sort(
+      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
   }
 
   // Empty state
@@ -92,17 +91,19 @@ export function OpsPage({ onNavigateToNewBook }: Props) {
           <div className={styles.filterBar}>
             <span className={styles.filterLabel}>Filter by status:</span>
             <div className={styles.filterButtons}>
-              {(["ALL", "IN_PROGRESS", "SUCCESS", "FAILED"] as StatusFilter[]).map((filter) => (
+              {(["ALL", "ACTIVE", "FAILED"] as StatusFilter[]).map((filter) => (
                 <button
                   key={filter}
                   className={`${styles.filterButton} ${statusFilter === filter ? styles.filterActive : ""}`}
                   onClick={() => setStatusFilter(filter)}
                 >
-                  {filter === "ALL" ? "All" : filter.replace("_", " ")}
+                  {filter}
                   <span className={styles.filterCount}>
                     {filter === "ALL"
                       ? files.length
-                      : files.filter((f) => f.current_status === filter).length}
+                      : filter === "FAILED"
+                      ? files.filter((f) => f.stage === "failed").length
+                      : files.filter((f) => f.stage !== "failed").length}
                   </span>
                 </button>
               ))}
@@ -114,7 +115,7 @@ export function OpsPage({ onNavigateToNewBook }: Props) {
               <tr>
                 <th className={styles.colExpand}></th>
                 <th className={styles.colId}>Upload ID</th>
-                <th className={styles.colStatus}>Status</th>
+                <th className={styles.colStatus}>Stage</th>
                 <th className={styles.colCreated}>Created</th>
                 <th className={styles.colUpdated}>Updated</th>
               </tr>
@@ -137,8 +138,8 @@ export function OpsPage({ onNavigateToNewBook }: Props) {
                     <code>{file.upload_id.slice(0, 8)}</code>
                   </td>
                   <td className={styles.colStatus}>
-                    <span className={`${styles.badge} ${getStatusColor(file.current_status)}`}>
-                      {file.current_status}
+                    <span className={`${styles.badge} ${getStageColor(file.stage)}`}>
+                      {file.stage}
                     </span>
                   </td>
                   <td className={styles.colCreated}>{formatDate(file.created_at)}</td>
@@ -148,62 +149,36 @@ export function OpsPage({ onNavigateToNewBook }: Props) {
                   <tr key={`detail-${file.upload_id}`}>
                     <td colSpan={5} className={styles.detailCell}>
                       <div className={styles.detail}>
-                        <h3>Pipeline Progress</h3>
-                        <div className={styles.progressContainer}>
-                          <div className={styles.progressBar}>
-                            {["user_upload", "enrichment", "routing", "av_scan"].map((stageName, idx) => {
-                              const stageData = file.stage_progress.find(s => s.stage_name === stageName);
-                              const isComplete = stageData?.status === "success";
-                              const isFailed = stageData?.status === "failed";
-                              const isActive = stageData?.status === "in_progress";
-
-                              return (
-                                <div key={stageName} className={styles.stageNode}>
-                                  <div
-                                    className={`${styles.stageCircle} ${
-                                      isComplete ? styles.stageSuccess : ""
-                                    } ${isActive ? styles.stageActive : ""} ${
-                                      isFailed ? styles.stageFailed : ""
-                                    }`}
-                                  >
-                                    {isComplete && "✓"}
-                                    {isFailed && "✕"}
-                                    {isActive && "⟳"}
-                                    {!stageData && "○"}
-                                  </div>
-                                  <div className={styles.stageLabelSmall}>
-                                    {stageName.replace("_", "\n")}
-                                  </div>
-                                  {stageData?.processing_time && (
-                                    <div className={styles.stageTimeSmall}>
-                                      {stageData.processing_time}s
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
+                        <h3>Pipeline Stages</h3>
                         <div className={styles.stageDetails}>
-                          {file.stage_progress.map((stage, idx) => (
+                          {Object.entries(file.stages).map(([stageName, stageData]) => (
                             <div
-                              key={idx}
+                              key={stageName}
                               className={`${styles.stageDetailItem} ${
-                                stage.status === "success" ? styles.detailSuccess : ""
-                              } ${stage.status === "failed" ? styles.detailFailed : ""} ${
-                                stage.status === "in_progress" ? styles.detailInProgress : ""
+                                stageData.error ? styles.detailFailed : styles.detailSuccess
                               }`}
                             >
-                              <div className={styles.detailName}>{stage.stage_name}</div>
-                              <div className={styles.detailStatus}>{stage.status}</div>
-                              {stage.processing_time && (
-                                <div className={styles.detailTime}>{stage.processing_time}s</div>
+                              <div className={styles.detailName}>{stageName}</div>
+                              <div className={styles.detailStatus}>
+                                {stageData.error ? "failed" : "complete"}
+                              </div>
+                              {stageData.startedAt && stageData.endedAt && (
+                                <div className={styles.detailTime}>
+                                  {(
+                                    (new Date(stageData.endedAt).getTime() -
+                                      new Date(stageData.startedAt).getTime()) /
+                                    1000
+                                  ).toFixed(1)}s
+                                </div>
                               )}
-                              {stage.error_message && (
-                                <div className={styles.detailError}>{stage.error_message}</div>
+                              {stageData.error && (
+                                <div className={styles.detailError}>{stageData.error}</div>
                               )}
                             </div>
                           ))}
+                          {Object.keys(file.stages).length === 0 && (
+                            <div className={styles.detailEmpty}>No stage data recorded yet.</div>
+                          )}
                         </div>
                       </div>
                     </td>

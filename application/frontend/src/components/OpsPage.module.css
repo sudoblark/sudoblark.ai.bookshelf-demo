@@ -425,6 +425,12 @@
   font-style: italic;
 }
 
+.detailEmpty {
+  grid-column: 1 / -1;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
 /* Expand arrow */
 .expandOpen {
   display: inline-block;

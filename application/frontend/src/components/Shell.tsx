@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import styles from "./Shell.module.css";
 
-type NavItem = "bookshelf" | "new-book" | "ook-chat" | "ops";
+type NavItem = "bookshelf" | "new-book" | "ook-chat" | "ops" | "graph";
 
 interface Props {
   active: NavItem;
@@ -53,6 +53,15 @@ export function Shell({ active, onNav, children }: Props) {
             >
               <span className={styles.navIcon}>📊</span>
               Ops
+            </button>
+          </li>
+          <li>
+            <button
+              className={`${styles.navItem} ${active === "graph" ? styles.active : ""}`}
+              onClick={() => onNav("graph")}
+            >
+              <span className={styles.navIcon}>🕸</span>
+              Graph
             </button>
           </li>
         </ul>

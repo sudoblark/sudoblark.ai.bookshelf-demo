@@ -44,12 +44,13 @@ POST /api/ook/chat
 
 Environment variables
 ---------------------
-BEDROCK_MODEL_ID       Bedrock model ID (required)
-BEDROCK_REGION         AWS region for Bedrock calls (default: eu-west-2)
-LANDING_BUCKET         S3 bucket name for uploads (required)
-RAW_BUCKET             S3 bucket name for accepted metadata JSON (required)
-TRACKING_TABLE         DynamoDB table name for ingestion tracking (required)
-CORS_ALLOWED_ORIGINS   Comma-separated allowed CORS origins (default: http://localhost:5173)
+BEDROCK_MODEL_ID              Bedrock model ID (required by metadata handler)
+BEDROCK_REGION                AWS region for Bedrock calls (default: eu-west-2)
+LANDING_BUCKET                S3 bucket name for uploads (required)
+RAW_BUCKET                    S3 bucket name for accepted metadata JSON (required)
+TRACKING_TABLE                DynamoDB table name for ingestion tracking (required)
+ENRICHMENT_STATE_MACHINE_ARN  ARN of the enrichment Step Functions state machine (optional)
+CORS_ALLOWED_ORIGINS          Comma-separated allowed CORS origins (default: http://localhost:5173)
 """
 
 import logging
@@ -88,7 +89,7 @@ _presigned = PresignedUrlHandler()
 _metadata = MetadataHandler()
 _accept = AcceptHandler(dynamodb_resource=_dynamodb)
 _ops = OpsHandler()
-_bookshelf = BookshelfHandler()
+_bookshelf = BookshelfHandler(dynamodb_resource=_dynamodb)
 _ook = OokHandler()
 
 
@@ -135,6 +136,16 @@ async def bookshelf_catalogue(request: Request) -> JSONResponse:
 @app.get("/api/bookshelf/search")
 async def bookshelf_search(request: Request) -> JSONResponse:
     return await _bookshelf.handle_search(request)
+
+
+@app.get("/api/bookshelf/graph")
+async def bookshelf_graph(request: Request) -> JSONResponse:
+    return await _bookshelf.handle_similarity_graph(request)
+
+
+@app.get("/api/bookshelf/{file_id}/related")
+async def bookshelf_related(request: Request, file_id: str) -> JSONResponse:
+    return await _bookshelf.handle_related(request, file_id)
 
 
 @app.post("/api/ook/chat")

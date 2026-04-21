@@ -4,9 +4,10 @@ import { MetadataPage } from "./components/MetadataPage";
 import { OokChatPage } from "./components/OokChatPage";
 import { OpsPage } from "./components/OpsPage";
 import { Shell } from "./components/Shell";
+import { SimilarityGraph } from "./components/SimilarityGraph";
 import { UploadPage } from "./components/UploadPage";
 
-type TabId = "bookshelf" | "new-book" | "ook-chat" | "ops";
+type TabId = "bookshelf" | "new-book" | "ook-chat" | "ops" | "graph";
 
 interface UploadContext {
   sessionId: string;
@@ -18,6 +19,7 @@ interface UploadContext {
 export default function App() {
   const [activeTab, setActiveTab] = useState<TabId>("bookshelf");
   const [uploadCtx, setUploadCtx] = useState<UploadContext | null>(null);
+  const [graphFocusId, setGraphFocusId] = useState<string | null>(null);
 
   function handleUploadComplete(sessionId: string, bucket: string, key: string, filename: string) {
     setUploadCtx({ sessionId, bucket, key, filename });
@@ -43,7 +45,12 @@ export default function App() {
   function renderContent() {
     switch (activeTab) {
       case "bookshelf":
-        return <BookshelfPage onNavigateToNewBook={handleNavigateToNewBook} />;
+        return (
+          <BookshelfPage
+            onNavigateToNewBook={handleNavigateToNewBook}
+            onViewGraph={(bookId) => { setGraphFocusId(bookId); setActiveTab("graph"); }}
+          />
+        );
       case "new-book":
         return uploadCtx ? (
           <MetadataPage
@@ -60,6 +67,8 @@ export default function App() {
         return <OokChatPage />;
       case "ops":
         return <OpsPage onNavigateToNewBook={handleNavigateToNewBook} />;
+      case "graph":
+        return <SimilarityGraph focusBookId={graphFocusId} onClearFocus={() => setGraphFocusId(null)} />;
     }
   }
 

@@ -17,6 +17,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Build Lambda packages
+        run: |
+          ./scripts/build_lambdas.sh
+          cp -r lambda-packages infrastructure/aws-sudoblark-development/lambda-packages
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:

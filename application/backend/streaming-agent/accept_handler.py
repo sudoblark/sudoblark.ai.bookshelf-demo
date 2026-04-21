@@ -41,13 +41,33 @@ def _sanitise(value: str) -> str:
 class AcceptHandler:
     """Saves accepted metadata to S3 with Hive-style partitioning."""
 
-    def __init__(self, s3_client: Any = None, dynamodb_resource: Any = None) -> None:
+    def __init__(
+        self,
+        s3_client: Any = None,
+        dynamodb_resource: Any = None,
+        sfn_client: Any = None,
+    ) -> None:
         self._s3 = s3_client or boto3.client("s3")
+        self._sfn = sfn_client or boto3.client("stepfunctions")
+        self._enrichment_state_machine_arn: str = os.environ.get("ENRICHMENT_STATE_MACHINE_ARN", "")
         self._raw_bucket: str = os.environ["RAW_BUCKET"]
         self._tracker = BookshelfTracker(
             dynamodb_resource=dynamodb_resource,
             table_name=os.environ.get("TRACKING_TABLE", ""),
         )
+
+    def _trigger_enrichment(self, upload_id: str) -> None:
+        """Fire the enrichment state machine for the given upload_id (non-fatal)."""
+        if not self._enrichment_state_machine_arn:
+            return
+        try:
+            self._sfn.start_execution(
+                stateMachineArn=self._enrichment_state_machine_arn,
+                input=json.dumps({"upload_id": upload_id}),
+            )
+            logger.info("Triggered enrichment state machine for upload_id=%s", upload_id)
+        except Exception:
+            logger.warning("Failed to trigger enrichment state machine for upload_id=%s", upload_id)
 
     async def handle(self, request: Request) -> JSONResponse:
         """Write metadata JSON to the raw bucket and return the saved key."""
@@ -89,35 +109,39 @@ class AcceptHandler:
             )
         except Exception:
             logger.exception("Failed to write metadata to s3://%s/%s", self._raw_bucket, key)
-            # Mark ENRICHMENT as failed
+            # Mark ANALYSED as failed
             if upload_id:
                 try:
                     self._tracker.fail_stage(
                         user_id=user_id,
                         upload_id=upload_id,
-                        stage=UploadStage.ENRICHMENT,
+                        stage=UploadStage.ANALYSED,
                         error_message="Failed to save metadata to S3",
                     )
                 except Exception:
                     logger.exception(
-                        "Failed to mark ENRICHMENT stage as failed for upload_id=%s", upload_id
+                        "Failed to mark ANALYSED stage as failed for upload_id=%s", upload_id
                     )
             raise HTTPException(status_code=500, detail="Failed to save metadata")
 
-        # Mark the ENRICHMENT stage as complete in DynamoDB after successful S3 write
+        # Mark the ANALYSED stage as complete in DynamoDB after successful S3 write
         if upload_id:
             try:
                 self._tracker.complete_stage(
                     user_id=user_id,
                     upload_id=upload_id,
-                    stage=UploadStage.ENRICHMENT,
+                    stage=UploadStage.ANALYSED,
                     dest_bucket=self._raw_bucket,
                     dest_key=key,
                 )
             except Exception:
                 logger.exception(
-                    "Failed to mark ENRICHMENT stage as complete for upload_id=%s", upload_id
+                    "Failed to mark ANALYSED stage as complete for upload_id=%s", upload_id
                 )
 
         logger.info("Saved metadata to s3://%s/%s", self._raw_bucket, key)
+
+        if upload_id:
+            self._trigger_enrichment(upload_id)
+
         return JSONResponse({"status": "accepted", "saved_key": key, "upload_id": upload_id})

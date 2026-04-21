@@ -161,3 +161,22 @@ class TestToolTrackerSummarizeResult:
     def test_unknown_tool_scalar_result(self):
         summary = ToolTracker._summarize_result("unknown_tool", "some string")
         assert summary == "Result retrieved"
+
+    def test_get_similar_books_with_results(self):
+        result = [{"file_id": "b1", "similarity": 0.9}, {"file_id": "b2", "similarity": 0.8}]
+        summary = ToolTracker._summarize_result("get_similar_books", result)
+        assert "2 similar" in summary
+
+    def test_get_similar_books_single(self):
+        result = [{"file_id": "b1", "similarity": 0.9}]
+        summary = ToolTracker._summarize_result("get_similar_books", result)
+        assert "1 similar book" in summary
+
+    def test_get_similarity_graph(self):
+        result = {
+            "nodes": [{"id": "a"}, {"id": "b"}],
+            "edges": [{"source": "a", "target": "b", "weight": 0.9}],
+        }
+        summary = ToolTracker._summarize_result("get_similarity_graph", result)
+        assert "2 nodes" in summary
+        assert "1 edge" in summary

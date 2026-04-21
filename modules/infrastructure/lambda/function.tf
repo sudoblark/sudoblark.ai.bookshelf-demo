@@ -1,13 +1,8 @@
 locals {
   lambdas_map = { for lambda in var.lambdas : lambda.name => lambda }
 
-  # Merge public layer ARNs (layers) with locally-managed layer ARNs (resolved from layer_names)
   resolved_layers = {
-    for name, lambda in local.lambdas_map :
-    name => concat(
-      lambda.layers,
-      [for layer_name in lambda.layer_names : var.layer_arns[layer_name]]
-    )
+    for name, lambda in local.lambdas_map : name => lambda.layers
   }
 }
 

@@ -1,0 +1,81 @@
+# Seed book catalogue — pipe-separated values
+# Format: title|author|published_year|isbn|description
+# Lines starting with # are ignored. Blank lines are ignored.
+
+# ---------------------------------------------------------------------------
+# Discworld — Terry Pratchett
+# ---------------------------------------------------------------------------
+The Colour of Magic|Terry Pratchett|1983|9780062225672|Rincewind, the Disc's worst wizard, is press-ganged into guiding the naively optimistic tourist Twoflower across a world balanced on four elephants atop a giant turtle.
+The Light Fantastic|Terry Pratchett|1986|9780062225689|A deadly red star approaches the Disc and only a single spell locked inside Rincewind's head can save it, if he can survive long enough to use it.
+Equal Rites|Terry Pratchett|1987|9780062225696|A dying wizard accidentally bequeaths his staff and powers to a girl, who must fight the entrenched prejudice of Unseen University to be admitted as a wizard.
+Mort|Terry Pratchett|1987|9780552131063|Death takes on an apprentice named Mort, who makes the critical mistake of falling in love and deciding to override fate by refusing to let someone die.
+Sourcery|Terry Pratchett|1988|9780552131537|The eighth son of an eighth son of a wizard is a sourcerer of terrifying raw power, threatening to return the Disc to the dangerous age of magic.
+Wyrd Sisters|Terry Pratchett|1988|9780552134606|Three witches in the kingdom of Lancre become entangled in a royal succession crisis, a murdered king, a stolen crown, and a theatre troupe with an inconvenient play.
+Pyramids|Terry Pratchett|1989|9780552134613|A young Assassin's Guild graduate unexpectedly inherits the ancient kingdom of Djelibeybi and must contend with its all-consuming obsession with pyramids and the dead.
+Guards! Guards!|Terry Pratchett|1989|9780552134637|The threadbare Night Watch of Ankh-Morpork faces a full-grown dragon summoned by a secret brotherhood, led by a new recruit who believes in truth and justice.
+Eric|Terry Pratchett|1990|9780575046061|The Disc's only demonologist attempts to summon a demon to grant three wishes and instead gets Rincewind, resulting in chaos across time, space, and the Dungeon Dimensions.
+Moving Pictures|Terry Pratchett|1990|9780552134645|Holy Wood hill begins producing moving pictures with an eerie compulsion that draws people from across the Disc into a silver-screen fantasy with a dark purpose.
+Reaper Man|Terry Pratchett|1991|9780552134651|Death is issued a retirement notice and must live as a mortal farm hand, while the Disc, denied death, begins to suffer from an accumulation of unspent life force.
+Witches Abroad|Terry Pratchett|1991|9780552134668|Granny Weatherwax and the Lancre witches travel to the distant city of Genua to prevent a fairy godmother from forcing a happy ending on a young woman who doesn't want one.
+Small Gods|Terry Pratchett|1992|9780552138901|The great god Om finds himself trapped in the body of a small tortoise with only one true believer left — a simple novice named Brutha — as the Omnian Inquisition wages holy war.
+Lords and Ladies|Terry Pratchett|1992|9780552140065|The elves — beautiful, cold, and utterly without mercy — attempt to force their way back into the Disc through a gap in reality near Lancre, and only the witches stand in their way.
+Men at Arms|Terry Pratchett|1993|9780552140904|The Night Watch investigates a series of murders connected to a new and terrible weapon called a gonne, as Ankh-Morpork's new diversity initiative complicates policing.
+Soul Music|Terry Pratchett|1994|9780552140911|Music with rocks in arrives in Ankh-Morpork with a life of its own, and Death's adopted granddaughter Susan must understand what it truly means for something to die.
+Interesting Times|Terry Pratchett|1994|9780552142359|Rincewind is magically transported to the Agatean Empire, where revolution is stirring and a prophecy about the Great Wizzard is about to cause enormous diplomatic problems.
+Maskerade|Terry Pratchett|1995|9780552142373|Agnes Nitt joins the Ankh-Morpork Opera House and discovers it is haunted, while Granny Weatherwax and Nanny Ogg investigate from Lancre with a cookbook as cover.
+Feet of Clay|Terry Pratchett|1996|9780552142380|Commander Vimes investigates a series of murders and a plot to poison Lord Vetinari, uncovering questions about free will and identity among the city's golem population.
+Hogfather|Terry Pratchett|1996|9780552142397|The Hogfather — the Disc's equivalent of Father Christmas — has gone missing, and Death must take his place while his granddaughter Susan hunts down what stole him.
+Jingo|Terry Pratchett|1997|9780552145428|Ankh-Morpork stumbles toward a pointless war over a tiny island, and Commander Vimes must navigate politics, patriotism, and a device that lets him see two futures at once.
+The Last Continent|Terry Pratchett|1998|9780552146142|Rincewind is stranded on XXXX, a continent at the end of the world running on narrative clichés, while the Unseen University wizards search for him somewhere in the distant past.
+Carpe Jugulum|Terry Pratchett|1998|9780552146159|A family of progressive, self-help vampires invades the kingdom of Lancre, and Granny Weatherwax — whose faith is wavering — may be the only one who can resist their influence.
+The Fifth Elephant|Terry Pratchett|1999|9780552146166|Vimes travels to Uberwald as Ankh-Morpork's reluctant ambassador and uncovers a conspiracy involving the dwarf clans, a missing replica, and the werewolf political situation.
+The Truth|Terry Pratchett|2000|9780385601214|William de Worde accidentally invents the newspaper in Ankh-Morpork and finds himself investigating a conspiracy to frame Lord Vetinari for murder.
+Thief of Time|Terry Pratchett|2001|9780385601221|A master clockmaker is commissioned to build the first truly accurate clock, which would stop time itself — and only the History Monks and a young apprentice can prevent it.
+The Last Hero|Terry Pratchett|2001|9780575068858|Cohen the Barbarian and his Silver Horde plan to return fire to the gods atop Cori Celesti, which would destroy the Disc, forcing an unlikely rescue mission in a primitive spacecraft.
+The Amazing Maurice and His Educated Rodents|Terry Pratchett|2001|9780385601238|A streetwise cat leads a group of self-aware rats and an earnest pied-piper boy in a profitable scam that goes dangerously wrong in a town where something has already eaten the rats.
+Night Watch|Terry Pratchett|2002|9780385602501|Commander Vimes is thrown back in time to his younger self's era and must navigate the Glorious Revolution of the 25th of May while keeping his own history on track.
+The Wee Free Men|Terry Pratchett|2003|9780385602518|Nine-year-old Tiffany Aching armed with a frying pan and aided by a clan of tiny blue pictsies must rescue her baby brother from the Queen of the Fairies.
+Monstrous Regiment|Terry Pratchett|2003|9780385602525|A girl disguises herself as a boy to enlist and find her missing brother in a beleaguered army fighting a war for a country run entirely on religious zealotry.
+A Hat Full of Sky|Terry Pratchett|2004|9780385608602|Tiffany Aching leaves home to apprentice with a real witch and is possessed by a hiver, a bodiless creature that has been hunting minds for millennia.
+Going Postal|Terry Pratchett|2004|9780385603416|Moist von Lipwig, a career conman, is given a choice — death or taking charge of Ankh-Morpork's long-derelict Post Office and making it work.
+Thud!|Terry Pratchett|2005|9780385608619|Vimes investigates the murder of a dwarf deep in the mines as centuries-old tensions between dwarfs and trolls threaten to reignite into full-scale street war.
+Wintersmith|Terry Pratchett|2006|9780385609753|Tiffany Aching steps into a dance meant only for the seasons and the Wintersmith — the spirit of winter — falls in destructive obsessive love with her.
+Making Money|Terry Pratchett|2007|9780385611015|Moist von Lipwig is press-ganged into running Ankh-Morpork's Royal Bank and its broken mint, with a small dog as majority shareholder and the Lavish family plotting against him.
+Unseen Academicals|Terry Pratchett|2009|9780385611022|The wizards of Unseen University must learn to play foot-the-ball or lose their ancient right to a free dinner, while a young man from the Night Kitchen changes everything.
+I Shall Wear Midnight|Terry Pratchett|2010|9780385611039|Tiffany Aching faces the Cunning Man, an ancient malevolent force that turns communities against witches, while dealing with the very human complications of being the local witch.
+Snuff|Terry Pratchett|2011|9780385611046|Commander Vimes takes a forced holiday in the countryside and finds himself investigating the trafficking and murder of goblins, a people nobody considers worth protecting.
+Raising Steam|Terry Pratchett|2013|9780552170468|The steam engine comes to the Disc, and Moist von Lipwig must manage its rapid proliferation while a dwarfish fundamentalist movement violently resists all change.
+The Shepherd's Crown|Terry Pratchett|2015|9780062429971|Tiffany Aching faces her greatest challenge as the elves, emboldened by loss in the world of humans, attempt to reclaim the Disc and the witches must close ranks.
+
+# ---------------------------------------------------------------------------
+# A Song of Ice and Fire — George R.R. Martin
+# ---------------------------------------------------------------------------
+A Game of Thrones|George R.R. Martin|1996|9780553103540|Noble houses across Westeros war for the Iron Throne while in the frozen north an ancient evil stirs, and a exiled princess plots her return across the Narrow Sea.
+A Clash of Kings|George R.R. Martin|1998|9780553108033|The realm fractures as five kings press their claims simultaneously, a comet blazes across the sky, and dragons are reborn for the first time in over a century.
+A Storm of Swords|George R.R. Martin|2000|9780553106633|The war of five kings reaches its bloody climax through treachery, impossible battles, and a series of deaths that shatter every expectation of how such stories end.
+A Feast for Crows|George R.R. Martin|2005|9780553801507|The aftermath of war leaves the Seven Kingdoms economically ruined and politically unstable as new and dangerous players make their moves on a weakened board.
+A Dance with Dragons|George R.R. Martin|2011|9780553801477|Daenerys struggles to rule the slave city of Meereen as her dragons grow uncontrollable, while Jon Snow faces threats from beyond the Wall and from within the Night's Watch.
+
+# ---------------------------------------------------------------------------
+# Powder Mage — Brian McClellan
+# ---------------------------------------------------------------------------
+Promise of Blood|Brian McClellan|2013|9780316219037|Field Marshal Tamas leads a bloody coup against the corrupt Adran monarchy, only to discover the gods of the Dynize people may be real and are returning to reclaim the world.
+The Crimson Campaign|Brian McClellan|2014|9780316219051|Tamas and his powder mages are cut off behind enemy lines while his son Taniel fights addiction and conspiracy in the capital as the Adran war effort begins to collapse.
+The Autumn Republic|Brian McClellan|2015|9780316219068|The gods walk the earth, foreign armies occupy the capital, and Tamas must unite powder mages, privileged sorcerers, and common soldiers for a final desperate defence.
+Sins of Empire|Brian McClellan|2017|9780316310598|A new generation of soldiers and powder mages uncover a conspiracy deep in the occupied Dynize continent that could plunge the world back into divine war.
+Wrath of Empire|Brian McClellan|2017|9780316310611|The Dynize invade Landfall and an unlikely alliance of powder mages, bone-eyes, and street criminals must hold the city against an enemy that controls the power of gods.
+Blood of Empire|Brian McClellan|2019|9780316310635|Michel Bravis works as a spy inside the Dynize occupation while Ben Styke and the Mad Lancers fight a brutal guerrilla war to drive the conquerors from Landfall.
+
+# ---------------------------------------------------------------------------
+# General fiction — diverse sample for cross-genre similarity
+# ---------------------------------------------------------------------------
+Nineteen Eighty-Four|George Orwell|1949|9780451524935|A totalitarian society surveils and controls every aspect of human life through propaganda, doublethink, and the systematic destruction of truth and memory.
+Brave New World|Aldous Huxley|1932|9780060850524|A future society engineered for frictionless stability through genetic conditioning, pleasure drugs, and the elimination of family, art, and individual aspiration.
+The Handmaid's Tale|Margaret Atwood|1985|9780385490818|A theocratic regime strips women of all rights and identities; the tale of one handmaid's resistance narrated under conditions where even writing is forbidden.
+Dune|Frank Herbert|1965|9780441013593|A desert planet holds the universe's most precious resource; the fate of empire, ecology, religion, and humanity converge on a boy who may be the prophesied messiah.
+Foundation|Isaac Asimov|1951|9780553293357|A mathematician predicts the inevitable fall of galactic civilisation and plants twin seeds of recovery to shorten the dark age from thirty thousand years to one thousand.
+The Name of the Wind|Patrick Rothfuss|2007|9780756404741|A legendary wizard recounts his own story — from orphaned street child to the most famous man alive — in a world where knowing the true name of a thing gives power over it.
+To Kill a Mockingbird|Harper Lee|1960|9780061935466|A small-town Alabama lawyer defends a Black man falsely accused of rape in the 1930s, witnessed through the eyes of his young daughter Scout growing into moral understanding.
+One Hundred Years of Solitude|Gabriel Garcia Marquez|1967|9780060883287|Seven generations of the Buendia family found, inhabit, and are undone by the mythical town of Macondo in a story where the miraculous and the mundane are indistinguishable.
+The Road|Cormac McCarthy|2006|9780307387899|A father and son walk south through the ash-covered ruins of America, carrying the fire of human decency against a world that has almost entirely extinguished it.
+Sapiens|Yuval Noah Harari|2011|9780062316097|A sweeping history of the human species from the cognitive revolution to the present, questioning whether the pursuit of progress has made us any happier.

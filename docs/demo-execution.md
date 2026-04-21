@@ -12,6 +12,55 @@ If these haven't been deployed, see the infrastructure README.
 
 ---
 
+## Pre-requisites
+
+Before running the demo, the AWS infrastructure must be deployed and the bookshelf seeded with data.
+
+### 1. Deploy infrastructure
+
+Trigger the GitHub Actions apply workflow, or run Terraform locally:
+
+```bash
+cd infrastructure/aws-sudoblark-development
+terraform init
+terraform apply
+```
+
+### 2. Build Lambda packages
+
+```bash
+./scripts/build_lambdas.sh
+```
+
+### 3. Seed the bookshelf
+
+The seed script writes book metadata directly to the raw S3 bucket and fires the enrichment state machine for each book, running the full `raw → processed → embedding` pipeline.
+
+**Dry-run first** (no AWS calls, just prints what would happen):
+
+```bash
+./scripts/seed_books.sh
+```
+
+**Execute** (seeds ~60 books across Discworld, A Song of Ice and Fire, Powder Mage, and general fiction):
+
+```bash
+eval $(aws configure export-credentials --format env)
+./scripts/seed_books.sh --execute
+```
+
+The enrichment pipeline runs asynchronously. Each book takes ~10–20 seconds end to end (copy → Bedrock embedding). With ~60 books this will take a few minutes. You can monitor progress in the AWS Step Functions console or the Ops dashboard once the backend is running.
+
+**To add more books**, append lines to [scripts/seed_books.csv](../scripts/seed_books.csv) in the format:
+
+```
+title|author|published_year|isbn|description
+```
+
+Then re-run `./scripts/seed_books.sh --execute` — existing books are unaffected, only new lines are seeded.
+
+---
+
 ## Local Setup
 
 ### Prerequisites
@@ -20,6 +69,7 @@ If these haven't been deployed, see the infrastructure README.
 - **Docker & Docker Compose**: `docker --version && docker-compose --version`
 - **AWS credentials**: Configured locally (via `~/.aws/credentials` or `AWS_PROFILE`)
 - **Python 3.11+**: For backend linting/testing (optional, but recommended)
+- **jq**: For the seed script (`brew install jq`)
 
 ### AWS Credentials
 
@@ -237,7 +287,7 @@ Access at `http://localhost:5173`
 
 **Goal:** Verify bookshelf search and multi-page navigation.
 
-**Prerequisites:** At least 6 books accepted on bookshelf (to test pagination).
+**Prerequisites:** Seed script run (see Pre-requisites above) — provides 60+ books across multiple authors and genres.
 
 **Steps:**
 
