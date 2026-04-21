@@ -254,7 +254,9 @@ jobs:
           aws-region: eu-west-2
 
       - name: Build Lambda packages
-        run: ./scripts/build_lambdas.sh
+        run: |
+          ./scripts/build_lambdas.sh
+          cp -r lambda-packages infrastructure/aws-sudoblark-development/lambda-packages
 
       - name: terraform plan
         uses: dflook/terraform-plan@v2
