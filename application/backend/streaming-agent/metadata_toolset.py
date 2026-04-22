@@ -24,6 +24,98 @@ from tool_tracker import ToolTracker
 logger = logging.getLogger(__name__)
 
 
+def _query_google_books_by_title_author(
+    title: str, author: str, publisher: str = "", timeout: float = 5.0
+) -> Optional[dict]:
+    """Query Google Books API using title and author.
+
+    Returns None if no results or on error.
+    """
+    try:
+        query = f"{title} {author}"
+        if publisher:
+            query += f" {publisher}"
+
+        url = f"https://www.googleapis.com/books/v1/volumes?q={query.replace(' ', '+')}"
+        response = httpx.get(url, timeout=timeout)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("totalItems", 0) == 0:
+            return None
+
+        item = data["items"][0]
+        volume_info = item.get("volumeInfo", {})
+        identifiers = volume_info.get("industryIdentifiers", [])
+
+        # Extract ISBN-13 if available
+        isbn = None
+        for identifier in identifiers:
+            if identifier.get("type") == "ISBN_13":
+                isbn = identifier.get("identifier")
+                break
+        if not isbn and identifiers:
+            isbn = identifiers[0].get("identifier")
+
+        return {
+            "isbn": isbn,
+            "title": volume_info.get("title", ""),
+            "authors": ", ".join(volume_info.get("authors", [])),
+            "publisher": volume_info.get("publisher", ""),
+            "published_date": volume_info.get("publishedDate", ""),
+            "description": volume_info.get("description", ""),
+            "source": "Google Books API (title/author)",
+        }
+    except httpx.TimeoutException:  # pragma: no cover
+        logger.info(f"Google Books timeout for {title} by {author}")
+        return None
+    except httpx.HTTPStatusError as e:  # pragma: no cover
+        logger.info(f"Google Books HTTP {e.response.status_code} for {title} by {author}")
+        return None
+    except Exception:  # pragma: no cover
+        logger.exception(f"Google Books error for {title} by {author}")
+        return None
+
+
+def _query_openlibrary_by_title_author(
+    title: str, author: str, timeout: float = 5.0
+) -> Optional[dict]:
+    """Query Open Library search API using title and author.
+
+    Returns None if no results or on error.
+    """
+    try:
+        url = f"https://openlibrary.org/search.json?title={title.replace(' ', '+')}&author={author.replace(' ', '+')}"
+        response = httpx.get(url, timeout=timeout)
+        response.raise_for_status()
+        data = response.json()
+
+        if data.get("numFound", 0) == 0:
+            return None
+
+        doc = data["docs"][0]
+        return {
+            "isbn": doc.get("isbn", [None])[0] if doc.get("isbn") else None,
+            "title": doc.get("title", ""),
+            "authors": ", ".join(doc.get("author_name", [])),
+            "publisher": ", ".join(doc.get("publisher", [])) if doc.get("publisher") else "",
+            "published_date": str(doc.get("first_publish_year", ""))
+            if doc.get("first_publish_year")
+            else "",
+            "description": "",
+            "source": "Open Library API (title/author)",
+        }
+    except httpx.TimeoutException:  # pragma: no cover
+        logger.info(f"Open Library timeout for {title} by {author}")
+        return None
+    except httpx.HTTPStatusError as e:  # pragma: no cover
+        logger.info(f"Open Library HTTP {e.response.status_code} for {title} by {author}")
+        return None
+    except Exception:  # pragma: no cover
+        logger.exception(f"Open Library error for {title} by {author}")
+        return None
+
+
 def build_metadata_toolset(
     s3_client: Any,
     textract_client: Any,
@@ -294,55 +386,22 @@ def build_metadata_toolset(
         if not title or not author:
             return {"error": "Title and author are required"}
 
+        if call_counts["lookup_by_title_author"] >= 1:
+            return {"error": "Title/author lookup already completed"}
+
+        if not title or not author:
+            return {"error": "Title and author are required"}
+
         start = time.time()
-        try:
-            query = f"{title} {author}"
-            if publisher:
-                query += f" {publisher}"
+        query = f"{title} {author}"
+        if publisher:
+            query += f" {publisher}"
 
-            logger.info(f"Attempting title/author lookup: {query}")
+        logger.info(f"Attempting title/author lookup: {query}")
 
-            url = f"https://www.googleapis.com/books/v1/volumes?q={query.replace(' ', '+')}"
-            response = httpx.get(url, timeout=5.0)
-            response.raise_for_status()
-            data = response.json()
-
-            if data.get("totalItems", 0) > 0:
-                item = data["items"][0]
-                volume_info = item.get("volumeInfo", {})
-                identifiers = volume_info.get("industryIdentifiers", [])
-
-                # Extract ISBN-13 if available
-                isbn = None
-                for identifier in identifiers:
-                    if identifier.get("type") == "ISBN_13":
-                        isbn = identifier.get("identifier")
-                        break
-                if not isbn and identifiers:
-                    isbn = identifiers[0].get("identifier")
-
-                result = {
-                    "isbn": isbn,
-                    "title": volume_info.get("title", ""),
-                    "authors": ", ".join(volume_info.get("authors", [])),
-                    "publisher": volume_info.get("publisher", ""),
-                    "published_date": volume_info.get("publishedDate", ""),
-                    "description": volume_info.get("description", ""),
-                    "source": "Google Books API (title/author)",
-                }
-                elapsed_ms = (time.time() - start) * 1000
-                if tracker:
-                    tracker.record(
-                        tool_name="lookup_by_title_author",
-                        inputs_str=f"Title: {title}, Author: {author}",
-                        result=result,
-                        execution_time_ms=elapsed_ms,
-                    )
-                logger.info(f"Title/author lookup found: {result['title']}")
-                call_counts["lookup_by_title_author"] += 1
-                return result
-
-            result = {"error": "No matches found"}
+        # Try Google Books first
+        result = _query_google_books_by_title_author(title, author, publisher, timeout=5.0)
+        if result:
             elapsed_ms = (time.time() - start) * 1000
             if tracker:
                 tracker.record(
@@ -351,14 +410,16 @@ def build_metadata_toolset(
                     result=result,
                     execution_time_ms=elapsed_ms,
                 )
-            logger.info("Title/author lookup returned no results")
+            logger.info(f"Title/author lookup found: {result['title']}")
             call_counts["lookup_by_title_author"] += 1
             return result
 
-        except Exception as e:
-            logger.exception("Title/author lookup error")
+        logger.info("Google Books returned no results, trying Open Library")
+
+        # Fallback to Open Library
+        result = _query_openlibrary_by_title_author(title, author, timeout=5.0)
+        if result:
             elapsed_ms = (time.time() - start) * 1000
-            result = {"error": str(e)}
             if tracker:
                 tracker.record(
                     tool_name="lookup_by_title_author",
@@ -366,7 +427,23 @@ def build_metadata_toolset(
                     result=result,
                     execution_time_ms=elapsed_ms,
                 )
+            logger.info(f"Open Library found: {result['title']}")
+            call_counts["lookup_by_title_author"] += 1
             return result
+
+        # Both APIs failed or returned no results
+        result = {"error": "No matches found in Google Books or Open Library"}
+        elapsed_ms = (time.time() - start) * 1000
+        if tracker:
+            tracker.record(
+                tool_name="lookup_by_title_author",
+                inputs_str=f"Title: {title}, Author: {author}",
+                result=result,
+                execution_time_ms=elapsed_ms,
+            )
+        logger.info("Title/author lookup returned no results from any source")
+        call_counts["lookup_by_title_author"] += 1
+        return result
 
     @toolset.tool_plain
     def update_metadata_field(field: str, value: str) -> Dict:  # pragma: no cover

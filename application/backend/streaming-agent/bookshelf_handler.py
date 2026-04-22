@@ -124,7 +124,7 @@ class BookshelfHandler:
             records = self._tracker.list_all()
         except Exception as e:
             logger.exception("Error reading tracking table for embeddings: %s", e)
-            return embeddings
+            raise
 
         for record in records:
             upload_id = record.get("upload_id", "")
