@@ -138,6 +138,34 @@ echo "Access Key: $AWS_ACCESS_KEY_ID"
 echo "Session Token: $AWS_SESSION_TOKEN"
 ```
 
+**IMPORTANT: Forcing Container Recreation**
+
+If you've made code changes but the backend is still running old code, use `--force-recreate` to ensure Docker builds fresh containers:
+
+```bash
+docker-compose down
+docker-compose up --build --force-recreate
+```
+
+The `--force-recreate` flag ensures:
+- Old container instances are completely removed
+- Images are rebuilt from scratch (with `--build`)
+- No cached layers interfere with changes
+
+**When to use `--force-recreate`:**
+- Code changes aren't being picked up despite `--build`
+- You see old error messages that you've fixed
+- The backend is behaving inconsistently
+- After changes to shared utilities (`common/tracker.py`, handlers, etc.)
+
+If you're still seeing issues after `--force-recreate`, fully prune Docker:
+
+```bash
+docker-compose down -v
+docker system prune -a -f
+docker-compose up --build --force-recreate
+```
+
 ### Start Frontend
 
 In a new terminal:

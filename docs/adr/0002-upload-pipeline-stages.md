@@ -1,7 +1,9 @@
 # ADR-0002: Upload Pipeline Stages
 
 ## Status
-Accepted
+Superseded by ADR-0005
+
+**This ADR describes an old tracking schema and has been replaced. See [ADR-0005](0005-upload-pipeline-stages.md) for the current implementation.**
 
 ## Context
 
