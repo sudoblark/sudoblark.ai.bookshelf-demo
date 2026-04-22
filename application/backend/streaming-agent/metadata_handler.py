@@ -20,6 +20,7 @@ from typing import Any, AsyncGenerator, Optional
 
 import boto3
 from bookshelf_streaming_agent import BookshelfStreamingAgent
+from common.tracker import BookshelfTracker, UploadStage
 from fastapi import HTTPException, Request
 from fastapi.responses import StreamingResponse
 from metadata_toolset import build_metadata_toolset
@@ -57,6 +58,7 @@ class MetadataHandler:
         s3_client: Any = None,
         textract_client: Any = None,
         tracker: Optional[ToolTracker] = None,
+        dynamodb_resource: Any = None,
     ) -> None:
         self._model_id: str = os.environ["BEDROCK_MODEL_ID"]
         region: str = os.environ.get(
@@ -65,6 +67,27 @@ class MetadataHandler:
         self._s3 = s3_client or boto3.client("s3")
         self._textract = textract_client or boto3.client("textract", region_name=region)
         self._tracker = tracker or ToolTracker()
+
+        # DynamoDB tracking for upload pipeline
+        tracking_table = os.environ.get("TRACKING_TABLE", "")
+        if not tracking_table:
+            logger.warning(
+                "TRACKING_TABLE environment variable not set - tracking will fail silently"
+            )
+        self._bookshelf_tracker = BookshelfTracker(
+            dynamodb_resource=dynamodb_resource,
+            table_name=tracking_table,
+        )
+        # Validate table is accessible (fail-fast if misconfigured)
+        if tracking_table:
+            try:
+                self._bookshelf_tracker._table.load()  # Triggers DescribeTable API call
+                logger.info("Successfully connected to tracking table: %s", tracking_table)
+            except Exception:
+                logger.exception(
+                    "Failed to connect to tracking table: %s - tracking will be degraded",
+                    tracking_table,
+                )
 
         # Initialize agent with metadata extraction prompt and structured output for tool tracking
         if agent is None:
@@ -113,9 +136,60 @@ class MetadataHandler:
         # Get or initialize session history
         message_history = _session_history.get(session_id, [])
         prev_msg = ""
+        user_id = "anonymous"  # TODO: extract from auth context in production
 
         # Reset tracker for this request
         self._tracker.clear()
+
+        # On initial extraction (bucket and key provided), create tracking record
+        if bucket and key:
+            try:
+                self._bookshelf_tracker.create_record(user_id, session_id)
+                logger.info("Successfully created tracking record for upload_id=%s", session_id)
+            except Exception:
+                logger.exception(
+                    "Failed to create tracking record for upload_id=%s, user_id=%s, table=%s",
+                    session_id,
+                    user_id,
+                    os.environ.get("TRACKING_TABLE", "(not set)"),
+                )
+
+            try:
+                self._bookshelf_tracker.start_stage(
+                    session_id, UploadStage.USER_UPLOAD, bucket, key
+                )
+                logger.debug("Started USER_UPLOAD stage for upload_id=%s", session_id)
+            except Exception:
+                logger.exception(
+                    "Failed to start USER_UPLOAD stage for upload_id=%s, bucket=%s, key=%s",
+                    session_id,
+                    bucket,
+                    key,
+                )
+
+            try:
+                self._bookshelf_tracker.complete_stage(
+                    user_id, session_id, UploadStage.USER_UPLOAD, bucket, key
+                )
+                logger.debug("Completed USER_UPLOAD stage for upload_id=%s", session_id)
+            except Exception:
+                logger.exception(
+                    "Failed to complete USER_UPLOAD stage for upload_id=%s, user_id=%s",
+                    session_id,
+                    user_id,
+                )
+
+            # Start ANALYSED stage (extraction + refinement + acceptance)
+            try:
+                self._bookshelf_tracker.start_stage(session_id, UploadStage.ANALYSED, bucket, key)
+                logger.debug("Started ANALYSED stage for upload_id=%s", session_id)
+            except Exception:
+                logger.exception(
+                    "Failed to start ANALYSED stage for upload_id=%s, bucket=%s, key=%s",
+                    session_id,
+                    bucket,
+                    key,
+                )
 
         try:
             # Build toolset for this session
@@ -166,6 +240,24 @@ class MetadataHandler:
 
         except Exception as exc:
             logger.exception("Agent stream error in metadata extraction: %s", exc)
+            # Mark ANALYSED stage as failed if we started it
+            if bucket and key:
+                try:
+                    self._bookshelf_tracker.fail_stage(
+                        user_id=user_id,
+                        upload_id=session_id,
+                        stage=UploadStage.ANALYSED,
+                        error_message=f"Agent extraction error: {str(exc)}",
+                    )
+                    logger.info(
+                        "Successfully marked ANALYSED stage as failed for upload_id=%s", session_id
+                    )
+                except Exception:
+                    logger.exception(
+                        "Failed to mark ANALYSED stage as failed for upload_id=%s, user_id=%s",
+                        session_id,
+                        user_id,
+                    )
             yield _sse("error", {"message": "Extraction error — please try again"})
             return
 

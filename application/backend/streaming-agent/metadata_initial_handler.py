@@ -70,10 +70,25 @@ class MetadataInitialHandler:
         self._agent = agent
 
         # DynamoDB tracking for ingestion pipeline
+        tracking_table = os.environ.get("TRACKING_TABLE", "")
+        if not tracking_table:
+            logger.warning(
+                "TRACKING_TABLE environment variable not set - tracking will fail silently"
+            )
         self._tracker = BookshelfTracker(
             dynamodb_resource=dynamodb_resource,
-            table_name=os.environ.get("TRACKING_TABLE", ""),
+            table_name=tracking_table,
         )
+        # Validate table is accessible (fail-fast if misconfigured)
+        if tracking_table:
+            try:
+                self._tracker._table.load()  # Triggers DescribeTable API call
+                logger.info("Successfully connected to tracking table: %s", tracking_table)
+            except Exception:
+                logger.exception(
+                    "Failed to connect to tracking table: %s - tracking will be degraded",
+                    tracking_table,
+                )
 
     async def _extract_ocr_text(self, bucket: str, key: str) -> dict:
         """Extract OCR text from image via Textract.
@@ -292,10 +307,35 @@ class MetadataInitialHandler:
         # Create tracking record and mark USER_UPLOAD as complete (file already landed via presigned URL)
         try:
             self._tracker.create_record(user_id, upload_id)
-            self._tracker.start_stage(upload_id, UploadStage.USER_UPLOAD, bucket, key)
-            self._tracker.complete_stage(user_id, upload_id, UploadStage.USER_UPLOAD, bucket, key)
+            logger.info("Successfully created tracking record for upload_id=%s", upload_id)
         except Exception:
-            logger.exception("Failed to initialize tracking for upload_id=%s", upload_id)
+            logger.exception(
+                "Failed to create tracking record for upload_id=%s, user_id=%s, table=%s",
+                upload_id,
+                user_id,
+                os.environ.get("TRACKING_TABLE", "(not set)"),
+            )
+
+        try:
+            self._tracker.start_stage(upload_id, UploadStage.USER_UPLOAD, bucket, key)
+            logger.debug("Started USER_UPLOAD stage for upload_id=%s", upload_id)
+        except Exception:
+            logger.exception(
+                "Failed to start USER_UPLOAD stage for upload_id=%s, bucket=%s, key=%s",
+                upload_id,
+                bucket,
+                key,
+            )
+
+        try:
+            self._tracker.complete_stage(user_id, upload_id, UploadStage.USER_UPLOAD, bucket, key)
+            logger.debug("Completed USER_UPLOAD stage for upload_id=%s", upload_id)
+        except Exception:
+            logger.exception(
+                "Failed to complete USER_UPLOAD stage for upload_id=%s, user_id=%s",
+                upload_id,
+                user_id,
+            )
 
         return StreamingResponse(
             self._stream_events(prompt, toolsets, upload_id, user_id, bucket, key, ocr_confidence),
@@ -322,9 +362,13 @@ class MetadataInitialHandler:
         # Start the ENRICHMENT stage (extraction + refinement + acceptance)
         try:
             self._tracker.start_stage(upload_id, UploadStage.ENRICHMENT, bucket, key)
+            logger.debug("Started ENRICHMENT stage for upload_id=%s", upload_id)
         except Exception:
             logger.exception(
-                "Failed to mark ENRICHMENT stage as started for upload_id=%s", upload_id
+                "Failed to start ENRICHMENT stage for upload_id=%s, bucket=%s, key=%s",
+                upload_id,
+                bucket,
+                key,
             )
 
         try:
@@ -357,9 +401,14 @@ class MetadataInitialHandler:
                     stage=UploadStage.ENRICHMENT,
                     error_message=f"Bedrock API error: {str(exc)}",
                 )
+                logger.info(
+                    "Successfully marked ENRICHMENT stage as failed for upload_id=%s", upload_id
+                )
             except Exception:
                 logger.exception(
-                    "Failed to mark ENRICHMENT stage as failed for upload_id=%s", upload_id
+                    "Failed to mark ENRICHMENT stage as failed for upload_id=%s, user_id=%s",
+                    upload_id,
+                    user_id,
                 )
             yield _sse("error", {"message": "Agent error — please try again"})
             return

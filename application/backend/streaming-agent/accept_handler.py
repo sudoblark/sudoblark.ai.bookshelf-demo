@@ -51,10 +51,25 @@ class AcceptHandler:
         self._sfn = sfn_client or boto3.client("stepfunctions")
         self._enrichment_state_machine_arn: str = os.environ.get("ENRICHMENT_STATE_MACHINE_ARN", "")
         self._raw_bucket: str = os.environ["RAW_BUCKET"]
+        tracking_table = os.environ.get("TRACKING_TABLE", "")
+        if not tracking_table:
+            logger.warning(
+                "TRACKING_TABLE environment variable not set - tracking will fail silently"
+            )
         self._tracker = BookshelfTracker(
             dynamodb_resource=dynamodb_resource,
-            table_name=os.environ.get("TRACKING_TABLE", ""),
+            table_name=tracking_table,
         )
+        # Validate table is accessible (fail-fast if misconfigured)
+        if tracking_table:
+            try:
+                self._tracker._table.load()  # Triggers DescribeTable API call
+                logger.info("Successfully connected to tracking table: %s", tracking_table)
+            except Exception:
+                logger.exception(
+                    "Failed to connect to tracking table: %s - tracking will be degraded",
+                    tracking_table,
+                )
 
     def _trigger_enrichment(self, upload_id: str) -> None:
         """Fire the enrichment state machine for the given upload_id (non-fatal)."""
@@ -118,9 +133,15 @@ class AcceptHandler:
                         stage=UploadStage.ANALYSED,
                         error_message="Failed to save metadata to S3",
                     )
+                    logger.info(
+                        "Successfully marked ANALYSED stage as failed for upload_id=%s", upload_id
+                    )
                 except Exception:
                     logger.exception(
-                        "Failed to mark ANALYSED stage as failed for upload_id=%s", upload_id
+                        "Failed to mark ANALYSED stage as failed for upload_id=%s, user_id=%s, table=%s",
+                        upload_id,
+                        user_id,
+                        os.environ.get("TRACKING_TABLE", "(not set)"),
                     )
             raise HTTPException(status_code=500, detail="Failed to save metadata")
 
@@ -134,9 +155,15 @@ class AcceptHandler:
                     dest_bucket=self._raw_bucket,
                     dest_key=key,
                 )
+                logger.info(
+                    "Successfully marked ANALYSED stage as complete for upload_id=%s", upload_id
+                )
             except Exception:
                 logger.exception(
-                    "Failed to mark ANALYSED stage as complete for upload_id=%s", upload_id
+                    "Failed to mark ANALYSED stage as complete for upload_id=%s, user_id=%s, table=%s",
+                    upload_id,
+                    user_id,
+                    os.environ.get("TRACKING_TABLE", "(not set)"),
                 )
 
         logger.info("Saved metadata to s3://%s/%s", self._raw_bucket, key)

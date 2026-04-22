@@ -86,7 +86,7 @@ app.add_middleware(
 _dynamodb = boto3.resource("dynamodb")
 
 _presigned = PresignedUrlHandler()
-_metadata = MetadataHandler()
+_metadata = MetadataHandler(dynamodb_resource=_dynamodb)
 _accept = AcceptHandler(dynamodb_resource=_dynamodb)
 _ops = OpsHandler()
 _bookshelf = BookshelfHandler(dynamodb_resource=_dynamodb)
