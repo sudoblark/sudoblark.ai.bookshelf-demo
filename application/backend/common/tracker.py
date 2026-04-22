@@ -117,13 +117,11 @@ class BookshelfTracker:
             source_key: Key the file is being read from.
         """
         now = _now_iso()
+        # Only include non-None values; DynamoDB doesn't store null in maps
         stage_entry = {
             "startedAt": now,
-            "endedAt": None,
             "sourceBucket": source_bucket,
             "sourceKey": source_key,
-            "destinationBucket": None,
-            "destinationKey": None,
         }
         self._table.update_item(
             Key={"upload_id": upload_id},
@@ -155,30 +153,36 @@ class BookshelfTracker:
             dest_bucket: Bucket the file was written to.
             dest_key: Key the file was written to.
         """
+        import logging
+
+        logger = logging.getLogger(__name__)
+
         now = _now_iso()
-        # Read the existing stage entry to preserve startedAt / source fields
+        # Read existing stage data to preserve all fields
         record = self._table.get_item(Key={"upload_id": upload_id}).get("Item", {})
         existing = (record.get("stages") or {}).get(stage.value) or {}
-        updated_entry = {
-            "startedAt": existing.get("startedAt", now),
-            "endedAt": now,
-            "sourceBucket": existing.get("sourceBucket"),
-            "sourceKey": existing.get("sourceKey"),
-            "destinationBucket": dest_bucket,
-            "destinationKey": dest_key,
-        }
+
+        logger.debug(
+            f"complete_stage: upload_id={upload_id}, stage={stage.value}, "
+            f"existing_keys={list(existing.keys())}"
+        )
+
+        # Build complete entry, preserving all existing fields and adding completion data
+        completed_entry = dict(existing)  # Copy all existing fields
+        completed_entry["endedAt"] = now
+        completed_entry["destinationBucket"] = dest_bucket
+        completed_entry["destinationKey"] = dest_key
+
         self._table.update_item(
             Key={"upload_id": upload_id},
-            UpdateExpression=(
-                "SET #stages.#stage_name = :entry, #stage = :stage_name, updated_at = :now"
-            ),
+            UpdateExpression="SET #stages.#stage_name = :entry, #stage = :stage_name, updated_at = :now",
             ExpressionAttributeNames={
                 "#stages": "stages",
                 "#stage_name": stage.value,
                 "#stage": "stage",
             },
             ExpressionAttributeValues={
-                ":entry": updated_entry,
+                ":entry": completed_entry,
                 ":stage_name": stage.value,
                 ":now": now,
             },
@@ -200,22 +204,18 @@ class BookshelfTracker:
             error_message: Human-readable failure reason.
         """
         now = _now_iso()
+        # Read existing stage data to preserve all fields
         record = self._table.get_item(Key={"upload_id": upload_id}).get("Item", {})
         existing = (record.get("stages") or {}).get(stage.value) or {}
-        failed_entry = {
-            "startedAt": existing.get("startedAt", now),
-            "endedAt": now,
-            "sourceBucket": existing.get("sourceBucket"),
-            "sourceKey": existing.get("sourceKey"),
-            "destinationBucket": None,
-            "destinationKey": None,
-            "error": error_message,
-        }
+
+        # Build complete entry, preserving existing fields and adding error
+        failed_entry = dict(existing)  # Copy all existing fields
+        failed_entry["endedAt"] = now
+        failed_entry["error"] = error_message
+
         self._table.update_item(
             Key={"upload_id": upload_id},
-            UpdateExpression=(
-                "SET #stages.#stage_name = :entry, #stage = :failed, updated_at = :now"
-            ),
+            UpdateExpression="SET #stages.#stage_name = :entry, #stage = :failed, updated_at = :now",
             ExpressionAttributeNames={
                 "#stages": "stages",
                 "#stage_name": stage.value,
