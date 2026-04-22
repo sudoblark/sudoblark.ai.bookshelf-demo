@@ -357,15 +357,59 @@
 }
 
 .stageDetailItem {
-  display: grid;
-  grid-template-columns: 120px 1fr auto;
-  gap: 1rem;
-  align-items: center;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
   padding: 0.75rem;
   background: #1a1a1a;
   border-left: 3px solid #3a3a3a;
   border-radius: 4px;
   font-size: var(--font-xs);
+}
+
+.detailHeader {
+  display: grid;
+  grid-template-columns: 120px 1fr auto;
+  gap: 1rem;
+  align-items: center;
+}
+
+.detailMeta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #333333;
+}
+
+.detailMetaRow {
+  display: grid;
+  grid-template-columns: 100px 1fr;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.detailMetaRow .label {
+  color: #888;
+  font-weight: 500;
+  text-transform: uppercase;
+  font-size: var(--font-xs);
+  letter-spacing: 0.05em;
+}
+
+.detailMetaRow .value {
+  color: #ddd;
+  word-break: break-all;
+}
+
+.detailMetaRow code {
+  background: #0a0a0a;
+  padding: 0.25rem 0.5rem;
+  border-radius: 3px;
+  border: 1px solid #2a2a2a;
+  font-size: var(--font-xs);
+  color: #88dd88;
 }
 
 .detailSuccess {
@@ -436,4 +480,43 @@
   display: inline-block;
   transform: rotate(90deg);
   transition: transform 0.15s;
+}
+
+/* Refresh button */
+.refreshButton {
+  padding: 0.5rem 1rem;
+  background: #1a1a1a;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  color: #999;
+  font-size: var(--font-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.refreshButton:hover:not(:disabled) {
+  border-color: #7c6ff7;
+  color: #e8e8e8;
+  background: #252525;
+}
+
+.refreshButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.refreshing {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
