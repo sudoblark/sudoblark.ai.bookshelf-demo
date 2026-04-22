@@ -52,7 +52,7 @@ export function MetadataPage({ sessionId, bucket, s3Key, filename, onReset }: Pr
 
     async function extract() {
       try {
-        for await (const event of streamInitialMetadata(bucket, s3Key, filename)) {
+        for await (const event of streamInitialMetadata(bucket, s3Key, filename, uploadId)) {
           if (cancelled) break;
           if (event.type === "text_delta") {
             setMessages((prev) => {

@@ -56,9 +56,9 @@ async function* parseSse(response: Response): AsyncGenerator<StreamEvent> {
 export async function* streamInitialMetadata(
   bucket: string,
   key: string,
-  filename: string
+  filename: string,
+  sessionId: string = crypto.randomUUID()
 ): AsyncGenerator<StreamEvent> {
-  const sessionId = crypto.randomUUID();
   const res = await fetch("/api/metadata/extract", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
